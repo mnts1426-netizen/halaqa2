@@ -1,0 +1,1708 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>حلقات جامع الهدى - لتحفيظ القرآن الكريم</title>
+    <!-- الخط الرسمي: Cairo & Tajawal -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <!-- مكتبة التصدير والاستيراد لـ Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- مكتبات Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+    <!-- ملف التنسيقات -->
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- ========================================== -->
+    <!-- 1. شاشة تسجيل الدخول + رابط التسجيل الذاتي -->
+    <!-- ========================================== -->
+    <div id="view-login" class="page-view active">
+      <div class="login-wrapper">
+        <div class="login-left-panel">
+          <div class="login-box">
+            <h2 class="login-title">تسجيل الدخول</h2>
+            <p class="login-subtitle">أدخل بياناتك للوصول إلى لوحة التحكم</p>
+
+            <form id="login-form">
+              <div class="form-group">
+                <label for="login-username">اسم المستخدم</label>
+                <input
+                  type="text"
+                  id="login-username"
+                  class="form-control"
+                  placeholder="admin"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label for="login-password">كلمة المرور</label>
+                <input
+                  type="password"
+                  id="login-password"
+                  class="form-control"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+              <button type="submit" class="btn btn-primary btn-block btn-lg">
+                دخول
+              </button>
+            </form>
+
+            <div style="margin-top: 1rem; text-align: center">
+              <button
+                type="button"
+                class="btn btn-outline-brown btn-block"
+                onclick="openModal('modal-self-register')"
+              >
+                📝 رابط تسجيل طالب جديد (التحاق بالحلقة)
+              </button>
+            </div>
+
+            <div class="demo-login-section">
+              <span class="demo-title">دخول سريع تجريبي</span>
+              <div class="demo-buttons">
+                <button
+                  type="button"
+                  class="btn btn-demo active"
+                  onclick="quickLogin('admin')"
+                >
+                  مدير
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-demo"
+                  onclick="quickLogin('teacher')"
+                >
+                  معلم
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-demo"
+                  onclick="quickLogin('student')"
+                >
+                  طالب
+                </button>
+              </div>
+            </div>
+
+            <div class="login-footer-info">
+              حلقات جامع الهدى V1.0 — البيانات محفوظة محلياً وفي السحابة
+            </div>
+          </div>
+        </div>
+
+        <div class="login-right-panel">
+          <div class="brand-hero">
+            <div class="brand-logo-hero">
+              <div class="logo-icon-big">
+                <svg
+                  width="60"
+                  height="60"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path
+                    d="M12 3L2 12h3v8h14v-8h3L12 3zm0 4.5l5 4.5v6H7v-6l5-4.5z"
+                  />
+                </svg>
+              </div>
+              <h1 class="brand-name-big">حلقات جامع الهدى</h1>
+              <p class="brand-sub-big">لتطفيظ القرآن الكريم</p>
+            </div>
+
+            <div class="quran-quote">
+              «خيرُكُم مَن تعلَّمَ القرآنَ وعلَّمَهُ»
+            </div>
+
+            <p class="brand-desc">
+              نظام احترافي متكامل لإدارة حلقات تحفيظ القرآن الكريم بجامع الهدى.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 2. الهيكل العام للتطبيق والقائمة الجانبية -->
+    <!-- ========================================== -->
+    <div id="app-container" class="app-layout style-hidden">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-logo">
+            <div class="logo-icon">
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="var(--primary-brown)"
+              >
+                <path
+                  d="M12 3L2 12h3v8h14v-8h3L12 3zm0 4.5l5 4.5v6H7v-6l5-4.5z"
+                />
+              </svg>
+            </div>
+            <div class="logo-text">
+              <h2>حلقات جامع الهدى</h2>
+              <p>لتطفيظ القرآن الكريم</p>
+            </div>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <div class="nav-section role-section-admin">
+            <a href="#" class="nav-link active" data-target="view-dashboard">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>
+              <span>لوحة التحكم</span>
+            </a>
+            <a href="#" class="nav-link" data-target="view-circles">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="12" r="10" />
+              </svg>
+              <span>الحلقات</span>
+            </a>
+            <a href="#" class="nav-link" data-target="view-students">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+              </svg>
+              <span>الطلاب</span>
+            </a>
+            <!-- تم دمج متابعة المعلمين في خانة المعلمون -->
+            <a
+              href="#"
+              class="nav-link nav-admin-only"
+              data-target="view-teachers"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                <path d="M6 12v5c3 3 9 3 12 0v-5" />
+              </svg>
+              <span>المعلمون والمتابعة</span>
+            </a>
+            <a href="#" class="nav-link" data-target="view-attendance">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="9 11 12 14 22 4" />
+                <path
+                  d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"
+                />
+              </svg>
+              <span>الحضور</span>
+            </a>
+            <!-- التسميع مخصص للمعلم فقط في القائمة الجانبية -->
+            <a
+              href="#"
+              class="nav-link nav-teacher-only"
+              data-target="view-tasmeea"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                <path d="M22 3h-6a4 4 0 0 1 4 4v14a3 3 0 0 1 3-3h7z" />
+              </svg>
+              <span>التسميع</span>
+            </a>
+            <!-- الاختبارات للمدير فقط -->
+            <a
+              href="#"
+              class="nav-link nav-admin-only"
+              data-target="view-tests"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+              <span>الاختبارات</span>
+            </a>
+            <a
+              href="#"
+              class="nav-link nav-admin-only"
+              data-target="view-reports"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <span>التقارير</span>
+            </a>
+            <a href="#" class="nav-link" data-target="view-notifications">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              <span>الإشعارات والرسائل</span>
+            </a>
+            <a href="#" class="nav-link" data-target="view-settings">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path
+                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+                />
+              </svg>
+              <span>الإعدادات</span>
+            </a>
+            <a
+              href="#"
+              class="nav-link nav-admin-only"
+              data-target="view-backup"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+              </svg>
+              <span>النسخ الاحتياطية</span>
+            </a>
+          </div>
+
+          <div class="nav-section role-section-student style-hidden">
+            <a href="#" class="nav-link active" data-target="view-student-home"
+              ><span>الرئيسية</span></a
+            >
+            <a href="#" class="nav-link" data-target="view-student-lessons"
+              ><span>دروسي</span></a
+            >
+            <a href="#" class="nav-link" data-target="view-student-attendance"
+              ><span>حضوري</span></a
+            >
+            <a href="#" class="nav-link" data-target="view-notifications"
+              ><span>الإشعارات والرسائل</span></a
+            >
+            <a href="#" class="nav-link" data-target="view-settings"
+              ><span>الإعدادات</span></a
+            >
+          </div>
+        </nav>
+
+        <div class="sidebar-user-card">
+          <div class="user-avatar" id="current-user-avatar">أ</div>
+          <div class="user-info">
+            <h4 id="current-user-name">الشيخ أحمد بن يوسف</h4>
+            <span id="current-user-role">معلم</span>
+          </div>
+          <button class="logout-btn" id="btn-logout" title="تسجيل الخروج">
+            تسجيل الخروج
+          </button>
+        </div>
+      </aside>
+
+      <!-- المحتوى الرئيسي للمشروع -->
+      <main class="main-content">
+        <header class="top-header">
+          <div class="top-header-left">
+            <button class="menu-toggle-btn" id="sidebar-toggle">☰</button>
+            <span class="header-welcome-tag" id="welcome-message"
+              >أهلاً بك</span
+            >
+          </div>
+          <div class="top-header-right">
+            <span class="current-date-badge" id="header-date"
+              >مرحباً، اليوم 2026/8/5</span
+            >
+          </div>
+        </header>
+
+        <!-- 1. لوحة التحكم -->
+        <section id="view-dashboard" class="content-view active">
+          <div class="view-header">
+            <h2 id="dash-title-role">أهلاً الشيخ أحمد بن يوسف</h2>
+            <p class="text-muted" id="dash-sub-title">لوحة تحكم المعلم</p>
+          </div>
+
+          <div class="stats-grid" id="dashboard-stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon icon-brown">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                </svg>
+              </div>
+              <div class="stat-details">
+                <span class="stat-label" id="lbl-stat-1">حلقاتي</span>
+                <h3 class="stat-value" id="val-stat-1">2</h3>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon icon-brown">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                </svg>
+              </div>
+              <div class="stat-details">
+                <span class="stat-label" id="lbl-stat-2">طلابي</span>
+                <h3 class="stat-value" id="val-stat-2">4</h3>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon icon-red-soft">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="8.5" cy="7" r="4" />
+                  <line x1="18" y1="8" x2="23" y2="13" />
+                  <line x1="23" y1="8" x2="18" y2="13" />
+                </svg>
+              </div>
+              <div class="stat-details">
+                <span class="stat-label" id="lbl-stat-3">غياب اليوم</span>
+                <h3 class="stat-value" id="val-stat-3">0</h3>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon icon-warning-soft">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+                  />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
+              <div class="stat-details">
+                <span class="stat-label" id="lbl-stat-4">بدون خطة الغد</span>
+                <h3 class="stat-value" id="val-stat-4">4</h3>
+              </div>
+            </div>
+          </div>
+
+          <!-- لوحة الطلاب المتميزين (التميز الأسبوعي) مع فلتر الأسابيع للمدير -->
+          <div class="card mb-3" id="tamayuz-board-card">
+            <div class="card-header flex-between">
+              <div>
+                <h3>🌟 لوحة الطلاب المتميزين (التميز الأسبوعي)</h3>
+                <small class="text-muted"
+                  >الطلاب المحققون لنسبة حضور 100% وإنجاز مقرر التسميع الأسبوعي
+                  كاملاً</small
+                >
+              </div>
+              <div
+                id="tamayuz-week-filter-wrapper"
+                class="flex-align-gap nav-admin-only"
+              >
+                <label style="font-size: 0.85rem; font-weight: 700"
+                  >عرض أسبوع:</label
+                >
+                <select
+                  id="tamayuz-week-filter"
+                  class="form-control select-input"
+                  style="width: auto; min-width: 170px"
+                  onchange="renderTamayuzBoard()"
+                >
+                  <option value="current">الأسبوع الحالي</option>
+                  <option value="w_1">الأسبوع السابق (1)</option>
+                  <option value="w_2">الأسبوع السابق (2)</option>
+                  <option value="w_3">الأسبوع السابق (3)</option>
+                </select>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>الطالب المتميز</th>
+                    <th>الحلقة</th>
+                    <th>نسبة الحضور الأسبوعي</th>
+                    <th>إنجاز مقرر التسميع</th>
+                    <th>التقدير العام</th>
+                  </tr>
+                </thead>
+                <tbody id="tamayuz-students-body">
+                  <tr>
+                    <td colspan="5" class="text-center text-muted p-3">
+                      جاري تجهيز لوحة التميز...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- قسما جدول اليوم وحلقاتي للمعلمين فقط -->
+          <div
+            class="dashboard-columns teacher-only-dash"
+            id="teacher-dash-columns"
+          >
+            <div class="card card-dashboard">
+              <div class="card-header flex-between">
+                <h3 id="dash-right-box-title">حلقاتي</h3>
+              </div>
+              <div class="card-body" id="dash-right-box-content"></div>
+            </div>
+
+            <div class="card card-dashboard">
+              <div class="card-header flex-between">
+                <h3 id="dash-left-box-title">جدول اليوم</h3>
+              </div>
+              <div class="card-body" id="dash-left-box-content"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. شاشة الطلاب مع زر استيراد Excel -->
+        <section id="view-students" class="content-view">
+          <div class="view-header flex-between">
+            <div>
+              <h2>الطلاب</h2>
+              <p class="text-muted" id="teacher-students-sub">
+                إدارة طلاب جامع الهدى
+              </p>
+            </div>
+            <div class="header-actions">
+              <input
+                type="file"
+                id="excel-file-input"
+                accept=".xlsx, .xls"
+                style="display: none"
+                onchange="handleExcelImport(event)"
+              />
+              <button
+                class="btn btn-outline-brown nav-admin-only"
+                onclick="document.getElementById('excel-file-input').click()"
+              >
+                📥 استيراد طلاب من Excel
+              </button>
+              <button
+                class="btn btn-primary nav-admin-only"
+                onclick="openModal('modal-add-student')"
+              >
+                ➕ إضافة طالب
+              </button>
+              <button class="btn btn-outline-brown" onclick="window.print()">
+                🖨️ طباعة
+              </button>
+            </div>
+          </div>
+
+          <div class="sub-tabs-bar nav-admin-only">
+            <button
+              class="tab-btn active"
+              id="tab-btn-active-students"
+              onclick="switchStudentSubTab('active')"
+            >
+              الطلاب الحاليون
+            </button>
+            <button
+              class="tab-btn"
+              id="tab-btn-pending-requests"
+              onclick="switchStudentSubTab('pending')"
+            >
+              📥 طلبات التسجيل الجديدة (<span id="pending-count-badge">0</span>)
+            </button>
+          </div>
+
+          <div class="card" id="box-active-students-table">
+            <div class="card-filter-bar">
+              <input
+                type="text"
+                id="search-students"
+                class="form-control search-input"
+                placeholder="ابحث بالاسم أو الهوية أو الجوال..."
+              />
+              <select
+                id="filter-student-circle"
+                class="form-control select-input"
+              >
+                <option value="all">كل الحلقات</option>
+              </select>
+              <select
+                id="filter-student-status"
+                class="form-control select-input"
+              >
+                <option value="active">النشطون</option>
+                <option value="archived">الأرشيف</option>
+              </select>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>الاسم الرباعي</th>
+                    <th>الهوية</th>
+                    <th>جوال الطالب</th>
+                    <th>اسم ولي الأمر</th>
+                    <th>صلة القرابة</th>
+                    <th>جوال ولي الأمر</th>
+                    <th>الحلقة</th>
+                    <th>الحالة</th>
+                    <th>إجراء</th>
+                  </tr>
+                </thead>
+                <tbody id="students-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card style-hidden" id="box-pending-requests-table">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>اسم الطالب</th>
+                    <th>رقم الهوية</th>
+                    <th>جوال الطالب</th>
+                    <th>اسم ولي الأمر</th>
+                    <th>صلة القرابة</th>
+                    <th>جوال ولي الأمر</th>
+                    <th>القرار</th>
+                  </tr>
+                </thead>
+                <tbody id="pending-requests-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. شاشة المعلمون والمتابعة المدمجة للمدير -->
+        <section id="view-teachers" class="content-view">
+          <div class="view-header flex-between">
+            <div>
+              <h2>المعلمون والمتابعة</h2>
+              <p class="text-muted">
+                بيانات المعلمين، الحلقات، ونسب إدخال الحضور والتسميع اليومي
+              </p>
+            </div>
+            <button class="btn btn-primary" onclick="openModalAddTeacher()">
+              ➕ إضافة معلم
+            </button>
+          </div>
+
+          <div class="card">
+            <div class="card-filter-bar">
+              <input
+                type="text"
+                id="search-teachers"
+                class="form-control search-input"
+                placeholder="ابحث باسم المعلم أو رقم الجوال..."
+              />
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>اسم المعلم</th>
+                    <th>رقم الجوال</th>
+                    <th>الحلقات المكلف بها</th>
+                    <th>آخر دخول للنظام</th>
+                    <th>نسبة الحضور</th>
+                    <th>نسبة التسميع</th>
+                    <th>إجراءات وتعديل</th>
+                  </tr>
+                </thead>
+                <tbody id="teachers-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. شاشة الحلقات -->
+        <section id="view-circles" class="content-view">
+          <div class="view-header flex-between">
+            <div>
+              <h2>الحلقات بجامع الهدى</h2>
+              <p class="text-muted" id="circles-count-title">2 حلقة</p>
+            </div>
+            <button
+              class="btn btn-primary nav-admin-only"
+              onclick="openModalAddCircle()"
+            >
+              ➕ إضافة حلقة جديدة
+            </button>
+          </div>
+
+          <div class="card card-search-only">
+            <input
+              type="text"
+              id="search-circles"
+              class="form-control search-input"
+              placeholder="ابحث في الحلقات..."
+            />
+          </div>
+
+          <div class="circles-grid" id="circles-cards-container"></div>
+        </section>
+
+        <!-- 5. شاشة الحضور -->
+        <section id="view-attendance" class="content-view">
+          <div class="view-header">
+            <h2>تسجيل الحضور والغياب</h2>
+            <p class="text-muted">
+              اختر الحلقة ثم حدد حالة كل طالب من القائمة المنسدلة
+            </p>
+          </div>
+
+          <div class="card">
+            <div class="card-filter-bar flex-between">
+              <div
+                class="filter-inputs-group"
+                style="display: flex; gap: 0.8rem; flex: 1"
+              >
+                <select
+                  id="attendance-circle-select"
+                  class="form-control select-input"
+                >
+                  <option value="">— اختر الحلقة —</option>
+                </select>
+                <input
+                  type="date"
+                  id="attendance-date-select"
+                  class="form-control select-input"
+                />
+                <input
+                  type="text"
+                  id="search-attendance-student"
+                  class="form-control search-input"
+                  placeholder="🔍 ابحث عن طالب بالحلقة..."
+                />
+              </div>
+              <button class="btn btn-outline-brown" onclick="markAllPresent()">
+                🟢 الكل حاضر
+              </button>
+            </div>
+
+            <div class="table-responsive" id="attendance-table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>اسم الطالب</th>
+                    <th>الحلقة</th>
+                    <th>حالة الحضور</th>
+                    <th>ملاحظات</th>
+                  </tr>
+                </thead>
+                <tbody id="attendance-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. شاشة التسميع (للمعلم مع إمكانية تعديل المدير الكامل) -->
+        <section id="view-tasmeea" class="content-view">
+          <div class="view-header">
+            <h2>التسميع اليومي</h2>
+            <p class="text-muted">
+              تسجيل وتعديل الحفظ والمراجعة والتلاوة والتقدير لطلاب الحلقة
+            </p>
+          </div>
+          <div class="card mb-3">
+            <div class="tasmeea-header-bar" style="display: flex; gap: 1rem">
+              <div class="form-group flex-1">
+                <label>الحلقة</label>
+                <select id="tasmeea-circle-select" class="form-control">
+                  <option value="">— اختر الحلقة —</option>
+                </select>
+              </div>
+              <div class="form-group flex-1">
+                <label>التاريخ</label>
+                <input
+                  type="date"
+                  id="tasmeea-date-select"
+                  class="form-control"
+                />
+              </div>
+            </div>
+          </div>
+          <div id="tasmeea-students-container">
+            <div class="empty-state-card">
+              <h3>اختر الحلقة للتسميع</h3>
+              <p class="text-muted">
+                قم باختيار الحلقة والتاريخ لبدء استعراض وتسجيل التسميع
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 7. شاشة الاختبارات -->
+        <section id="view-tests" class="content-view">
+          <div class="view-header flex-between">
+            <div>
+              <h2>الاختبارات</h2>
+              <p class="text-muted" id="tests-count-title">
+                سجل اختبارات الطلاب وتقييماتهم بجامع الهدى
+              </p>
+            </div>
+            <button class="btn btn-primary" onclick="openModalAddTest()">
+              ➕ إضافة اختبار
+            </button>
+          </div>
+          <div class="card" id="tests-list-card">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>اسم الطالب</th>
+                    <th>الحلقة</th>
+                    <th>نوع الاختبار</th>
+                    <th>الدرجة</th>
+                    <th>التقدير</th>
+                    <th>التاريخ</th>
+                  </tr>
+                </thead>
+                <tbody id="tests-table-body">
+                  <tr>
+                    <td colspan="6" class="text-center text-muted p-3">
+                      لا توجد اختبارات مسجلة بعد
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 8. شاشة التقارير المكتملة بالتنسيقات والجداول -->
+        <section id="view-reports" class="content-view">
+          <div class="view-header">
+            <h2>التقارير والإحصائيات</h2>
+            <p class="text-muted">
+              استخراج تقارير شاملة قابلة للطباعة والتصدير
+            </p>
+          </div>
+          <div class="card">
+            <div
+              class="reports-filter-grid"
+              style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 1rem;
+              "
+            >
+              <div class="form-group">
+                <label>نوع التقرير</label>
+                <select
+                  id="report-type-select"
+                  class="form-control"
+                  onchange="handleReportTypeChange()"
+                >
+                  <option value="students">تقرير الطلاب الشامل</option>
+                  <option value="attendance">تقرير الحضور والغياب</option>
+                  <option value="tasmeea">تقرير إنجاز التسميع</option>
+                  <option value="teachers">تقرير أداء المعلمين</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>الحلقة</label>
+                <select id="report-circle-select" class="form-control">
+                  <option value="all">كل الحلقات</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>من تاريخ</label>
+                <input type="date" id="report-date-from" class="form-control" />
+              </div>
+              <div class="form-group">
+                <label>إلى تاريخ</label>
+                <input type="date" id="report-date-to" class="form-control" />
+              </div>
+            </div>
+            <div class="mt-3 flex-align-gap">
+              <button class="btn btn-primary" onclick="generateReport()">
+                🔍 استخراج التقرير
+              </button>
+              <button class="btn btn-outline-brown" onclick="window.print()">
+                🖨️ طباعة التقرير
+              </button>
+            </div>
+          </div>
+
+          <div class="card mt-3" id="report-results-wrapper">
+            <div class="table-responsive">
+              <table class="data-table" id="report-results-table">
+                <thead id="report-thead"></thead>
+                <tbody id="report-tbody">
+                  <tr>
+                    <td class="text-center text-muted p-4">
+                      حدد خيارات التقرير ثم اضغط على "استخراج التقرير"
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 9. شاشة الإشعارات والرسائل الموحدة -->
+        <section id="view-notifications" class="content-view">
+          <div class="view-header flex-between">
+            <div>
+              <h2>الإشعارات والرسائل</h2>
+              <p class="text-muted">
+                صندوق التنبيهات والمحادثات المباشرة والدردشة
+              </p>
+            </div>
+            <button
+              class="btn btn-primary"
+              onclick="openModalSendUnifiedMessage()"
+            >
+              💬 إرسال رسالة / إشعار جديد
+            </button>
+          </div>
+
+          <div class="dashboard-columns">
+            <div class="card">
+              <div class="card-header">
+                <h3>📢 الإشعارات والتعاميم</h3>
+              </div>
+              <div id="unified-notifications-container">
+                <div class="notification-item-card mb-2 p-3">
+                  <h4>مرحباً بكم في حلقات جامع الهدى</h4>
+                  <p class="text-muted mt-1">
+                    نتمنى لكم عاماً موفقاً في تحفيظ كتاب الله الكريم.
+                  </p>
+                  <span class="notif-date-sub">من: إدارة النظام</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3>💬 الرسائل المباشرة</h3>
+              </div>
+              <div id="unified-chats-container">
+                <div class="empty-state-card p-3">
+                  <p class="text-muted">لا توجد رسائل واردة حالياً</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 10. شاشة الإعدادات المتاحة للجميع (تم إزالة بطاقة بيانات المسجد بناءً على طلبك) -->
+        <section id="view-settings" class="content-view">
+          <div class="view-header">
+            <h2>إعدادات الحساب والإشعارات</h2>
+            <p class="text-muted">ضبط تفضيلات إشعارات الهاتف والجهاز</p>
+          </div>
+          <div class="card" style="max-width: 600px">
+            <h3>📱 إشعارات الهاتف والجهاز</h3>
+            <div class="mt-3">
+              <label
+                class="checkbox-item-row p-3"
+                style="
+                  border: 1px solid var(--border-color);
+                  border-radius: 8px;
+                "
+              >
+                <input
+                  type="checkbox"
+                  id="toggle-browser-notifications"
+                  onchange="handleNotificationPermissionChange(this)"
+                />
+                <div>
+                  <strong>قبول وتفعيل إشعارات الهاتف والجهاز</strong>
+                  <p
+                    class="text-muted"
+                    style="font-size: 0.8rem; margin-top: 2px"
+                  >
+                    السماح للنظام بإرسال التنبيهات المباشرة والرسائل إلى هاتفك
+                    فور صدورها.
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- 11. النسخ الاحتياطية -->
+        <section id="view-backup" class="content-view">
+          <div class="view-header">
+            <h2>النسخ الاحتياطية</h2>
+            <p class="text-muted">حفظ واسترجاع قاعدة بيانات جامع الهدى</p>
+          </div>
+          <div class="card">
+            <h3>إدارة بيانات جامع الهدى</h3>
+            <div
+              class="backup-action-row mt-2"
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 1rem;
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+              "
+            >
+              <div>
+                <h4>حفظ نسخة احتياطية كاملة</h4>
+                <p class="text-muted">
+                  تصدير كافة الحلقات والطلاب وسجلات الحضور والتسميع في ملف خارجي
+                </p>
+              </div>
+              <button class="btn btn-primary" onclick="downloadBackupJSON()">
+                📥 تنزيل النسخة
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- شاشات الطالب -->
+        <section id="view-student-home" class="content-view">
+          <div class="view-header">
+            <h2 id="student-welcome-title">مرحباً بك</h2>
+            <p class="text-muted" id="student-tag-name">
+              طالب في حلقات جامع الهدى
+            </p>
+          </div>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon icon-brown">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                </svg>
+              </div>
+              <div class="stat-details">
+                <span class="stat-label">الحلقة</span>
+                <h3 class="stat-value" id="stu-card-circles">1</h3>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon icon-green">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="9 11 12 14 22 4" />
+                </svg>
+              </div>
+              <div class="stat-details">
+                <span class="stat-label">نسبة الحضور</span>
+                <h3 class="stat-value" id="stu-card-attendance">100%</h3>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon icon-warning-soft">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polygon
+                    points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+                  />
+                </svg>
+              </div>
+              <div class="stat-details">
+                <span class="stat-label">آخر تقدير</span>
+                <h3 class="stat-value" id="stu-card-rating">ممتاز</h3>
+              </div>
+            </div>
+          </div>
+          <div class="dashboard-columns">
+            <div class="card">
+              <div class="card-header flex-between">
+                <h3>📖 درس اليوم والتسميع</h3>
+              </div>
+              <div class="card-body" id="stu-today-lesson-box">
+                <p class="text-muted p-2">جاري جلب درس اليوم...</p>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header flex-between">
+                <h3>🎯 خطة درس الغد</h3>
+              </div>
+              <div class="card-body" id="stu-next-lesson-box">
+                <p class="text-muted p-2">جاري جلب خطة الغد...</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-student-lessons" class="content-view">
+          <div class="view-header">
+            <h2>دروسي وسجل التسميع</h2>
+            <p class="text-muted">
+              سجل الحفظ والمراجعة والتلاوة وتقديرات المعلم
+            </p>
+          </div>
+          <div id="stu-lessons-container">
+            <div class="empty-state-card">
+              <p class="text-muted">جاري تحميل السجل...</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-student-attendance" class="content-view">
+          <div class="view-header flex-between">
+            <div>
+              <h2>سجل الحضور والغياب</h2>
+              <p class="text-muted" id="stu-att-days-count">0 يوم مسجل</p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="table-responsive" id="stu-attendance-container">
+              <div class="empty-state-card">
+                <p class="text-muted">جاري تحميل سجل الحضور...</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- MODALS: النوافذ المنبثقة -->
+
+    <!-- 1. نافذة إضافة/تعديل حلقة مع فلاتر البحث وعلامات الحلقات الأخرى -->
+    <div id="modal-add-circle" class="modal-overlay">
+      <div class="modal-card modal-lg">
+        <div class="modal-header">
+          <h3 id="modal-circle-title">إضافة حلقة جديدة بجامع الهدى</h3>
+          <button class="modal-close" onclick="closeModal('modal-add-circle')">
+            &times;
+          </button>
+        </div>
+        <form id="form-add-circle">
+          <input type="hidden" id="edit-circle-id" value="" />
+          <div class="modal-body">
+            <div class="form-group">
+              <label>اسم الحلقة</label>
+              <input
+                type="text"
+                id="circle-name"
+                class="form-control"
+                placeholder="مثال: حلقة الفجر"
+                required
+              />
+            </div>
+
+            <!-- اختيار المعلمين مع حقل بحث -->
+            <div class="form-group">
+              <label>المعلمون المكلفون بالحلقة:</label>
+              <input
+                type="text"
+                id="search-modal-teachers"
+                class="form-control search-input mb-1"
+                placeholder="🔍 ابحث عن معلم..."
+                oninput="filterCircleModalTeachers()"
+              />
+              <div
+                id="circle-teachers-list"
+                class="checkbox-list-container"
+              ></div>
+            </div>
+
+            <!-- اختيار الطلاب مع حقل بحث -->
+            <div class="form-group">
+              <label>الطلاب المشاركون في الحلقة:</label>
+              <input
+                type="text"
+                id="search-modal-students"
+                class="form-control search-input mb-1"
+                placeholder="🔍 ابحث عن طالب..."
+                oninput="filterCircleModalStudents()"
+              />
+              <div
+                id="circle-students-list"
+                class="checkbox-list-container"
+              ></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary" id="btn-save-circle">
+              حفظ الحلقة
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline-brown"
+              onclick="closeModal('modal-add-circle')"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 2. نافذة إضافة طالب -->
+    <div id="modal-add-student" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>إضافة طالب جديد</h3>
+          <button class="modal-close" onclick="closeModal('modal-add-student')">
+            &times;
+          </button>
+        </div>
+        <form id="form-add-student">
+          <div class="modal-body">
+            <div class="form-group">
+              <label
+                >الاسم الرباعي للطالب <span style="color: red">*</span></label
+              >
+              <input type="text" id="stu-name" class="form-control" required />
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>رقم هوية الطالب <span style="color: red">*</span></label>
+                <input type="text" id="stu-id" class="form-control" required />
+              </div>
+              <div class="form-group flex-1">
+                <label
+                  >رقم جوال الطالب
+                  <small class="text-muted">(اختياري)</small></label
+                >
+                <input type="tel" id="stu-phone" class="form-control" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>اسم ولي الأمر <span style="color: red">*</span></label>
+                <input
+                  type="text"
+                  id="stu-parent-name"
+                  class="form-control"
+                  required
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label>صلة القرابة <span style="color: red">*</span></label>
+                <input
+                  type="text"
+                  id="stu-parent-relation"
+                  class="form-control"
+                  placeholder="أب / عم / أخ"
+                  required
+                />
+              </div>
+            </div>
+            <div class="form-group">
+              <label
+                >رقم جوال ولي الأمر <span style="color: red">*</span></label
+              >
+              <input
+                type="tel"
+                id="stu-parent-phone"
+                class="form-control"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label>الحلقة <span style="color: red">*</span></label>
+              <select id="stu-circle" class="form-control" required>
+                <option value="">— اختر الحلقة —</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">حفظ الطالب</button>
+            <button
+              type="button"
+              class="btn btn-outline-brown"
+              onclick="closeModal('modal-add-student')"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 3. نافذة إضافة معلم -->
+    <div id="modal-add-teacher" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>إضافة معلم جديد</h3>
+          <button class="modal-close" onclick="closeModal('modal-add-teacher')">
+            &times;
+          </button>
+        </div>
+        <form id="form-add-teacher">
+          <div class="modal-body">
+            <div class="form-group">
+              <label>اسم المعلم</label>
+              <input
+                type="text"
+                id="teach-name"
+                class="form-control"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label>رقم الجوال</label>
+              <input
+                type="tel"
+                id="teach-phone"
+                class="form-control"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label>الحلقات المكلف بها:</label>
+              <div
+                id="teacher-circles-checkbox-container"
+                class="checkbox-list-container"
+              ></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">حفظ المعلم</button>
+            <button
+              type="button"
+              class="btn btn-outline-brown"
+              onclick="closeModal('modal-add-teacher')"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 4. نافذة التسجيل الذاتي للطالب -->
+    <div id="modal-self-register" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>طلب الالتحاق بحلقات جامع الهدى</h3>
+          <button
+            class="modal-close"
+            onclick="closeModal('modal-self-register')"
+          >
+            &times;
+          </button>
+        </div>
+        <form id="form-self-register" onsubmit="handleSelfRegistration(event)">
+          <div class="modal-body">
+            <div class="form-group">
+              <label
+                >الاسم الرباعي للطالب <span style="color: red">*</span></label
+              >
+              <input
+                type="text"
+                id="reg-stu-name"
+                class="form-control"
+                required
+              />
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>رقم هوية الطالب <span style="color: red">*</span></label>
+                <input
+                  type="text"
+                  id="reg-stu-id"
+                  class="form-control"
+                  required
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label
+                  >رقم جوال الطالب
+                  <small class="text-muted">(اختياري)</small></label
+                >
+                <input type="tel" id="reg-stu-phone" class="form-control" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>اسم ولي الأمر <span style="color: red">*</span></label>
+                <input
+                  type="text"
+                  id="reg-parent-name"
+                  class="form-control"
+                  required
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label>صلة القرابة <span style="color: red">*</span></label>
+                <input
+                  type="text"
+                  id="reg-parent-relation"
+                  class="form-control"
+                  placeholder="أب / عم / أخ"
+                  required
+                />
+              </div>
+            </div>
+            <div class="form-group">
+              <label
+                >رقم جوال ولي الأمر <span style="color: red">*</span></label
+              >
+              <input
+                type="tel"
+                id="reg-parent-phone"
+                class="form-control"
+                required
+              />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">
+              إرسال الطلب للإدارة
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline-brown"
+              onclick="closeModal('modal-self-register')"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 5. نافذة إضافة اختبار (التي كانت ناقصة وتم تفعيلها بالكامل) -->
+    <div id="modal-add-test" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>تسجيل اختبار جديد</h3>
+          <button class="modal-close" onclick="closeModal('modal-add-test')">
+            &times;
+          </button>
+        </div>
+        <form id="form-add-test" onsubmit="handleSaveTest(event)">
+          <div class="modal-body">
+            <div class="form-group">
+              <label>الحلقة</label>
+              <select
+                id="test-circle-select"
+                class="form-control"
+                onchange="populateTestStudentsDropdown()"
+                required
+              >
+                <option value="">— اختر الحلقة —</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>الطالب</label>
+              <select id="test-student-select" class="form-control" required>
+                <option value="">— اختر الطالب —</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>نوع الاختبار / المقرر</label>
+                <input
+                  type="text"
+                  id="test-type"
+                  class="form-control"
+                  placeholder="مثال: جزء عم / 5 أجزاء"
+                  required
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label>الدرجة من (100)</label>
+                <input
+                  type="number"
+                  id="test-score"
+                  class="form-control"
+                  min="0"
+                  max="100"
+                  required
+                />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>التقدير</label>
+              <select id="test-rating" class="form-control" required>
+                <option value="ممتاز مرتفع">ممتاز مرتفع</option>
+                <option value="ممتاز">ممتاز</option>
+                <option value="جيد جداً">جيد جداً</option>
+                <option value="جيد">جيد</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">حفظ الاختبار</button>
+            <button
+              type="button"
+              class="btn btn-outline-brown"
+              onclick="closeModal('modal-add-test')"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 6. نافذة إرسال رسالة / إشعار موحدة (الخيارات الخمسة مع القائمة الديناميكية) -->
+    <div id="modal-send-unified-msg" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>إرسال إشعار / رسالة جديدة</h3>
+          <button
+            class="modal-close"
+            onclick="closeModal('modal-send-unified-msg')"
+          >
+            &times;
+          </button>
+        </div>
+        <form
+          id="form-send-unified-msg"
+          onsubmit="handleSendUnifiedMessage(event)"
+        >
+          <div class="modal-body">
+            <div class="form-group nav-admin-only">
+              <label>المستهدف بالإشعار / الرسالة</label>
+              <select
+                id="msg-target-recipient"
+                class="form-control"
+                onchange="handleRecipientTypeChange(this)"
+              >
+                <option value="all">الجميع (الكل)</option>
+                <option value="teachers">جميع المعلمين</option>
+                <option value="students">جميع الطلاب</option>
+                <option value="specific_teacher">معلم محدد</option>
+                <option value="specific_student">طالب محدد</option>
+              </select>
+            </div>
+
+            <!-- قائمة الاختيار الديناميكية للمعلم أو الطالب المحدد -->
+            <div
+              id="msg-specific-recipient-group"
+              class="form-group style-hidden"
+            >
+              <label id="msg-specific-label">اختر الشخص المستهدف:</label>
+              <select id="msg-specific-select" class="form-control"></select>
+            </div>
+
+            <div class="form-group">
+              <label>عنوان الرسالة / الإشعار</label>
+              <input
+                type="text"
+                id="msg-title"
+                class="form-control"
+                placeholder="عنوان التنبيه..."
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label>نص الرسالة / التنبيه</label>
+              <textarea
+                id="msg-body"
+                class="form-control"
+                rows="3"
+                placeholder="اكتب نص الرسالة هنا..."
+                required
+              ></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">إرسال الآن</button>
+            <button
+              type="button"
+              class="btn btn-outline-brown"
+              onclick="closeModal('modal-send-unified-msg')"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 7. نافذة تعديل بيانات ومتابعة المعلم -->
+    <div id="modal-edit-teacher-monitoring" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>تعديل إحصائيات ومتابعة المعلم</h3>
+          <button
+            class="modal-close"
+            onclick="closeModal('modal-edit-teacher-monitoring')"
+          >
+            &times;
+          </button>
+        </div>
+        <form
+          id="form-edit-teacher-monitoring"
+          onsubmit="handleSaveTeacherMonitoring(event)"
+        >
+          <input type="hidden" id="edit-monitoring-teacher-id" value="" />
+          <div class="modal-body">
+            <div class="form-group">
+              <label>اسم المعلم</label>
+              <input
+                type="text"
+                id="edit-monitoring-name"
+                class="form-control"
+                readonly
+              />
+            </div>
+            <div class="form-group">
+              <label>آخر وقت دخول للنظام</label>
+              <input
+                type="text"
+                id="edit-monitoring-last-login"
+                class="form-control"
+              />
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>نسبة تحضير الطلاب %</label>
+                <input
+                  type="number"
+                  id="edit-monitoring-att-rate"
+                  class="form-control"
+                  min="0"
+                  max="100"
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label>نسبة إدخال التسميع %</label>
+                <input
+                  type="number"
+                  id="edit-monitoring-tas-rate"
+                  class="form-control"
+                  min="0"
+                  max="100"
+                />
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">حفظ التحديثات</button>
+            <button
+              type="button"
+              class="btn btn-outline-brown"
+              onclick="closeModal('modal-edit-teacher-monitoring')"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ملفات النظام البرمجية -->
+    <script src="config.js"></script>
+    <script src="firebase.js"></script>
+    <script src="tasmeea.js"></script>
+    <script src="admin.js"></script>
+    <script src="reports.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
