@@ -1,5 +1,5 @@
 /* ==========================================================================
-   الهوية البصرية الكاملة - حلقات جامع الهدى (مُحدثة)
+   الهوية البصرية الكاملة - حلقات جامع الهدى (مُحدثة مع تجاوب فائق للجوال والطباعة الرسمية)
    ========================================================================== */
 
 :root {
@@ -39,6 +39,7 @@ body {
   direction: rtl;
   line-height: 1.6;
   min-height: 100vh;
+  -webkit-tap-highlight-color: transparent;
 }
 
 #view-login {
@@ -414,7 +415,9 @@ body {
   display: none;
   background: none;
   border: none;
+  font-size: 1.5rem;
   cursor: pointer;
+  color: var(--text-dark);
 }
 
 .header-welcome-tag {
@@ -627,6 +630,7 @@ body {
 
 .table-responsive {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .data-table {
@@ -642,11 +646,13 @@ body {
   font-weight: 700;
   padding: 0.75rem 0.9rem;
   border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
 }
 
 .data-table td {
   padding: 0.75rem 0.9rem;
   border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
 }
 
 .data-table tbody tr:hover {
@@ -719,7 +725,7 @@ body {
 }
 
 .checkbox-list-container {
-  max-height: 110px;
+  max-height: 120px;
   overflow-y: auto;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
@@ -731,7 +737,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 8px;
+  padding: 6px 8px;
   border-bottom: 1px solid var(--border-color);
   cursor: pointer;
   font-size: 0.85rem;
@@ -768,14 +774,14 @@ body {
   border-radius: var(--radius-md);
   width: 100%;
   max-width: 480px;
-  max-height: 85vh;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
 }
 
 .modal-card.modal-lg {
-  max-width: 580px;
+  max-width: 680px;
 }
 
 .modal-header {
@@ -820,6 +826,18 @@ body {
   gap: 0.8rem;
 }
 
+.dynamic-columns-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.6rem;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: #faf8f5;
+}
+
 .mt-1 {
   margin-top: 0.25rem !important;
 }
@@ -839,6 +857,9 @@ body {
   text-align: center !important;
 }
 
+/* ==========================================================================
+   التوافق الفائق مع شاشات الهواتف الذكية (Mobile Responsive)
+   ========================================================================== */
 @media (max-width: 992px) {
   .sidebar {
     right: -260px;
@@ -848,6 +869,7 @@ body {
   }
   .main-content {
     margin-right: 0;
+    padding: 1rem 0.8rem;
   }
   .menu-toggle-btn {
     display: block;
@@ -857,5 +879,122 @@ body {
   }
   .dashboard-columns {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .form-row {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+  }
+  .stat-card {
+    padding: 0.8rem;
+    gap: 0.5rem;
+  }
+  .stat-value {
+    font-size: 1.3rem;
+  }
+  .modal-card {
+    max-height: 95vh;
+    border-radius: var(--radius-sm);
+  }
+  .modal-body {
+    padding: 0.8rem;
+  }
+  .card {
+    padding: 0.9rem;
+  }
+}
+
+/* ==========================================================================
+   تنسيقات الطباعة الرسمية الفخمة (@media print)
+   ========================================================================== */
+.print-official-header {
+  display: none;
+}
+
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+  }
+
+  .sidebar,
+  .top-header,
+  .no-print,
+  .btn,
+  .modal-overlay,
+  .card-filter-bar,
+  .sub-tabs-bar {
+    display: none !important;
+  }
+
+  .main-content {
+    margin-right: 0 !important;
+    padding: 0 !important;
+  }
+
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .print-official-header {
+    display: block !important;
+    margin-bottom: 1.5rem !important;
+    border-bottom: 2px solid var(--primary-brown) !important;
+    padding-bottom: 0.8rem !important;
+  }
+
+  .print-header-top {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  .print-header-title-box {
+    text-align: center !important;
+    background: #f7f1eb !important;
+    padding: 0.5rem !important;
+    border-radius: 4px !important;
+    margin-top: 0.5rem !important;
+  }
+
+  .table-responsive {
+    overflow: visible !important;
+  }
+
+  .data-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  .data-table th,
+  .data-table td {
+    border: 1px solid #ddd !important;
+    padding: 6pt 8pt !important;
+    color: #000000 !important;
+  }
+
+  .data-table th {
+    background-color: #f7f1eb !important;
+    font-weight: bold !important;
+  }
+
+  .data-table tr {
+    page-break-inside: avoid !important;
+  }
+
+  .badge {
+    border: 1px solid #888 !important;
+    background: transparent !important;
+    color: #000 !important;
   }
 }
