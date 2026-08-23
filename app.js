@@ -6,7 +6,7 @@
 
 window.currentUser = null;
 
-// خريطة الصلاحيات البرمجية المعتمدة لكل دور (تم فتح الإشعارات والرسائل للطالب وحذف الشاشات الملغاة)
+// خريطة الصلاحيات البرمجية المعتمدة لكل دور
 const ROLE_PERMISSIONS = {
   admin: [
     "view-dashboard",
@@ -64,7 +64,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   updateCircleDropdowns();
-
   if (typeof renderSettingsView === "function") renderSettingsView();
 });
 
@@ -91,6 +90,7 @@ function quickLogin(role) {
       id: "u_t1",
       teacherId: "t1",
       name: "الشيخ أحمد بن يوسف",
+      phone: "0501234567",
       role: ROLES.TEACHER,
       username: "teacher1",
     };
@@ -98,6 +98,7 @@ function quickLogin(role) {
     user = {
       id: "s1",
       name: "خالد بن سعد",
+      phone: "0550001122",
       role: ROLES.STUDENT,
       username: "student",
       circleId: "c1",
@@ -171,7 +172,6 @@ function adjustSidebarAndViewsForRole(role) {
         el.style.display = "flex";
       });
     } else {
-      // المدير: إظهار عناصر الإدارة وإخفاء خانة التسميع الخاصة بالمعلم
       document.querySelectorAll(".sidebar .nav-admin-only").forEach((el) => {
         el.style.display = "flex";
       });
@@ -356,6 +356,9 @@ function renderStudentData() {
       attContainer.innerHTML = `<div class="empty-state-card"><p class="text-muted">لا توجد سجلات حضور</p></div>`;
     }
   }
+
+  // عرض لوحة التميز الخاصة بالطالب
+  if (typeof renderTamayuzBoard === "function") renderTamayuzBoard();
 }
 
 function updateCircleDropdowns() {
@@ -430,10 +433,11 @@ function refreshActiveView(viewId) {
     renderAttendanceTable();
   if (viewId === "view-tests" && typeof renderTestsTable === "function")
     renderTestsTable();
+  if (viewId === "view-settings" && typeof renderSettingsView === "function")
+    renderSettingsView();
   if (viewId === "view-student-home") renderStudentData();
 }
 
-// بناء لوحة التحكم: إخفاء جدول اليوم وحلقاتي للمدير بالكامل
 function renderDashboardView() {
   const user = window.currentUser;
   if (!user) return;
@@ -554,7 +558,6 @@ function renderDashboardView() {
       }
     }
   } else {
-    // لوحة تحكم المدير: إخفاء جدول اليوم وحلقاتي نهائياً
     if (titleRole) titleRole.textContent = "لوحة تحكم المدير";
     if (subTitle) subTitle.textContent = "مرحباً، اليوم 2026/8/5";
 
@@ -586,8 +589,133 @@ function renderDashboardView() {
     document.getElementById("val-stat-4").textContent = presentCount;
   }
 
-  // تحديث لوحة التميز دائماً
   if (typeof renderTamayuzBoard === "function") renderTamayuzBoard();
+}
+
+// --------------------------------------------------------------------------
+// إدارة شاشة الإعدادات، تعديل الملفات الشخصية، وموافقة المدير للطلاب
+// --------------------------------------------------------------------------
+function renderSettingsView() {
+  const user = window.currentUser;
+  if (!user) return;
+
+  const nameInput = document.getElementById("set-profile-name");
+  const phoneInput = document.getElementById("set-profile-phone");
+  const passInput = document.getElementById("set-profile-password");
+  const studentNote = document.getElementById("student-edit-note");
+  const adminReqBox = document.getElementById("admin-profile-requests-box");
+
+  if (nameInput) nameInput.value = user.name || "";
+  if (phoneInput) phoneInput.value = user.phone || "";
+  if (passInput) passInput.value = "";
+
+  if (user.role === ROLES.STUDENT) {
+    studentNote?.classList.remove("style-hidden");
+    adminReqBox?.classList.add("style-hidden");
+  } else if (user.role === ROLES.ADMIN) {
+    studentNote?.classList.add("style-hidden");
+    adminReqBox?.classList.remove("style-hidden");
+    if (typeof renderProfileRequestsList === "function") {
+      renderProfileRequestsList();
+    }
+  } else {
+    studentNote?.classList.add("style-hidden");
+    adminReqBox?.classList.add("style-hidden");
+  }
+}
+
+function handleUserProfileSave(e) {
+  e.preventDefault();
+  const user = window.currentUser;
+  if (!user) return;
+
+  const newName = document.getElementById("set-profile-name")?.value.trim();
+  const newPhone = document.getElementById("set-profile-phone")?.value.trim();
+  const newPass = document.getElementById("set-profile-password")?.value.trim();
+
+  if (user.role === ROLES.STUDENT) {
+    // تحديث كلمة المرور مباشرة للطالب
+    if (newPass) {
+      const userRec = (window.appStore.users || []).find(
+        (u) => u.id === user.id || u.username === user.username,
+      );
+      if (userRec) {
+        userRec.pass = newPass;
+        if (typeof saveToCloud === "function")
+          saveToCloud("users", userRec.id, userRec);
+      }
+    }
+
+    // إرسال طلب تعديل الاسم والجوال للمدير
+    if (newName !== user.name || newPhone !== user.phone) {
+      if (!window.appStore.profileRequests)
+        window.appStore.profileRequests = [];
+      const newReq = {
+        id: "req_" + Date.now(),
+        studentId: user.id,
+        studentName: user.name,
+        newName: newName,
+        newPhone: newPhone,
+        date: new Date().toLocaleDateString("ar-SA"),
+        status: "pending",
+      };
+
+      window.appStore.profileRequests.push(newReq);
+      if (typeof saveToCloud === "function")
+        saveToCloud("profileRequests", newReq.id, newReq);
+      alert(
+        "✅ تم إرسال طلب تعديل بياناتك للمدير للموافقة عليها. تم تحديث كلمة المرور فوراً.",
+      );
+    } else {
+      alert("✅ تم تحديث كلمة المرور بنجاح!");
+    }
+  } else if (user.role === ROLES.TEACHER) {
+    // المعلم: تعديل مباشر دون موافقة
+    user.name = newName;
+    user.phone = newPhone;
+
+    const teacherObj = (window.appStore.teachers || []).find(
+      (t) => t.userId === user.id || t.id === user.teacherId,
+    );
+    if (teacherObj) {
+      teacherObj.name = newName;
+      teacherObj.phone = newPhone;
+      if (typeof saveToCloud === "function")
+        saveToCloud("teachers", teacherObj.id, teacherObj);
+    }
+
+    const userRec = (window.appStore.users || []).find(
+      (u) => u.id === user.id || u.username === user.username,
+    );
+    if (userRec) {
+      userRec.name = newName;
+      if (newPass) userRec.pass = newPass;
+      if (typeof saveToCloud === "function")
+        saveToCloud("users", userRec.id, userRec);
+    }
+
+    localStorage.setItem("HALAQAT_SESSION_USER", JSON.stringify(user));
+    document.getElementById("current-user-name").textContent = newName;
+    alert("✅ تم حفظ وتحديث بيانات المعلم بنجاح!");
+  } else {
+    // المدير: تعديل مباشر
+    user.name = newName;
+    user.phone = newPhone;
+
+    const userRec = (window.appStore.users || []).find(
+      (u) => u.id === user.id || u.username === user.username,
+    );
+    if (userRec) {
+      userRec.name = newName;
+      if (newPass) userRec.pass = newPass;
+      if (typeof saveToCloud === "function")
+        saveToCloud("users", userRec.id, userRec);
+    }
+
+    localStorage.setItem("HALAQAT_SESSION_USER", JSON.stringify(user));
+    document.getElementById("current-user-name").textContent = newName;
+    alert("✅ تم حفظ وتحديث بيانات المدير بنجاح!");
+  }
 }
 
 function openModalSendUnifiedMessage() {
@@ -673,9 +801,12 @@ function openModal(modalId) {
 
   if (
     window.currentUser.role !== "admin" &&
-    ["modal-add-teacher", "modal-add-circle", "modal-add-test"].includes(
-      modalId,
-    )
+    [
+      "modal-add-teacher",
+      "modal-add-circle",
+      "modal-add-test",
+      "modal-excel-import",
+    ].includes(modalId)
   ) {
     alert("⚠️ تنبيه: هذه الخاصية مقتصرة على مدير النظام فقط.");
     return;
