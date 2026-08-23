@@ -4,6 +4,17 @@
  * ==========================================================================
  */
 
+// تهيئة المخزن العام للحماية من أخطاء عدم التعريف
+window.appStore = window.appStore || {
+  students: [],
+  teachers: [],
+  circles: [],
+  attendance: [],
+  tests: [],
+  profileRequests: [],
+  tasmeea: [],
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   // ربط نماذج الإضافة
   const formAddStudent = document.getElementById("form-add-student");
@@ -43,18 +54,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const attDateSelect = document.getElementById("attendance-date-select");
   const attSearchInput = document.getElementById("search-attendance-student");
 
-  if (attDateSelect)
+  if (attDateSelect && !attDateSelect.value) {
     attDateSelect.value = new Date().toISOString().split("T")[0];
+  }
   if (attCircleSelect)
     attCircleSelect.addEventListener("change", renderAttendanceTable);
   if (attDateSelect)
     attDateSelect.addEventListener("change", renderAttendanceTable);
   if (attSearchInput)
     attSearchInput.addEventListener("input", renderAttendanceTable);
+
+  // تجهيز حقول مطابقة أعمدة Excel الافتراضية
+  if (typeof renderExcelColumnMappingInputs === "function") {
+    renderExcelColumnMappingInputs();
+  }
 });
 
 // ==========================================================================
-// 1. إدارة الطلاب، استيراد Excel، وطلبات التسجيل
+// 1. إدارة الطلاب، استيراد Excel المرن، والصلاحيات المنفصلة (معلم / مدير)
 // ==========================================================================
 function switchStudentSubTab(tab) {
   const btnActive = document.getElementById("tab-btn-active-students");
@@ -63,16 +80,16 @@ function switchStudentSubTab(tab) {
   const boxPending = document.getElementById("box-pending-requests-table");
 
   if (tab === "active") {
-    btnActive.classList.add("active");
-    btnPending.classList.remove("active");
-    boxActive.classList.remove("style-hidden");
-    boxPending.classList.add("style-hidden");
+    btnActive?.classList.add("active");
+    btnPending?.classList.remove("active");
+    boxActive?.classList.remove("style-hidden");
+    boxPending?.classList.add("style-hidden");
     renderStudentsTable();
   } else {
-    btnPending.classList.add("active");
-    btnActive.classList.remove("active");
-    boxPending.classList.remove("style-hidden");
-    boxActive.classList.add("style-hidden");
+    btnPending?.classList.add("active");
+    btnActive?.classList.remove("active");
+    boxPending?.classList.remove("style-hidden");
+    boxActive?.classList.add("style-hidden");
     renderPendingRequestsTable();
   }
 }
@@ -81,29 +98,31 @@ function renderStudentsTable() {
   const tbody = document.getElementById("students-table-body");
   if (!tbody) return;
 
-  const searchVal = (
-    document.getElementById("search-students")?.value || ""
-  ).toLowerCase();
+  const searchVal = (document.getElementById("search-students")?.value || "")
+    .trim()
+    .toLowerCase();
   const circleFilter =
     document.getElementById("filter-student-circle")?.value || "all";
   const statusFilter =
     document.getElementById("filter-student-status")?.value || "active";
 
   const user = window.currentUser;
+  const isTeacher = user && user.role === "teacher";
   let studentsList = (window.appStore.students || []).filter(
     (s) => s.status !== "pending",
   );
 
-  if (user && user.role === "teacher") {
+  if (isTeacher) {
+    const teachersList = window.appStore.teachers || [];
     const teacherObj =
-      window.appStore.teachers.find(
+      teachersList.find(
         (t) => t.userId === user.id || t.id === user.teacherId,
-      ) || window.appStore.teachers[0];
+      ) || teachersList[0];
     const teacherId = teacherObj ? teacherObj.id : "t1";
     const teacherCircleIds = (window.appStore.circles || [])
       .filter(
         (c) =>
-          (c.teacherIds && c.teacherIds.includes(teacherId)) ||
+          (Array.isArray(c.teacherIds) && c.teacherIds.includes(teacherId)) ||
           c.teacherId === teacherId,
       )
       .map((c) => c.id);
@@ -112,12 +131,12 @@ function renderStudentsTable() {
     );
   }
 
-  let filtered = studentsList.filter((s) => {
+  const filtered = studentsList.filter((s) => {
     const matchesSearch =
-      s.name.toLowerCase().includes(searchVal) ||
-      (s.nationalId && s.nationalId.includes(searchVal)) ||
-      (s.phone && s.phone.includes(searchVal)) ||
-      (s.parentPhone && s.parentPhone.includes(searchVal));
+      (s.name && s.name.toLowerCase().includes(searchVal)) ||
+      (s.nationalId && String(s.nationalId).includes(searchVal)) ||
+      (s.phone && String(s.phone).includes(searchVal)) ||
+      (s.parentPhone && String(s.parentPhone).includes(searchVal));
     const matchesCircle = circleFilter === "all" || s.circleId === circleFilter;
     const matchesStatus = s.status === statusFilter;
     return matchesSearch && matchesCircle && matchesStatus;
@@ -125,19 +144,24 @@ function renderStudentsTable() {
 
   if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted">لا يوجد طلاب مطابقون للبحث</td></tr>`;
+    updatePendingBadgeCount();
     return;
   }
 
   let html = "";
   filtered.forEach((student) => {
-    const circle = window.appStore.circles.find(
+    const circle = (window.appStore.circles || []).find(
       (c) => c.id === student.circleId,
     );
     const circleName = circle ? circle.name : "غير مسجل";
 
+    const actionBtn = isTeacher
+      ? `<button class="btn btn-outline-brown btn-sm" onclick="openTeacherStudentModal('${student.id}')">✏️ تعديل السجل والتسميع</button>`
+      : `<button class="btn btn-outline-brown btn-sm" onclick="openModalEditStudentComprehensive('${student.id}')">✏️ تعديل شامل</button>`;
+
     html += `
             <tr>
-                <td style="font-weight: 700;">${student.name}</td>
+                <td style="font-weight: 700;">${student.name || "—"}</td>
                 <td>${student.nationalId || "—"}</td>
                 <td>${student.phone || "بدون جوال"}</td>
                 <td>${student.parentName || "—"}</td>
@@ -149,11 +173,7 @@ function renderStudentsTable() {
                         ${student.status === "active" ? "نشط" : "مؤرشف"}
                     </span>
                 </td>
-                <td>
-                    <button class="btn btn-outline-brown btn-sm" onclick="toggleArchiveStudent('${student.id}')">
-                        ${student.status === "active" ? "أرشفة" : "إعادة تفعيل"}
-                    </button>
-                </td>
+                <td>${actionBtn}</td>
             </tr>
         `;
   });
@@ -162,65 +182,287 @@ function renderStudentsTable() {
   updatePendingBadgeCount();
 }
 
-// دالة استيراد الطلاب من ملف Excel بالأعمدة الأربعة المحددة
-function handleExcelImport(e) {
-  const file = e.target.files[0];
-  if (!file) return;
+function openModalEditStudentComprehensive(studentId) {
+  const student = (window.appStore.students || []).find(
+    (s) => s.id === studentId,
+  );
+  if (!student) return;
+
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val !== undefined && val !== null ? val : "";
+  };
+
+  setVal("edit-comp-stu-id", student.id);
+  setVal("edit-comp-name", student.name);
+  setVal("edit-comp-national-id", student.nationalId);
+  setVal("edit-comp-phone", student.phone);
+  setVal("edit-comp-parent-name", student.parentName);
+  setVal("edit-comp-parent-relation", student.parentRelation || "أب");
+  setVal("edit-comp-parent-phone", student.parentPhone);
+  setVal("edit-comp-status", student.status || "active");
+
+  const circleSelect = document.getElementById("edit-comp-circle");
+  if (circleSelect) {
+    let opts = '<option value="">— غير مسجل بحلقة —</option>';
+    (window.appStore.circles || []).forEach((c) => {
+      opts += `<option value="${c.id}" ${c.id === student.circleId ? "selected" : ""}>${c.name}</option>`;
+    });
+    circleSelect.innerHTML = opts;
+  }
+
+  if (typeof openModal === "function") {
+    openModal("modal-edit-student-comprehensive");
+  }
+}
+
+function handleSaveStudentComprehensive(e) {
+  e.preventDefault();
+  const studentId = document.getElementById("edit-comp-stu-id")?.value;
+  const student = (window.appStore.students || []).find(
+    (s) => s.id === studentId,
+  );
+
+  if (student) {
+    student.name =
+      document.getElementById("edit-comp-name")?.value.trim() || student.name;
+    student.nationalId =
+      document.getElementById("edit-comp-national-id")?.value.trim() || "";
+    student.phone =
+      document.getElementById("edit-comp-phone")?.value.trim() || "";
+    student.parentName =
+      document.getElementById("edit-comp-parent-name")?.value.trim() || "";
+    student.parentRelation =
+      document.getElementById("edit-comp-parent-relation")?.value.trim() ||
+      "أب";
+    student.parentPhone =
+      document.getElementById("edit-comp-parent-phone")?.value.trim() || "";
+    student.circleId = document.getElementById("edit-comp-circle")?.value || "";
+    student.status =
+      document.getElementById("edit-comp-status")?.value || "active";
+
+    if (typeof saveToCloud === "function") {
+      saveToCloud("students", student.id, student);
+    }
+    alert("✅ تم حفظ التعديلات الشاملة للطالب بنجاح!");
+  }
+
+  if (typeof closeModal === "function") {
+    closeModal("modal-edit-student-comprehensive");
+  }
+  renderStudentsTable();
+}
+
+function openTeacherStudentModal(studentId) {
+  const student = (window.appStore.students || []).find(
+    (s) => s.id === studentId,
+  );
+  if (!student) return;
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const attRecord =
+    (window.appStore.attendance || []).find(
+      (a) => a.studentId === student.id && a.date === todayStr,
+    ) || {};
+
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val !== undefined && val !== null ? val : "";
+  };
+
+  setVal("teacher-edit-stu-id", student.id);
+  setVal("teacher-edit-stu-name", student.name);
+  setVal("teacher-edit-stu-att", attRecord.status || "present");
+  setVal("teacher-edit-stu-notes", attRecord.notes || "");
+
+  if (typeof openModal === "function") {
+    openModal("modal-teacher-edit-student-record");
+  }
+}
+
+function handleTeacherSaveStudentRecord(e) {
+  e.preventDefault();
+  const studentId = document.getElementById("teacher-edit-stu-id")?.value;
+  const status =
+    document.getElementById("teacher-edit-stu-att")?.value || "present";
+  const notes = document.getElementById("teacher-edit-stu-notes")?.value || "";
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  const student = (window.appStore.students || []).find(
+    (s) => s.id === studentId,
+  );
+  const recordId = `att_${studentId}_${todayStr}`;
+
+  if (!window.appStore.attendance) window.appStore.attendance = [];
+
+  let record = window.appStore.attendance.find((a) => a.id === recordId);
+  if (!record) {
+    record = {
+      id: recordId,
+      studentId,
+      circleId: student ? student.circleId : "",
+      date: todayStr,
+      status,
+      notes,
+    };
+    window.appStore.attendance.push(record);
+  } else {
+    record.status = status;
+    record.notes = notes;
+    if (student && !record.circleId) record.circleId = student.circleId;
+  }
+
+  if (typeof saveToCloud === "function") {
+    saveToCloud("attendance", record.id, record);
+  }
+
+  if (typeof closeModal === "function") {
+    closeModal("modal-teacher-edit-student-record");
+  }
+  alert("✅ تم حفظ تعديلات السجل بنجاح!");
+  if (typeof renderAttendanceTable === "function") renderAttendanceTable();
+}
+
+// --------------------------------------------------------------------------
+// نظام استيراد ملف Excel الديناميكي المرن
+// --------------------------------------------------------------------------
+const AVAILABLE_EXCEL_FIELDS = [
+  { key: "name", label: "اسم الطالب الرباعي (إجباري)" },
+  { key: "nationalId", label: "رقم الهوية" },
+  { key: "phone", label: "رقم جوال الطالب" },
+  { key: "parentPhone", label: "رقم جوال ولي الأمر" },
+  { key: "parentName", label: "اسم ولي الأمر" },
+  { key: "parentRelation", label: "صلة القرابة" },
+  { key: "level", label: "المرحلة الدراسية" },
+  { key: "district", label: "الحي السكني" },
+  { key: "birthDate", label: "تاريخ الميلاد" },
+  { key: "notes", label: "ملاحظات إضافية" },
+  { key: "school", label: "اسم المدرسة" },
+  { key: "quranLevel", label: "مقدار الحفظ السابق" },
+  { key: "emergencyPhone", label: "رقم هاتف طوارئ بديل" },
+  { key: "email", label: "البريد الإلكتروني" },
+  { key: "customField", label: "حقل مخصص إضافي" },
+];
+
+function renderExcelColumnMappingInputs() {
+  const container = document.getElementById("excel-columns-mapping-container");
+  const countSelect = document.getElementById("excel-col-count");
+  if (!container || !countSelect) return;
+
+  const count = parseInt(countSelect.value, 10) || 4;
+  let html = "";
+
+  for (let i = 0; i < count; i++) {
+    const defaultField = AVAILABLE_EXCEL_FIELDS[i]
+      ? AVAILABLE_EXCEL_FIELDS[i].key
+      : "customField";
+
+    html += `
+      <div class="form-group mb-2 p-2" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 6px;">
+        <label style="font-size: 0.8rem; font-weight: 700;">العمود رقم [${i + 1}] في ملفك:</label>
+        <select class="form-control excel-col-map-select" data-col-index="${i}" style="font-size: 0.85rem;">
+          ${AVAILABLE_EXCEL_FIELDS.map(
+            (f) => `
+            <option value="${f.key}" ${f.key === defaultField ? "selected" : ""}>${f.label}</option>
+          `,
+          ).join("")}
+        </select>
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+}
+
+function executeDynamicExcelImport() {
+  const fileInput = document.getElementById("excel-dynamic-file");
+  const file = fileInput?.files?.[0];
+
+  if (!file) {
+    alert("⚠️ الرجاء اختيار ملف Excel أولاً!");
+    return;
+  }
+
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة قراءة ملفات Excel غير متوفرة حالياً!");
+    return;
+  }
+
+  const mapSelects = document.querySelectorAll(".excel-col-map-select");
+  const fieldMapping = [];
+  mapSelects.forEach((sel) => {
+    fieldMapping.push(sel.value);
+  });
 
   const reader = new FileReader();
-  reader.onload = function (event) {
+  reader.onload = function (e) {
     try {
-      const data = new Uint8Array(event.target.result);
+      const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: "array" });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const firstSheetName = workbook.SheetNames[0];
+      const firstSheet = workbook.Sheets[firstSheetName];
       const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
 
       if (!rows || rows.length <= 1) {
-        alert("⚠️ ملف Excel فارغ أو لا يحتوي على بيانات!");
+        alert("⚠️ الملف فارغ أو لا يحتوي على صفوف بيانات كافية!");
         return;
       }
 
-      let addedCount = 0;
-      // بدء القراءة من السطر الثاني لتجاوز الترويسة
+      if (!window.appStore.students) window.appStore.students = [];
+
+      let importedCount = 0;
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        if (!row || !row[0]) continue;
+        if (!row || row.length === 0) continue;
 
-        const stuName = String(row[0] || "").trim();
-        const nationalId = String(row[1] || "").trim();
-        const stuPhone = String(row[2] || "").trim();
-        const parentPhone = String(row[3] || "").trim();
+        const newStudent = {
+          id: "s_imp_" + Date.now() + "_" + i,
+          name: "",
+          nationalId: "",
+          phone: "",
+          parentPhone: "",
+          parentName: "",
+          parentRelation: "أب",
+          level: "الابتدائية",
+          circleId: "",
+          status: "active",
+          createdAt: Date.now(),
+          extraFields: {},
+        };
 
-        if (stuName) {
-          const newStudent = {
-            id: "s_imp_" + Date.now() + "_" + i,
-            name: stuName,
-            nationalId: nationalId,
-            phone: stuPhone,
-            parentName: "ولي أمر " + stuName.split(" ")[0],
-            parentRelation: "أب",
-            parentPhone: parentPhone,
-            circleId: "",
-            status: "active",
-            createdAt: Date.now(),
-          };
+        fieldMapping.forEach((fieldKey, colIdx) => {
+          const val =
+            row[colIdx] !== undefined ? String(row[colIdx]).trim() : "";
+          if (fieldKey in newStudent) {
+            newStudent[fieldKey] = val;
+          } else {
+            newStudent.extraFields[fieldKey] = val;
+          }
+        });
 
+        if (newStudent.name) {
+          if (!newStudent.parentName) {
+            newStudent.parentName = "ولي أمر " + newStudent.name.split(" ")[0];
+          }
           window.appStore.students.push(newStudent);
-          if (typeof saveToCloud === "function")
+          if (typeof saveToCloud === "function") {
             saveToCloud("students", newStudent.id, newStudent);
-          addedCount++;
+          }
+          importedCount++;
         }
       }
 
       alert(
-        `✅ تم استيراد (${addedCount}) طالب بنجاح وإضافتهم لقاعدة البيانات!`,
+        `✅ تم بنجاح استيراد ومطابقة (${importedCount}) طالب في قاعدة بيانات جامع الهدى!`,
       );
+      if (typeof closeModal === "function") closeModal("modal-excel-import");
+      fileInput.value = "";
       renderStudentsTable();
-      e.target.value = "";
     } catch (err) {
-      alert("❌ حدث خطأ أثناء قراءة ملف Excel: " + err.message);
+      alert("❌ حدث خطأ أثناء معالجة ملف Excel: " + err.message);
     }
   };
+
   reader.readAsArrayBuffer(file);
 }
 
@@ -234,6 +476,7 @@ function renderPendingRequestsTable() {
 
   if (pendingList.length === 0) {
     tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">لا توجد طلبات تسجيل جديدة حالياً</td></tr>`;
+    updatePendingBadgeCount();
     return;
   }
 
@@ -241,7 +484,7 @@ function renderPendingRequestsTable() {
   pendingList.forEach((stu) => {
     html += `
       <tr>
-        <td style="font-weight: 700;">${stu.name}</td>
+        <td style="font-weight: 700;">${stu.name || "—"}</td>
         <td>${stu.nationalId || "—"}</td>
         <td>${stu.phone || "بدون جوال"}</td>
         <td>${stu.parentName || "—"}</td>
@@ -271,22 +514,27 @@ function handleAddStudent(e) {
   e.preventDefault();
   const newStudent = {
     id: "s_" + Date.now(),
-    name: document.getElementById("stu-name").value,
-    nationalId: document.getElementById("stu-id").value,
-    phone: document.getElementById("stu-phone").value || "",
-    parentName: document.getElementById("stu-parent-name").value,
-    parentRelation: document.getElementById("stu-parent-relation").value,
-    parentPhone: document.getElementById("stu-parent-phone").value,
-    circleId: document.getElementById("stu-circle").value,
+    name: document.getElementById("stu-name")?.value.trim() || "",
+    nationalId: document.getElementById("stu-id")?.value.trim() || "",
+    phone: document.getElementById("stu-phone")?.value.trim() || "",
+    parentName: document.getElementById("stu-parent-name")?.value.trim() || "",
+    parentRelation:
+      document.getElementById("stu-parent-relation")?.value.trim() || "أب",
+    parentPhone:
+      document.getElementById("stu-parent-phone")?.value.trim() || "",
+    circleId: document.getElementById("stu-circle")?.value || "",
     status: "active",
     createdAt: Date.now(),
   };
 
+  if (!window.appStore.students) window.appStore.students = [];
   window.appStore.students.push(newStudent);
-  if (typeof saveToCloud === "function")
-    saveToCloud("students", newStudent.id, newStudent);
 
-  closeModal("modal-add-student");
+  if (typeof saveToCloud === "function") {
+    saveToCloud("students", newStudent.id, newStudent);
+  }
+
+  if (typeof closeModal === "function") closeModal("modal-add-student");
   e.target.reset();
   if (typeof refreshAllViews === "function") refreshAllViews();
   alert("✅ تم إضافة الطالب بنجاح!");
@@ -296,33 +544,41 @@ function handleSelfRegistration(e) {
   e.preventDefault();
   const newRequest = {
     id: "s_req_" + Date.now(),
-    name: document.getElementById("reg-stu-name").value,
-    nationalId: document.getElementById("reg-stu-id").value,
-    phone: document.getElementById("reg-stu-phone").value || "",
-    parentName: document.getElementById("reg-parent-name").value,
-    parentRelation: document.getElementById("reg-parent-relation").value,
-    parentPhone: document.getElementById("reg-parent-phone").value,
+    name: document.getElementById("reg-stu-name")?.value.trim() || "",
+    nationalId: document.getElementById("reg-stu-id")?.value.trim() || "",
+    phone: document.getElementById("reg-stu-phone")?.value.trim() || "",
+    parentName: document.getElementById("reg-parent-name")?.value.trim() || "",
+    parentRelation:
+      document.getElementById("reg-parent-relation")?.value.trim() || "أب",
+    parentPhone:
+      document.getElementById("reg-parent-phone")?.value.trim() || "",
     circleId: "",
     status: "pending",
     requestDate: new Date().toLocaleDateString("ar-SA"),
   };
 
+  if (!window.appStore.students) window.appStore.students = [];
   window.appStore.students.push(newRequest);
-  if (typeof saveToCloud === "function")
-    saveToCloud("students", newRequest.id, newRequest);
 
-  closeModal("modal-self-register");
+  if (typeof saveToCloud === "function") {
+    saveToCloud("students", newRequest.id, newRequest);
+  }
+
+  if (typeof closeModal === "function") closeModal("modal-self-register");
   e.target.reset();
   alert("✅ تم إرسال طلب التقديم بنجاح! سيتم مراجعته من قبل إدارة جامع الهدى.");
 }
 
 function approveStudentRequest(studentId) {
-  const student = window.appStore.students.find((s) => s.id === studentId);
+  const student = (window.appStore.students || []).find(
+    (s) => s.id === studentId,
+  );
   if (!student) return;
 
   student.status = "active";
-  if (typeof saveToCloud === "function")
+  if (typeof saveToCloud === "function") {
     saveToCloud("students", student.id, student);
+  }
 
   alert(`✅ تم قبول انضمام الطالب (${student.name}) بنجاح!`);
   renderPendingRequestsTable();
@@ -331,7 +587,7 @@ function approveStudentRequest(studentId) {
 function rejectStudentRequest(studentId) {
   if (!confirm("هل أنت متأكد من رفض هذا الطلب؟")) return;
 
-  window.appStore.students = window.appStore.students.filter(
+  window.appStore.students = (window.appStore.students || []).filter(
     (s) => s.id !== studentId,
   );
 
@@ -339,31 +595,34 @@ function rejectStudentRequest(studentId) {
 }
 
 function toggleArchiveStudent(studentId) {
-  const student = window.appStore.students.find((s) => s.id === studentId);
+  const student = (window.appStore.students || []).find(
+    (s) => s.id === studentId,
+  );
   if (!student) return;
 
   student.status = student.status === "active" ? "archived" : "active";
-  if (typeof saveToCloud === "function")
+  if (typeof saveToCloud === "function") {
     saveToCloud("students", student.id, student);
+  }
 
   renderStudentsTable();
 }
 
 // ==========================================================================
-// 2. إدارة المعلمون والمتابعة المدمجة بالكامل
+// 2. إدارة المعلمين والمتابعة المدمجة بالكامل
 // ==========================================================================
 function renderTeachersTable() {
   const tbody = document.getElementById("teachers-table-body");
   if (!tbody) return;
 
-  const searchVal = (
-    document.getElementById("search-teachers")?.value || ""
-  ).toLowerCase();
+  const searchVal = (document.getElementById("search-teachers")?.value || "")
+    .trim()
+    .toLowerCase();
 
-  let filtered = (window.appStore.teachers || []).filter(
+  const filtered = (window.appStore.teachers || []).filter(
     (t) =>
-      t.name.toLowerCase().includes(searchVal) ||
-      (t.phone && t.phone.includes(searchVal)),
+      (t.name && t.name.toLowerCase().includes(searchVal)) ||
+      (t.phone && String(t.phone).includes(searchVal)),
   );
 
   if (filtered.length === 0) {
@@ -375,7 +634,8 @@ function renderTeachersTable() {
   filtered.forEach((t) => {
     const teacherCircles = (window.appStore.circles || []).filter(
       (c) =>
-        (c.teacherIds && c.teacherIds.includes(t.id)) || c.teacherId === t.id,
+        (Array.isArray(c.teacherIds) && c.teacherIds.includes(t.id)) ||
+        c.teacherId === t.id,
     );
     const circleNamesStr =
       teacherCircles.length > 0
@@ -395,7 +655,7 @@ function renderTeachersTable() {
     html += `
             <tr>
                 <td style="font-weight: 700;">${t.name}</td>
-                <td>${t.phone}</td>
+                <td>${t.phone || "—"}</td>
                 <td><span class="badge badge-warning">${circleNamesStr} (${teacherCircles.length} حلقة)</span></td>
                 <td dir="ltr" class="text-muted" style="text-align: right;">${lastLogin}</td>
                 <td><span class="badge badge-active">${attRate}%</span></td>
@@ -416,8 +676,10 @@ function renderTeachersTable() {
 }
 
 function openModalAddTeacher() {
-  document.getElementById("teach-name").value = "";
-  document.getElementById("teach-phone").value = "";
+  const nameEl = document.getElementById("teach-name");
+  const phoneEl = document.getElementById("teach-phone");
+  if (nameEl) nameEl.value = "";
+  if (phoneEl) phoneEl.value = "";
 
   const container = document.getElementById(
     "teacher-circles-checkbox-container",
@@ -436,13 +698,13 @@ function openModalAddTeacher() {
       html || '<p class="text-muted p-2">لا توجد حلقات معرفة</p>';
   }
 
-  openModal("modal-add-teacher");
+  if (typeof openModal === "function") openModal("modal-add-teacher");
 }
 
 function handleAddTeacher(e) {
   e.preventDefault();
-  const name = document.getElementById("teach-name").value;
-  const phone = document.getElementById("teach-phone").value;
+  const name = document.getElementById("teach-name")?.value.trim() || "";
+  const phone = document.getElementById("teach-phone")?.value.trim() || "";
 
   const selectedCircles = [];
   document
@@ -463,31 +725,38 @@ function handleAddTeacher(e) {
     customTasmeeaRate: 100,
   };
 
+  if (!window.appStore.teachers) window.appStore.teachers = [];
   window.appStore.teachers.push(newTeacher);
-  if (typeof saveToCloud === "function")
-    saveToCloud("teachers", newTeacher.id, newTeacher);
 
-  window.appStore.circles.forEach((c) => {
+  if (typeof saveToCloud === "function") {
+    saveToCloud("teachers", newTeacher.id, newTeacher);
+  }
+
+  (window.appStore.circles || []).forEach((c) => {
     if (selectedCircles.includes(c.id)) {
-      if (!c.teacherIds) c.teacherIds = [];
+      if (!Array.isArray(c.teacherIds)) c.teacherIds = [];
       if (!c.teacherIds.includes(newTeacherId)) c.teacherIds.push(newTeacherId);
+      if (!c.teacherId) c.teacherId = newTeacherId;
       if (typeof saveToCloud === "function") saveToCloud("circles", c.id, c);
     }
   });
 
-  closeModal("modal-add-teacher");
+  if (typeof closeModal === "function") closeModal("modal-add-teacher");
   e.target.reset();
   if (typeof refreshAllViews === "function") refreshAllViews();
   alert("✅ تم إضافة المعلم وتكليفه بالحلقات بنجاح!");
 }
 
 function toggleTeacherStatus(teacherId) {
-  const teacher = window.appStore.teachers.find((t) => t.id === teacherId);
+  const teacher = (window.appStore.teachers || []).find(
+    (t) => t.id === teacherId,
+  );
   if (!teacher) return;
 
   teacher.status = teacher.status === "active" ? "suspended" : "active";
-  if (typeof saveToCloud === "function")
+  if (typeof saveToCloud === "function") {
     saveToCloud("teachers", teacher.id, teacher);
+  }
 
   renderTeachersTable();
 }
@@ -498,48 +767,62 @@ function openModalEditTeacherMonitoring(teacherId) {
   );
   if (!teacher) return;
 
-  document.getElementById("edit-monitoring-teacher-id").value = teacher.id;
-  document.getElementById("edit-monitoring-name").value = teacher.name;
-  document.getElementById("edit-monitoring-last-login").value =
-    teacher.lastLogin || "اليوم 04:30 م";
-  document.getElementById("edit-monitoring-att-rate").value =
-    teacher.customAttendanceRate !== null &&
-    teacher.customAttendanceRate !== undefined
-      ? teacher.customAttendanceRate
-      : 85;
-  document.getElementById("edit-monitoring-tas-rate").value =
-    teacher.customTasmeeaRate !== null &&
-    teacher.customTasmeeaRate !== undefined
-      ? teacher.customTasmeeaRate
-      : 90;
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val !== undefined && val !== null ? val : "";
+  };
 
-  openModal("modal-edit-teacher-monitoring");
+  setVal("edit-monitoring-teacher-id", teacher.id);
+  setVal("edit-monitoring-name", teacher.name);
+  setVal("edit-monitoring-last-login", teacher.lastLogin || "اليوم 04:30 م");
+  setVal(
+    "edit-monitoring-att-rate",
+    teacher.customAttendanceRate !== null &&
+      teacher.customAttendanceRate !== undefined
+      ? teacher.customAttendanceRate
+      : 85,
+  );
+  setVal(
+    "edit-monitoring-tas-rate",
+    teacher.customTasmeeaRate !== null &&
+      teacher.customTasmeeaRate !== undefined
+      ? teacher.customTasmeeaRate
+      : 90,
+  );
+
+  if (typeof openModal === "function")
+    openModal("modal-edit-teacher-monitoring");
 }
 
 function handleSaveTeacherMonitoring(e) {
   e.preventDefault();
-  const teacherId = document.getElementById("edit-monitoring-teacher-id").value;
+  const teacherId = document.getElementById(
+    "edit-monitoring-teacher-id",
+  )?.value;
   const teacher = (window.appStore.teachers || []).find(
     (t) => t.id === teacherId,
   );
 
   if (teacher) {
-    teacher.lastLogin = document.getElementById(
-      "edit-monitoring-last-login",
-    ).value;
+    teacher.lastLogin =
+      document.getElementById("edit-monitoring-last-login")?.value || "";
     teacher.customAttendanceRate = parseInt(
-      document.getElementById("edit-monitoring-att-rate").value,
+      document.getElementById("edit-monitoring-att-rate")?.value || "0",
+      10,
     );
     teacher.customTasmeeaRate = parseInt(
-      document.getElementById("edit-monitoring-tas-rate").value,
+      document.getElementById("edit-monitoring-tas-rate")?.value || "0",
+      10,
     );
 
-    if (typeof saveToCloud === "function")
+    if (typeof saveToCloud === "function") {
       saveToCloud("teachers", teacher.id, teacher);
+    }
     alert("✅ تم تعديل بيانات المتابعة بنجاح!");
   }
 
-  closeModal("modal-edit-teacher-monitoring");
+  if (typeof closeModal === "function")
+    closeModal("modal-edit-teacher-monitoring");
   renderTeachersTable();
 }
 
@@ -551,28 +834,28 @@ function renderCirclesCards() {
   const countTitle = document.getElementById("circles-count-title");
   if (!container) return;
 
-  const searchVal = (
-    document.getElementById("search-circles")?.value || ""
-  ).toLowerCase();
+  const searchVal = (document.getElementById("search-circles")?.value || "")
+    .trim()
+    .toLowerCase();
   const user = window.currentUser;
 
   let circlesList = window.appStore.circles || [];
 
   if (user && user.role === "teacher") {
     const teacherObj =
-      window.appStore.teachers.find(
+      (window.appStore.teachers || []).find(
         (t) => t.userId === user.id || t.id === user.teacherId,
-      ) || window.appStore.teachers[0];
+      ) || (window.appStore.teachers || [])[0];
     const teacherId = teacherObj ? teacherObj.id : "t1";
     circlesList = circlesList.filter(
       (c) =>
-        (c.teacherIds && c.teacherIds.includes(teacherId)) ||
+        (Array.isArray(c.teacherIds) && c.teacherIds.includes(teacherId)) ||
         c.teacherId === teacherId,
     );
   }
 
-  const filtered = circlesList.filter((c) =>
-    c.name.toLowerCase().includes(searchVal),
+  const filtered = circlesList.filter(
+    (c) => c.name && c.name.toLowerCase().includes(searchVal),
   );
 
   if (countTitle) countTitle.textContent = `${circlesList.length} حلقة`;
@@ -585,12 +868,12 @@ function renderCirclesCards() {
   let html = "";
   filtered.forEach((circle) => {
     let assignedTeachers = [];
-    if (circle.teacherIds && circle.teacherIds.length > 0) {
-      assignedTeachers = window.appStore.teachers.filter((t) =>
+    if (Array.isArray(circle.teacherIds) && circle.teacherIds.length > 0) {
+      assignedTeachers = (window.appStore.teachers || []).filter((t) =>
         circle.teacherIds.includes(t.id),
       );
     } else if (circle.teacherId) {
-      const singleTeacher = window.appStore.teachers.find(
+      const singleTeacher = (window.appStore.teachers || []).find(
         (t) => t.id === circle.teacherId,
       );
       if (singleTeacher) assignedTeachers.push(singleTeacher);
@@ -647,29 +930,45 @@ function renderCirclesCards() {
 }
 
 function openModalAddCircle() {
-  document.getElementById("modal-circle-title").textContent =
-    "إضافة حلقة جديدة بجامع الهدى";
-  document.getElementById("edit-circle-id").value = "";
-  document.getElementById("circle-name").value = "";
-  document.getElementById("search-modal-teachers").value = "";
-  document.getElementById("search-modal-students").value = "";
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val;
+  };
+  const setTitle = (id, text) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+
+  setTitle("modal-circle-title", "إضافة حلقة جديدة بجامع الهدى");
+  setVal("edit-circle-id", "");
+  setVal("circle-name", "");
+  setVal("search-modal-teachers", "");
+  setVal("search-modal-students", "");
 
   populateCircleTeachersList([]);
   populateCircleStudentsList([]);
 
-  openModal("modal-add-circle");
+  if (typeof openModal === "function") openModal("modal-add-circle");
 }
 
 function openModalEditCircle(circleId) {
-  const circle = window.appStore.circles.find((c) => c.id === circleId);
+  const circle = (window.appStore.circles || []).find((c) => c.id === circleId);
   if (!circle) return;
 
-  document.getElementById("modal-circle-title").textContent =
-    `تعديل حلقة: ${circle.name}`;
-  document.getElementById("edit-circle-id").value = circle.id;
-  document.getElementById("circle-name").value = circle.name;
-  document.getElementById("search-modal-teachers").value = "";
-  document.getElementById("search-modal-students").value = "";
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val;
+  };
+  const setTitle = (id, text) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+
+  setTitle("modal-circle-title", `تعديل حلقة: ${circle.name}`);
+  setVal("edit-circle-id", circle.id);
+  setVal("circle-name", circle.name);
+  setVal("search-modal-teachers", "");
+  setVal("search-modal-students", "");
 
   const currentTeacherIds =
     circle.teacherIds || (circle.teacherId ? [circle.teacherId] : []);
@@ -680,13 +979,13 @@ function openModalEditCircle(circleId) {
   populateCircleTeachersList(currentTeacherIds);
   populateCircleStudentsList(currentStudents);
 
-  openModal("modal-add-circle");
+  if (typeof openModal === "function") openModal("modal-add-circle");
 }
 
 function filterCircleModalTeachers() {
-  const q = (
-    document.getElementById("search-modal-teachers")?.value || ""
-  ).toLowerCase();
+  const q = (document.getElementById("search-modal-teachers")?.value || "")
+    .trim()
+    .toLowerCase();
   document
     .querySelectorAll("#circle-teachers-list .checkbox-item-row")
     .forEach((el) => {
@@ -696,9 +995,9 @@ function filterCircleModalTeachers() {
 }
 
 function filterCircleModalStudents() {
-  const q = (
-    document.getElementById("search-modal-students")?.value || ""
-  ).toLowerCase();
+  const q = (document.getElementById("search-modal-students")?.value || "")
+    .trim()
+    .toLowerCase();
   document
     .querySelectorAll("#circle-students-list .checkbox-item-row")
     .forEach((el) => {
@@ -721,7 +1020,8 @@ function populateCircleTeachersList(selectedIds) {
     const isChecked = selectedIds.includes(t.id) ? "checked" : "";
     const otherCircles = (window.appStore.circles || []).filter(
       (c) =>
-        (c.teacherIds && c.teacherIds.includes(t.id)) || c.teacherId === t.id,
+        (Array.isArray(c.teacherIds) && c.teacherIds.includes(t.id)) ||
+        c.teacherId === t.id,
     );
     const otherNames = otherCircles.map((c) => c.name).join(" ، ");
     const tag = otherNames
@@ -773,8 +1073,9 @@ function populateCircleStudentsList(selectedStudentIds) {
 
 function handleSaveCircle(e) {
   e.preventDefault();
-  const editId = document.getElementById("edit-circle-id").value;
-  const name = document.getElementById("circle-name").value.trim();
+  const editId = document.getElementById("edit-circle-id")?.value;
+  const name =
+    document.getElementById("circle-name")?.value.trim() || "حلقة جديدة";
 
   const selectedTeachers = [];
   document
@@ -786,14 +1087,17 @@ function handleSaveCircle(e) {
     .querySelectorAll('input[name="circle_students"]:checked')
     .forEach((cb) => selectedStudents.push(cb.value));
 
+  if (!window.appStore.circles) window.appStore.circles = [];
+
   if (editId) {
     const circle = window.appStore.circles.find((c) => c.id === editId);
     if (circle) {
       circle.name = name;
       circle.teacherIds = selectedTeachers;
       circle.teacherId = selectedTeachers[0] || "";
-      if (typeof saveToCloud === "function")
+      if (typeof saveToCloud === "function") {
         saveToCloud("circles", circle.id, circle);
+      }
     }
 
     (window.appStore.students || []).forEach((s) => {
@@ -819,8 +1123,9 @@ function handleSaveCircle(e) {
     };
 
     window.appStore.circles.push(newCircle);
-    if (typeof saveToCloud === "function")
+    if (typeof saveToCloud === "function") {
       saveToCloud("circles", newCircle.id, newCircle);
+    }
 
     (window.appStore.students || []).forEach((s) => {
       if (selectedStudents.includes(s.id)) {
@@ -832,7 +1137,7 @@ function handleSaveCircle(e) {
     alert("✅ تم إنشاء الحلقة وتعيين الأعضاء بنجاح!");
   }
 
-  closeModal("modal-add-circle");
+  if (typeof closeModal === "function") closeModal("modal-add-circle");
   if (typeof refreshAllViews === "function") refreshAllViews();
 }
 
@@ -845,7 +1150,9 @@ function renderAttendanceTable() {
   const dateVal = document.getElementById("attendance-date-select")?.value;
   const searchStudentVal = (
     document.getElementById("search-attendance-student")?.value || ""
-  ).toLowerCase();
+  )
+    .trim()
+    .toLowerCase();
 
   if (!tbody) return;
 
@@ -859,8 +1166,8 @@ function renderAttendanceTable() {
   );
 
   if (searchStudentVal) {
-    students = students.filter((s) =>
-      s.name.toLowerCase().includes(searchStudentVal),
+    students = students.filter(
+      (s) => s.name && s.name.toLowerCase().includes(searchStudentVal),
     );
   }
 
@@ -900,16 +1207,18 @@ function renderAttendanceTable() {
 }
 
 function setStudentAttendance(studentId, status) {
-  const dateVal = document.getElementById("attendance-date-select").value;
-  const circleId = document.getElementById("attendance-circle-select").value;
+  const dateVal = document.getElementById("attendance-date-select")?.value;
+  const circleId = document.getElementById("attendance-circle-select")?.value;
   const recordId = `att_${studentId}_${dateVal}`;
+
+  if (!window.appStore.attendance) window.appStore.attendance = [];
 
   let record = window.appStore.attendance.find((a) => a.id === recordId);
   if (!record) {
     record = {
       id: recordId,
       studentId,
-      circleId,
+      circleId: circleId || "",
       date: dateVal,
       status,
       notes: "",
@@ -919,24 +1228,28 @@ function setStudentAttendance(studentId, status) {
     record.status = status;
   }
 
-  if (typeof saveToCloud === "function")
+  if (typeof saveToCloud === "function") {
     saveToCloud("attendance", record.id, record);
+  }
 }
 
 function updateAttendanceNotes(studentId, notesVal) {
-  const dateVal = document.getElementById("attendance-date-select").value;
+  const dateVal = document.getElementById("attendance-date-select")?.value;
   const recordId = `att_${studentId}_${dateVal}`;
 
-  let record = window.appStore.attendance.find((a) => a.id === recordId);
+  let record = (window.appStore.attendance || []).find(
+    (a) => a.id === recordId,
+  );
   if (record) {
     record.notes = notesVal;
-    if (typeof saveToCloud === "function")
+    if (typeof saveToCloud === "function") {
       saveToCloud("attendance", record.id, record);
+    }
   }
 }
 
 function markAllPresent() {
-  const circleId = document.getElementById("attendance-circle-select").value;
+  const circleId = document.getElementById("attendance-circle-select")?.value;
   if (!circleId) return alert("اختر حلقة أولاً!");
 
   const students = (window.appStore.students || []).filter(
@@ -966,7 +1279,7 @@ function openModalAddTest() {
     circleSelect.innerHTML = options;
   }
   populateTestStudentsDropdown();
-  openModal("modal-add-test");
+  if (typeof openModal === "function") openModal("modal-add-test");
 }
 
 function populateTestStudentsDropdown() {
@@ -989,11 +1302,11 @@ function populateTestStudentsDropdown() {
 
 function handleSaveTest(e) {
   e.preventDefault();
-  const circleId = document.getElementById("test-circle-select").value;
-  const studentId = document.getElementById("test-student-select").value;
-  const type = document.getElementById("test-type").value;
-  const score = document.getElementById("test-score").value;
-  const rating = document.getElementById("test-rating").value;
+  const circleId = document.getElementById("test-circle-select")?.value || "";
+  const studentId = document.getElementById("test-student-select")?.value || "";
+  const type = document.getElementById("test-type")?.value || "شهري";
+  const score = document.getElementById("test-score")?.value || "100";
+  const rating = document.getElementById("test-rating")?.value || "ممتاز";
 
   const newTest = {
     id: "test_" + Date.now(),
@@ -1007,10 +1320,12 @@ function handleSaveTest(e) {
 
   if (!window.appStore.tests) window.appStore.tests = [];
   window.appStore.tests.push(newTest);
-  if (typeof saveToCloud === "function")
-    saveToCloud("tests", newTest.id, newTest);
 
-  closeModal("modal-add-test");
+  if (typeof saveToCloud === "function") {
+    saveToCloud("tests", newTest.id, newTest);
+  }
+
+  if (typeof closeModal === "function") closeModal("modal-add-test");
   e.target.reset();
   renderTestsTable();
   alert("✅ تم حفظ الاختبار بنجاح!");
@@ -1039,10 +1354,10 @@ function renderTestsTable() {
       <tr>
         <td style="font-weight:700;">${student ? student.name : "طالب"}</td>
         <td><span class="badge badge-warning">${circle ? circle.name : "—"}</span></td>
-        <td>${t.type}</td>
-        <td style="font-weight:700; color:var(--primary-brown);">${t.score} / 100</td>
-        <td><span class="badge badge-active">${t.rating}</span></td>
-        <td>${t.date}</td>
+        <td>${t.type || "—"}</td>
+        <td style="font-weight:700; color:var(--primary-brown);">${t.score || "0"} / 100</td>
+        <td><span class="badge badge-active">${t.rating || "—"}</span></td>
+        <td>${t.date || "—"}</td>
       </tr>
     `;
   });
@@ -1053,67 +1368,163 @@ function renderTestsTable() {
 // 6. لوحة الطلاب المتميزين (التميز الأسبوعي)
 // ==========================================================================
 function renderTamayuzBoard() {
-  const tbody = document.getElementById("tamayuz-students-body");
-  if (!tbody) return;
+  const adminTbody = document.getElementById("tamayuz-students-body");
+  const stuHomeTbody = document.getElementById("stu-home-tamayuz-body");
 
   const activeStudents = (window.appStore.students || []).filter(
     (s) => s.status === "active",
   );
 
   if (activeStudents.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted p-3">لا يوجد طلاب متميزون مسجلون</td></tr>`;
+    const emptyMsg = `<tr><td colspan="5" class="text-center text-muted p-3">لا يوجد طلاب متميزون مسجلون</td></tr>`;
+    if (adminTbody) adminTbody.innerHTML = emptyMsg;
+    if (stuHomeTbody) stuHomeTbody.innerHTML = emptyMsg;
     return;
   }
 
-  let html = "";
+  let adminHtml = "";
+  let stuHomeHtml = "";
+
   activeStudents.slice(0, 6).forEach((stu) => {
     const circle = (window.appStore.circles || []).find(
       (c) => c.id === stu.circleId,
     );
     const circleName = circle ? circle.name : "جامع الهدى";
 
-    html += `
+    adminHtml += `
       <tr>
         <td style="font-weight: 800;">⭐ ${stu.name}</td>
         <td><span class="badge badge-warning">${circleName}</span></td>
-        <td><span class="badge badge-active">100% (كامل الأسبوع)</span></td>
+        <td><span class="badge badge-active">100% (حضور كامل)</span></td>
         <td><span class="badge badge-active">مكتمل 100%</span></td>
         <td><span class="badge badge-active">ممتاز مرتفع</span></td>
       </tr>
     `;
+
+    stuHomeHtml += `
+      <tr>
+        <td style="font-weight: 800;">⭐ ${stu.name}</td>
+        <td><span class="badge badge-warning">${circleName}</span></td>
+        <td><span class="badge badge-active">100%</span></td>
+        <td><span class="badge badge-active">مكتمل 100%</span></td>
+      </tr>
+    `;
   });
 
-  tbody.innerHTML = html;
+  if (adminTbody) adminTbody.innerHTML = adminHtml;
+  if (stuHomeTbody) stuHomeTbody.innerHTML = stuHomeHtml;
 }
 
 // ==========================================================================
-// 7. إدارة الإشعارات والرسائل الموحدة مع التحديد الديناميكي
+// 7. إدارة الإشعارات والرسائل
 // ==========================================================================
 function handleRecipientTypeChange(selectEl) {
   const specificGroup = document.getElementById("msg-specific-recipient-group");
   const specificSelect = document.getElementById("msg-specific-select");
   const specificLabel = document.getElementById("msg-specific-label");
-  const val = selectEl.value;
+  const val = selectEl?.value;
 
   if (val === "specific_teacher") {
-    specificGroup.classList.remove("style-hidden");
-    specificLabel.textContent = "اختر المعلم المستهدف:";
+    specificGroup?.classList.remove("style-hidden");
+    if (specificLabel) specificLabel.textContent = "اختر المعلم المستهدف:";
     let opts = "";
     (window.appStore.teachers || []).forEach((t) => {
       opts += `<option value="${t.id}">${t.name}</option>`;
     });
-    specificSelect.innerHTML = opts;
+    if (specificSelect) specificSelect.innerHTML = opts;
   } else if (val === "specific_student") {
-    specificGroup.classList.remove("style-hidden");
-    specificLabel.textContent = "اختر الطالب المستهدف:";
+    specificGroup?.classList.remove("style-hidden");
+    if (specificLabel) specificLabel.textContent = "اختر الطالب المستهدف:";
     let opts = "";
     (window.appStore.students || [])
       .filter((s) => s.status === "active")
       .forEach((s) => {
         opts += `<option value="${s.id}">${s.name}</option>`;
       });
-    specificSelect.innerHTML = opts;
+    if (specificSelect) specificSelect.innerHTML = opts;
   } else {
-    specificGroup.classList.add("style-hidden");
+    specificGroup?.classList.add("style-hidden");
   }
+}
+
+// ==========================================================================
+// 8. إدارة طلبات تعديل بيانات الطلاب
+// ==========================================================================
+function renderProfileRequestsList() {
+  const container = document.getElementById("profile-requests-list");
+  const badgeCount = document.getElementById("profile-requests-count");
+  if (!container) return;
+
+  const requests = (window.appStore.profileRequests || []).filter(
+    (r) => r.status === "pending",
+  );
+
+  if (badgeCount) badgeCount.textContent = requests.length;
+
+  if (requests.length === 0) {
+    container.innerHTML =
+      '<p class="text-muted p-2" style="font-size: 0.85rem;">لا توجد طلبات تعديل معلقة حالياً</p>';
+    return;
+  }
+
+  let html = "";
+  requests.forEach((req) => {
+    html += `
+      <div class="p-2 mb-2" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem;">
+        <div class="flex-between">
+          <strong>${req.studentName || "طالب"}</strong>
+          <span class="text-muted" style="font-size: 0.75rem;">${req.date || ""}</span>
+        </div>
+        <p class="mt-1" style="color: var(--text-dark);">الاسم الجديد: <strong>${req.newName || "—"}</strong> | الجوال: <strong>${req.newPhone || "—"}</strong></p>
+        <div class="mt-1 flex-align-gap">
+          <button class="btn btn-success btn-sm" onclick="approveProfileRequest('${req.id}')">🟢 اعتماد</button>
+          <button class="btn btn-danger btn-sm" onclick="rejectProfileRequest('${req.id}')">🔴 رفض</button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+function approveProfileRequest(reqId) {
+  const req = (window.appStore.profileRequests || []).find(
+    (r) => r.id === reqId,
+  );
+  if (!req) return;
+
+  const student = (window.appStore.students || []).find(
+    (s) => s.id === req.studentId,
+  );
+  if (student) {
+    if (req.newName) student.name = req.newName;
+    if (req.newPhone) student.phone = req.newPhone;
+    if (typeof saveToCloud === "function") {
+      saveToCloud("students", student.id, student);
+    }
+  }
+
+  req.status = "approved";
+  if (typeof saveToCloud === "function") {
+    saveToCloud("profileRequests", req.id, req);
+  }
+
+  alert(`✅ تم اعتماد التعديلات للطالب (${req.studentName}) بنجاح!`);
+  renderProfileRequestsList();
+  renderStudentsTable();
+}
+
+function rejectProfileRequest(reqId) {
+  const req = (window.appStore.profileRequests || []).find(
+    (r) => r.id === reqId,
+  );
+  if (!req) return;
+
+  req.status = "rejected";
+  if (typeof saveToCloud === "function") {
+    saveToCloud("profileRequests", req.id, req);
+  }
+
+  alert(`❌ تم رفض طلب التعديل.`);
+  renderProfileRequestsList();
 }
