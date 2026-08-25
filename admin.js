@@ -2126,7 +2126,7 @@ function renderScreenView() {
     if (students.length === 0) {
       screenGrid.innerHTML = `
         <div class="empty-state-card" style="grid-column: 1 / -1; background: #ffffff; border-radius: 12px; padding: 3rem;">
-          <h3>جاري تجهيز لوحة فرسان التميز لجامع الهدى...</h3>
+          <h3>جاري تجهيز لوحة فرسان التميز...</h3>
         </div>
       `;
     } else {
@@ -2135,7 +2135,7 @@ function renderScreenView() {
         const circle = (window.appStore.circles || []).find(
           (c) => c.id === stu.circleId,
         );
-        const circleName = circle ? circle.name : "جامع الهدى";
+        const circleName = circle ? circle.name : "المجمع";
         const isFirst = index === 0;
 
         gridHtml += `
@@ -2165,7 +2165,7 @@ function renderScreenView() {
         const circle = (window.appStore.circles || []).find(
           (c) => c.id === stu.circleId,
         );
-        const circleName = circle ? circle.name : "جامع الهدى";
+        const circleName = circle ? circle.name : "المجمع";
         const isFirst = index === 0;
 
         tbodyHtml += `
@@ -2237,7 +2237,7 @@ function resetScreenStudentOrder() {
 }
 
 // ==========================================================================
-// 10. شاشة إدارة الحسابات للمدير
+// 10. شاشة إدارة الحسابات (مع استبعاد حساب المدير نهائياً من الجدول)
 // ==========================================================================
 function renderAccountsTable() {
   const tbody = document.getElementById("accounts-table-body");
@@ -2251,10 +2251,11 @@ function renderAccountsTable() {
   const statusFilter =
     document.getElementById("filter-account-status")?.value || "all";
 
-  // دمج كافة الحسابات (المستخدمون الأساسيون، المعلمون، والطلاب)
+  // دمج الحسابات مع استبعاد حساب المدير بالكامل
   const combinedAccounts = [];
 
   (window.appStore.users || []).forEach((u) => {
+    if (u.role === "admin" || u.role === ROLES.ADMIN) return; // استبعاد المدير نهائياً
     combinedAccounts.push({
       id: u.id,
       name: u.name,
@@ -2306,13 +2307,11 @@ function renderAccountsTable() {
   let html = "";
   filtered.forEach((acc, idx) => {
     const roleBadge =
-      acc.role === "admin"
-        ? '<span class="badge" style="background:#805333; color:#fff;">مدير</span>'
-        : acc.role === "teacher"
-          ? '<span class="badge" style="background:#9c6d47; color:#fff;">معلم</span>'
-          : acc.role === "screen"
-            ? '<span class="badge" style="background:#2e7d32; color:#fff;">شاشة المسجد</span>'
-            : '<span class="badge badge-warning">طالب</span>';
+      acc.role === "teacher"
+        ? '<span class="badge" style="background:#9c6d47; color:#fff;">معلم</span>'
+        : acc.role === "screen"
+          ? '<span class="badge" style="background:#2e7d32; color:#fff;">شاشة المسجد</span>'
+          : '<span class="badge badge-warning">طالب</span>';
 
     const isActive = acc.status === "active";
 
