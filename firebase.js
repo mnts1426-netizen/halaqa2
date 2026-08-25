@@ -58,11 +58,15 @@ function loadInitialData() {
       window.appStore = JSON.parse(localData);
       if (!window.appStore.screenOrder) window.appStore.screenOrder = [];
 
-      // التأكد من وجود حساب المدير الفعلي
+      // التأكد من وجود حساب المدير وحساب شاشة المسجد
       const hasAdmin = (window.appStore.users || []).some(
         (u) => u.username === "123456" && u.role === ROLES.ADMIN,
       );
-      if (!hasAdmin) {
+      const hasScreen = (window.appStore.users || []).some(
+        (u) => u.username === "121212" && u.role === ROLES.SCREEN,
+      );
+
+      if (!hasAdmin || !hasScreen) {
         seedProductionAdminOnly();
       }
     } catch (e) {
@@ -88,7 +92,7 @@ function saveLocalStore() {
   }
 }
 
-// إنشاء حساب المدير الفعلي وتصفير بقية البيانات
+// إنشاء حساب المدير الفعلي وحساب شاشة المسجد وتصفير بقية البيانات
 function seedProductionAdminOnly() {
   const baseTime = Date.now();
   window.appStore = {
@@ -98,6 +102,16 @@ function seedProductionAdminOnly() {
         name: "أحمد بن عبدالله بن مهدي",
         role: ROLES.ADMIN,
         username: "123456",
+        pass: "1234",
+        phone: "0500000000",
+        status: "active",
+        createdAt: baseTime,
+      },
+      {
+        id: "u_screen_fixed",
+        name: "شاشة المسجد (فرسان التميز)",
+        role: ROLES.SCREEN,
+        username: "121212",
         pass: "1234",
         phone: "0500000000",
         status: "active",
