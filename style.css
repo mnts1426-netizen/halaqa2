@@ -1,16 +1,22 @@
 /* ==========================================================================
-   الهوية البصرية الكاملة - حلقات جامع الهدى (مُحدثة مع تجاوب فائق للجوال والطباعة الرسمية)
+   الهوية البصرية الكاملة - مَجْمَع عبدالله بن مهدي القرآني (ألوان الشعار الجديد والطباعة)
    ========================================================================== */
 
 :root {
-  --primary-brown: #9c6d47;
-  --primary-dark: #805333;
-  --primary-light: #f7f1eb;
-  --bg-main: #fbf9f5;
+  /* ألوان الشعار الجديد (الزيتي/البترولي الفاخر مع لمسات البني الأصيل) */
+  --primary-brown: #0b6b7d;
+  --primary-dark: #074e5c;
+  --primary-light: #e8f4f6;
+
+  --accent-gold: #9c6d47;
+  --accent-gold-dark: #805333;
+  --accent-gold-light: #f7f1eb;
+
+  --bg-main: #f8faf9;
   --bg-card: #ffffff;
-  --border-color: #efe8df;
-  --text-dark: #2c2623;
-  --text-muted: #7a7067;
+  --border-color: #e0eae8;
+  --text-dark: #1b282a;
+  --text-muted: #5b6f72;
 
   --status-green-bg: #e8f5e9;
   --status-green-text: #2e7d32;
@@ -64,7 +70,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 3rem 2rem;
-  background-color: #faf8f5;
+  background-color: #fafcfb;
 }
 
 .login-box {
@@ -112,7 +118,7 @@ body {
 .form-control:focus {
   outline: none;
   border-color: var(--primary-brown);
-  box-shadow: 0 0 0 3px rgba(156, 109, 71, 0.15);
+  box-shadow: 0 0 0 3px rgba(11, 107, 125, 0.15);
 }
 
 .btn {
@@ -212,7 +218,7 @@ body {
 
 .login-right-panel {
   flex: 1.2;
-  background: linear-gradient(135deg, #9c6d47 0%, #754b2b 100%);
+  background: linear-gradient(135deg, #0b6b7d 0%, #053b46 100%);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -227,29 +233,32 @@ body {
 }
 
 .logo-icon-big {
-  width: 80px;
-  height: 80px;
-  background-color: rgba(255, 255, 255, 0.15);
+  width: 90px;
+  height: 90px;
+  background-color: rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 1.2rem;
+  overflow: hidden;
+  padding: 8px;
 }
 
 .brand-name-big {
-  font-size: 2.2rem;
-  font-weight: 800;
+  font-size: 2.1rem;
+  font-weight: 900;
+  margin-bottom: 0.2rem;
 }
 
 .brand-sub-big {
-  font-size: 1rem;
+  font-size: 1.05rem;
   opacity: 0.9;
   margin-bottom: 1.5rem;
 }
 
 .quran-quote {
-  font-size: 1.4rem;
+  font-size: 1.35rem;
   font-weight: 700;
   color: #f7e3ce;
   margin-bottom: 1.2rem;
@@ -297,19 +306,21 @@ body {
 }
 
 .logo-icon {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   background-color: var(--primary-light);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .logo-text h2 {
-  font-size: 1rem;
-  font-weight: 800;
+  font-size: 0.92rem;
+  font-weight: 900;
   color: var(--primary-brown);
+  line-height: 1.3;
 }
 
 .logo-text p {
@@ -353,7 +364,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  background-color: #faf8f5;
+  background-color: #fafcfb;
 }
 
 .user-avatar {
@@ -585,10 +596,13 @@ body {
 }
 
 .badge {
-  padding: 0.3rem 0.65rem;
+  padding: 0.35rem 0.75rem;
   border-radius: 20px;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .badge-warning {
@@ -596,19 +610,16 @@ body {
   color: var(--status-yellow-text);
 }
 
-.badge-soft-warning {
-  background-color: #fff3e0;
-  color: #e65100;
-}
-
 .badge-active {
   background-color: var(--status-green-bg);
   color: var(--status-green-text);
 }
 
+.badge-archived,
 .badge-danger {
-  background-color: var(--status-red-bg);
-  color: var(--status-red-text);
+  background-color: #d32f2f !important;
+  color: #ffffff !important;
+  border: 1px solid #b71c1c !important;
 }
 
 .card-filter-bar {
@@ -641,22 +652,22 @@ body {
 }
 
 .data-table th {
-  background-color: #faf8f5;
-  color: var(--text-muted);
+  background-color: #f4f9f9;
+  color: var(--text-dark);
   font-weight: 700;
   padding: 0.75rem 0.9rem;
-  border-bottom: 1px solid var(--border-color);
+  border: 1px solid var(--border-color);
   white-space: nowrap;
 }
 
 .data-table td {
   padding: 0.75rem 0.9rem;
-  border-bottom: 1px solid var(--border-color);
+  border: 1px solid var(--border-color);
   white-space: nowrap;
 }
 
 .data-table tbody tr:hover {
-  background-color: #faf8f5;
+  background-color: #f7fbfb;
 }
 
 .circles-grid {
@@ -704,7 +715,7 @@ body {
   justify-content: space-around;
   text-align: center;
   padding: 0.7rem 0;
-  background-color: #faf8f5;
+  background-color: #f4f9f9;
   border-radius: var(--radius-sm);
   margin-bottom: 0.8rem;
 }
@@ -744,7 +755,7 @@ body {
 }
 
 .checkbox-item-row:hover {
-  background-color: #faf8f5;
+  background-color: #f4f9f9;
 }
 
 .checkbox-item-row:last-child {
@@ -790,7 +801,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: #faf8f5;
+  background-color: #f4f9f9;
 }
 
 .modal-header h3 {
@@ -818,7 +829,7 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: 0.6rem;
-  background-color: #faf8f5;
+  background-color: #f4f9f9;
 }
 
 .form-row {
@@ -835,7 +846,12 @@ body {
   padding: 0.5rem;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  background: #faf8f5;
+  background: #f4f9f9;
+}
+
+.complex-hub-cards .hub-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(11, 107, 125, 0.12);
 }
 
 .mt-1 {
@@ -858,7 +874,36 @@ body {
 }
 
 /* ==========================================================================
-   التوافق الفائق مع شاشات الهواتف الذكية (Mobile Responsive)
+   شبكة إحصائيات الطالب (3 مربعات بالصف الواحد في الجوال والشاشات)
+   ========================================================================== */
+.student-stats-report-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 600px) {
+  .student-stats-report-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 0.4rem !important;
+  }
+  .student-stats-report-grid .stat-card {
+    padding: 0.5rem 0.25rem !important;
+    border-radius: 8px !important;
+  }
+  .student-stats-report-grid .stat-label {
+    font-size: 0.68rem !important;
+    line-height: 1.2 !important;
+  }
+  .student-stats-report-grid .stat-value {
+    font-size: 1.15rem !important;
+    margin-top: 2px !important;
+  }
+}
+
+/* ==========================================================================
+   التوافق مع الجوال
    ========================================================================== */
 @media (max-width: 992px) {
   .sidebar {
@@ -911,9 +956,12 @@ body {
 }
 
 /* ==========================================================================
-   تنسيقات الطباعة الرسمية الفخمة (@media print)
+   تنسيقات الطباعة الرسمية والترويسة الثنائية والتوقيع
    ========================================================================== */
 .print-official-header {
+  display: none;
+}
+.print-report-footer {
   display: none;
 }
 
@@ -921,7 +969,7 @@ body {
   body {
     background-color: #ffffff !important;
     color: #000000 !important;
-    font-size: 11pt !important;
+    font-size: 10.5pt !important;
   }
 
   .sidebar,
@@ -948,23 +996,32 @@ body {
 
   .print-official-header {
     display: block !important;
-    margin-bottom: 1.5rem !important;
+    margin-bottom: 1.2rem !important;
     border-bottom: 2px solid var(--primary-brown) !important;
     padding-bottom: 0.8rem !important;
   }
 
-  .print-header-top {
+  .print-header-center-logos {
     display: flex !important;
-    justify-content: space-between !important;
     align-items: center !important;
+    justify-content: center !important;
+    gap: 1.5rem !important;
+    margin-bottom: 0.6rem !important;
+  }
+
+  .print-header-center-logos img {
+    height: 75px !important;
+    width: auto !important;
+    object-fit: contain !important;
   }
 
   .print-header-title-box {
     text-align: center !important;
-    background: #f7f1eb !important;
+    background: #f4f9f9 !important;
     padding: 0.5rem !important;
     border-radius: 4px !important;
-    margin-top: 0.5rem !important;
+    margin-top: 0.4rem !important;
+    border: 1px solid #ddd !important;
   }
 
   .table-responsive {
@@ -979,12 +1036,12 @@ body {
   .data-table th,
   .data-table td {
     border: 1px solid #ddd !important;
-    padding: 6pt 8pt !important;
+    padding: 5pt 7pt !important;
     color: #000000 !important;
   }
 
   .data-table th {
-    background-color: #f7f1eb !important;
+    background-color: #f4f9f9 !important;
     font-weight: bold !important;
   }
 
@@ -996,5 +1053,19 @@ body {
     border: 1px solid #888 !important;
     background: transparent !important;
     color: #000 !important;
+  }
+
+  .hide-on-print {
+    display: none !important;
+  }
+
+  /* توقيع مدير المجمع في آخر التقرير */
+  .print-report-footer {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-end !important;
+    margin-top: 2rem !important;
+    padding-top: 1rem !important;
+    border-top: 1px dashed #bbb !important;
   }
 }
