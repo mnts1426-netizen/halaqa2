@@ -58,15 +58,18 @@ function loadInitialData() {
       window.appStore = JSON.parse(localData);
       if (!window.appStore.screenOrder) window.appStore.screenOrder = [];
 
-      // التأكد من وجود حساب المدير وحساب شاشة المسجد
+      // التأكد من وجود الحسابات الرسمية
       const hasAdmin = (window.appStore.users || []).some(
         (u) => u.username === "123456" && u.role === ROLES.ADMIN,
       );
-      const hasScreen = (window.appStore.users || []).some(
-        (u) => u.username === "121212" && u.role === ROLES.SCREEN,
+      const hasTeacher = (window.appStore.users || []).some(
+        (u) => u.username === "123123" && u.role === ROLES.TEACHER,
+      );
+      const hasStudent = (window.appStore.students || []).some(
+        (s) => s.phone === "0537466925",
       );
 
-      if (!hasAdmin || !hasScreen) {
+      if (!hasAdmin || !hasTeacher || !hasStudent) {
         seedProductionAdminOnly();
       }
     } catch (e) {
@@ -92,7 +95,7 @@ function saveLocalStore() {
   }
 }
 
-// إنشاء حساب المدير الفعلي وحساب شاشة المسجد وتصفير بقية البيانات
+// إنشاء الحسابات الرسمية وتجهيز قاعدة البيانات
 function seedProductionAdminOnly() {
   const baseTime = Date.now();
   window.appStore = {
@@ -117,10 +120,64 @@ function seedProductionAdminOnly() {
         status: "active",
         createdAt: baseTime,
       },
+      {
+        id: "u_teacher_main",
+        teacherId: "t_main",
+        name: "معلم الحلقة",
+        role: ROLES.TEACHER,
+        username: "123123",
+        pass: "1234",
+        phone: "0501111111",
+        status: "active",
+        createdAt: baseTime,
+      },
+      {
+        id: "s_main_user",
+        name: "طالب المجمع",
+        role: ROLES.STUDENT,
+        username: "0537466925",
+        pass: "1234",
+        phone: "0537466925",
+        circleId: "c_main",
+        status: "active",
+        createdAt: baseTime,
+      },
     ],
-    teachers: [],
-    circles: [],
-    students: [],
+    teachers: [
+      {
+        id: "t_main",
+        userId: "u_teacher_main",
+        name: "معلم الحلقة",
+        phone: "0501111111",
+        status: "active",
+        lastLogin: "—",
+        createdAt: baseTime,
+      },
+    ],
+    circles: [
+      {
+        id: "c_main",
+        name: "حلقة النور",
+        mosque: "جامع الهدى",
+        teacherId: "t_main",
+        teacherIds: ["t_main"],
+        status: "نشطة",
+      },
+    ],
+    students: [
+      {
+        id: "s_main_user",
+        name: "طالب المجمع",
+        nationalId: "1000000001",
+        phone: "0537466925",
+        parentName: "ولي الأمر",
+        parentRelation: "أب",
+        parentPhone: "0500000000",
+        circleId: "c_main",
+        status: "active",
+        createdAt: baseTime,
+      },
+    ],
     attendance: [],
     tasmeea: [],
     tests: [],
