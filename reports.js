@@ -10,7 +10,29 @@ document.addEventListener("DOMContentLoaded", () => {
     handleReportTypeChange();
   }
   populateReportStudentsDropdown();
+  populateReportWeekDropdown();
 });
+
+// تعبئة قائمة أسابيع التميز تلقائياً بتاريخ يوم الأحد الفعلي لكل أسبوع
+function populateReportWeekDropdown() {
+  const weekSelect = document.getElementById("report-week-select");
+  if (!weekSelect) return;
+
+  const weekOptions = ["current", "w_1", "w_2", "w_3", "w_4"];
+  let optionsHtml = "";
+
+  weekOptions.forEach((opt, idx) => {
+    const days = getSundayToWednesdayDatesByWeekOption(opt);
+    const sundayDate = days[0];
+    if (idx === 0) {
+      optionsHtml += `<option value="${opt}">أسبوع الأحد (${sundayDate}) - الحالي</option>`;
+    } else {
+      optionsHtml += `<option value="${opt}">أسبوع الأحد (${sundayDate})</option>`;
+    }
+  });
+
+  weekSelect.innerHTML = optionsHtml;
+}
 
 // تعبئة وتغذية قائمة الطلاب في خانة واحدة موحدة
 function populateReportStudentsDropdown() {
@@ -59,6 +81,7 @@ function handleReportTypeChange() {
     if (weekGroup) weekGroup.classList.remove("style-hidden");
     if (dateFromGroup) dateFromGroup.style.display = "none";
     if (dateToGroup) dateToGroup.style.display = "none";
+    populateReportWeekDropdown();
   } else {
     if (weekGroup) weekGroup.classList.add("style-hidden");
     if (dateFromGroup) dateFromGroup.style.display = "block";
@@ -517,7 +540,10 @@ function generateReport() {
         const circle = (window.appStore.circles || []).find(
           (c) => c.id === s.circleId,
         );
-        const circleName = circle ? circle.name : "المجمع";
+        const circleName = circle
+          ? circle.name
+          : window.appStore.settings?.orgName ||
+            "مُجْمَع عبدالله بن مهدي القرآني";
 
         bodyHtml += `
           <tr>
