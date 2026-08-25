@@ -1,11 +1,12 @@
 /**
  * ==========================================================================
- * admin.js - المحرك الإداري المحدث بالكامل الملتزم بكافة الشروط المحددة
+ * admin.js - المحرك الإداري الشامل لإدارة المجمع (الحلقات، المعلمين، الطلاب، التحضير، الاختبارات، ملاحظات المعلمين، شاشة المسجد، وإدارة الحسابات)
  * ==========================================================================
  */
 
 // تهيئة المخزن العام للحماية من أخطاء عدم التعريف
 window.appStore = window.appStore || {
+  users: [],
   students: [],
   teachers: [],
   circles: [],
@@ -13,6 +14,7 @@ window.appStore = window.appStore || {
   tests: [],
   profileRequests: [],
   tasmeea: [],
+  screenOrder: [],
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -49,7 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (searchCircles)
     searchCircles.addEventListener("input", renderCirclesCards);
 
-  // أحداث شاشة الحضور
+  // أحداث شاشة التحضير
   const attCircleSelect = document.getElementById("attendance-circle-select");
   const attDateSelect = document.getElementById("attendance-date-select");
   const attSearchInput = document.getElementById("search-attendance-student");
@@ -64,6 +66,44 @@ document.addEventListener("DOMContentLoaded", () => {
   if (attSearchInput)
     attSearchInput.addEventListener("input", renderAttendanceTable);
 
+  // أحداث شاشة الاختبارات
+  const searchTestsInput = document.getElementById("search-tests");
+  if (searchTestsInput)
+    searchTestsInput.addEventListener("input", renderTestsTable);
+
+  const filterTestCircle = document.getElementById("filter-test-circle");
+  if (filterTestCircle)
+    filterTestCircle.addEventListener("change", renderTestsTable);
+
+  // أحداث شاشة ملاحظات المعلمين
+  const searchTeacherNotesInput = document.getElementById(
+    "search-teacher-notes",
+  );
+  if (searchTeacherNotesInput)
+    searchTeacherNotesInput.addEventListener("input", renderTeacherNotesTable);
+
+  const filterTeacherNotesCircle = document.getElementById(
+    "filter-teacher-notes-circle",
+  );
+  if (filterTeacherNotesCircle)
+    filterTeacherNotesCircle.addEventListener(
+      "change",
+      renderTeacherNotesTable,
+    );
+
+  // أحداث شاشة إدارة الحسابات
+  const searchAccountsInput = document.getElementById("search-accounts");
+  if (searchAccountsInput)
+    searchAccountsInput.addEventListener("input", renderAccountsTable);
+
+  const filterAccountRole = document.getElementById("filter-account-role");
+  if (filterAccountRole)
+    filterAccountRole.addEventListener("change", renderAccountsTable);
+
+  const filterAccountStatus = document.getElementById("filter-account-status");
+  if (filterAccountStatus)
+    filterAccountStatus.addEventListener("change", renderAccountsTable);
+
   // تجهيز حقول مطابقة أعمدة Excel الافتراضية
   if (typeof renderExcelColumnMappingInputs === "function") {
     renderExcelColumnMappingInputs();
@@ -71,7 +111,58 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ==========================================================================
-// 1. إدارة الطلاب، استيراد Excel المرن، والصلاحيات المنفصلة (معلم / مدير)
+// 1. التنقل بين الأقسام الثلاثة داخل شاشة "إدارة المجمع"
+// ==========================================================================
+function switchComplexSection(section) {
+  const btnCircles = document.getElementById("hub-btn-circles");
+  const btnTeachers = document.getElementById("hub-btn-teachers");
+  const btnStudents = document.getElementById("hub-btn-students");
+
+  const secCircles = document.getElementById("sec-complex-circles");
+  const secTeachers = document.getElementById("sec-complex-teachers");
+  const secStudents = document.getElementById("sec-complex-students");
+
+  [btnCircles, btnTeachers, btnStudents].forEach((btn) => {
+    if (btn) {
+      btn.style.borderColor = "var(--border-color)";
+      const h3 = btn.querySelector("h3");
+      if (h3) h3.style.color = "var(--text-dark)";
+    }
+  });
+
+  [secCircles, secTeachers, secStudents].forEach((sec) =>
+    sec?.classList.add("style-hidden"),
+  );
+
+  if (section === "circles") {
+    if (btnCircles) {
+      btnCircles.style.borderColor = "var(--primary-brown)";
+      const h3 = btnCircles.querySelector("h3");
+      if (h3) h3.style.color = "var(--primary-brown)";
+    }
+    secCircles?.classList.remove("style-hidden");
+    renderCirclesCards();
+  } else if (section === "teachers") {
+    if (btnTeachers) {
+      btnTeachers.style.borderColor = "var(--primary-brown)";
+      const h3 = btnTeachers.querySelector("h3");
+      if (h3) h3.style.color = "var(--primary-brown)";
+    }
+    secTeachers?.classList.remove("style-hidden");
+    renderTeachersTable();
+  } else if (section === "students") {
+    if (btnStudents) {
+      btnStudents.style.borderColor = "var(--primary-brown)";
+      const h3 = btnStudents.querySelector("h3");
+      if (h3) h3.style.color = "var(--primary-brown)";
+    }
+    secStudents?.classList.remove("style-hidden");
+    renderStudentsTable();
+  }
+}
+
+// ==========================================================================
+// 2. إدارة الطلاب وتحديد العمليات الجماعية
 // ==========================================================================
 function switchStudentSubTab(tab) {
   const btnActive = document.getElementById("tab-btn-active-students");
@@ -92,6 +183,204 @@ function switchStudentSubTab(tab) {
     boxActive?.classList.add("style-hidden");
     renderPendingRequestsTable();
   }
+}
+
+// تحديد أو إلغاء تحديد كافة الطلاب
+function toggleSelectAllStudents(masterCheckbox) {
+  const cbs = document.querySelectorAll(".student-select-cb");
+  cbs.forEach((cb) => {
+    cb.checked = masterCheckbox.checked;
+  });
+  updateBulkToolbarCount();
+}
+
+// جلب مصفوفة معرفات الطلاب المحددين حالياً
+function getSelectedStudentIds() {
+  const checked = document.querySelectorAll(".student-select-cb:checked");
+  const ids = [];
+  checked.forEach((cb) => ids.push(cb.value));
+  return ids;
+}
+
+// تحديث عداد التحديد الجماعي ومزامنة الخانة الرئيسية
+function updateBulkToolbarCount() {
+  const ids = getSelectedStudentIds();
+  const countSpan = document.getElementById("selected-students-count");
+  if (countSpan) countSpan.textContent = ids.length;
+
+  const masterCb = document.getElementById("select-all-students-cb");
+  const allCbs = document.querySelectorAll(".student-select-cb");
+  if (masterCb && allCbs.length > 0) {
+    masterCb.checked = ids.length === allCbs.length;
+  }
+}
+
+// فتح نافذة اختيار الحلقة للعمليات الجماعية (إضافة أو نقل)
+function openBulkCircleModal(actionType) {
+  const selectedIds = getSelectedStudentIds();
+  if (selectedIds.length === 0) {
+    alert("⚠️ يرجى تحديد طالب واحد على الأقل من الجدول أولاً!");
+    return;
+  }
+
+  const titleEl = document.getElementById("modal-bulk-circle-title");
+  const descEl = document.getElementById("bulk-circle-desc");
+  const typeInput = document.getElementById("bulk-circle-action-type");
+  const circleSelect = document.getElementById("bulk-target-circle");
+
+  if (typeInput) typeInput.value = actionType;
+
+  if (actionType === "assign") {
+    if (titleEl)
+      titleEl.textContent = `➕ إضافة (${selectedIds.length}) طلاب إلى حلقة`;
+    if (descEl)
+      descEl.textContent = "اختر الحلقة التي ترغب بإلحاق الطلاب المحددين بها:";
+  } else {
+    if (titleEl)
+      titleEl.textContent = `🔄 نقل (${selectedIds.length}) طلاب إلى حلقة أخرى`;
+    if (descEl)
+      descEl.textContent =
+        "اختر الحلقة الجديدة التي سيتم نقل الطلاب المحددين إليها:";
+  }
+
+  if (circleSelect) {
+    let opts = '<option value="">— اختر الحلقة —</option>';
+    (window.appStore.circles || []).forEach((c) => {
+      opts += `<option value="${c.id}">${c.name}</option>`;
+    });
+    circleSelect.innerHTML = opts;
+  }
+
+  if (typeof openModal === "function") openModal("modal-bulk-circle");
+}
+
+// تنفيذ الإضافة أو النقل الجماعي للطلاب
+function handleBulkCircleSubmit(e) {
+  e.preventDefault();
+  const actionType =
+    document.getElementById("bulk-circle-action-type")?.value || "assign";
+  const targetCircleId = document.getElementById("bulk-target-circle")?.value;
+  const selectedIds = getSelectedStudentIds();
+
+  if (!targetCircleId) {
+    alert("⚠️ يرجى اختيار الحلقة أولاً!");
+    return;
+  }
+
+  if (selectedIds.length === 0) {
+    alert("⚠️ لم يتم تحديد أي طلاب!");
+    return;
+  }
+
+  const targetCircle = (window.appStore.circles || []).find(
+    (c) => c.id === targetCircleId,
+  );
+  const circleName = targetCircle ? targetCircle.name : "الحلقة";
+
+  let updatedCount = 0;
+  (window.appStore.students || []).forEach((s) => {
+    if (selectedIds.includes(s.id)) {
+      s.circleId = targetCircleId;
+      if (typeof saveToCloud === "function") {
+        saveToCloud("students", s.id, s);
+      }
+      updatedCount++;
+    }
+  });
+
+  if (typeof closeModal === "function") closeModal("modal-bulk-circle");
+
+  const msg =
+    actionType === "assign"
+      ? `✅ تم بنجاح إضافة (${updatedCount}) طالب إلى حلقة (${circleName})!`
+      : `✅ تم بنجاح نقل (${updatedCount}) طالب إلى حلقة (${circleName})!`;
+
+  alert(msg);
+  renderStudentsTable();
+  if (typeof renderCirclesCards === "function") renderCirclesCards();
+}
+
+// حذف جماعي للطلاب المحددين
+function executeBulkDeleteStudents() {
+  const selectedIds = getSelectedStudentIds();
+  if (selectedIds.length === 0) {
+    alert("⚠️ يرجى تحديد الطلاب المراد حذفهم من الجدول أولاً!");
+    return;
+  }
+
+  if (
+    !confirm(
+      `⚠️ تحذير: هل أنت متأكد من حذف (${selectedIds.length}) طالب نهائياً من قاعدة البيانات؟`,
+    )
+  ) {
+    return;
+  }
+
+  window.appStore.students = (window.appStore.students || []).filter(
+    (s) => !selectedIds.includes(s.id),
+  );
+
+  selectedIds.forEach((id) => {
+    if (typeof saveToCloud === "function") {
+      saveToCloud("students", id, null, true);
+    }
+  });
+
+  alert(`✅ تم حذف (${selectedIds.length}) طالب بنجاح!`);
+  renderStudentsTable();
+  if (typeof renderAccountsTable === "function") renderAccountsTable();
+  if (typeof renderCirclesCards === "function") renderCirclesCards();
+}
+
+// تصدير بيانات الطلاب إلى Excel
+function executeBulkExportStudentsExcel() {
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة Excel غير محملة!");
+    return;
+  }
+
+  let studentsToExport = [];
+  const selectedIds = getSelectedStudentIds();
+
+  if (selectedIds.length > 0) {
+    studentsToExport = (window.appStore.students || []).filter((s) =>
+      selectedIds.includes(s.id),
+    );
+  } else {
+    studentsToExport = (window.appStore.students || []).filter(
+      (s) => s.status === "active",
+    );
+  }
+
+  if (studentsToExport.length === 0) {
+    alert("⚠️ لا توجد بيانات طلاب لتصديرها!");
+    return;
+  }
+
+  const exportData = studentsToExport.map((s, idx) => {
+    const circle = (window.appStore.circles || []).find(
+      (c) => c.id === s.circleId,
+    );
+    return {
+      م: idx + 1,
+      "اسم الطالب": s.name || "—",
+      "رقم الهوية": s.nationalId || "—",
+      "جوال الطالب": s.phone || "—",
+      "اسم ولي الأمر": s.parentName || "—",
+      "صلة القرابة": s.parentRelation || "—",
+      "جوال ولي الأمر": s.parentPhone || "—",
+      الحلقة: circle ? circle.name : "غير مسجل",
+      الحالة: s.status === "active" ? "نشط" : "مؤرشف",
+    };
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "الطلاب");
+  XLSX.writeFile(
+    workbook,
+    `قائمة_الطلاب_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
 }
 
 function renderStudentsTable() {
@@ -143,8 +432,9 @@ function renderStudentsTable() {
   });
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted">لا يوجد طلاب مطابقون للبحث</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted">لا يوجد طلاب مطابقون للبحث</td></tr>`;
     updatePendingBadgeCount();
+    updateBulkToolbarCount();
     return;
   }
 
@@ -156,30 +446,66 @@ function renderStudentsTable() {
     const circleName = circle ? circle.name : "غير مسجل";
 
     const actionBtn = isTeacher
-      ? `<button class="btn btn-outline-brown btn-sm" onclick="openTeacherStudentModal('${student.id}')">✏️ تعديل السجل والتسميع</button>`
-      : `<button class="btn btn-outline-brown btn-sm" onclick="openModalEditStudentComprehensive('${student.id}')">✏️ تعديل شامل</button>`;
+      ? `<button class="btn btn-outline-brown btn-sm" onclick="openTeacherStudentModal('${student.id}')">تعديل السجل والتسميع</button>`
+      : `
+        <div style="display: flex; gap: 0.35rem;">
+          <button class="btn btn-outline-brown btn-sm" onclick="openModalEditStudentComprehensive('${student.id}')">تعديل</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteStudent('${student.id}')">حذف</button>
+        </div>
+      `;
 
     html += `
-            <tr>
-                <td style="font-weight: 700;">${student.name || "—"}</td>
-                <td>${student.nationalId || "—"}</td>
-                <td>${student.phone || "بدون جوال"}</td>
-                <td>${student.parentName || "—"}</td>
-                <td>${student.parentRelation || "—"}</td>
-                <td style="color: var(--primary-brown); font-weight: 700;">${student.parentPhone || "—"}</td>
-                <td><span class="badge badge-warning">${circleName}</span></td>
-                <td>
-                    <span class="badge ${student.status === "active" ? "badge-active" : "badge-soft-warning"}">
-                        ${student.status === "active" ? "نشط" : "مؤرشف"}
-                    </span>
-                </td>
-                <td>${actionBtn}</td>
-            </tr>
-        `;
+      <tr>
+        <td style="text-align: center;">
+          <input type="checkbox" class="student-select-cb" value="${student.id}" onchange="updateBulkToolbarCount()" />
+        </td>
+        <td style="font-weight: 700;">${student.name || "—"}</td>
+        <td>${student.nationalId || "—"}</td>
+        <td>${student.phone || "بدون جوال"}</td>
+        <td>${student.parentName || "—"}</td>
+        <td>${student.parentRelation || "—"}</td>
+        <td style="color: var(--primary-brown); font-weight: 700;">${student.parentPhone || "—"}</td>
+        <td><span style="font-weight: 600; color: var(--text-dark);">${circleName}</span></td>
+        <td>
+          <span class="badge ${student.status === "active" ? "badge-active" : "badge-archived"}">
+            ${student.status === "active" ? "نشط" : "مؤرشف (موقوف)"}
+          </span>
+        </td>
+        <td>${actionBtn}</td>
+      </tr>
+    `;
   });
 
   tbody.innerHTML = html;
   updatePendingBadgeCount();
+  updateBulkToolbarCount();
+}
+
+function deleteStudent(studentId) {
+  const student = (window.appStore.students || []).find(
+    (s) => s.id === studentId,
+  );
+  if (!student) return;
+
+  if (
+    !confirm(
+      `هل أنت متأكد من حذف الطالب (${student.name}) نهائياً من قاعدة البيانات؟`,
+    )
+  ) {
+    return;
+  }
+
+  window.appStore.students = (window.appStore.students || []).filter(
+    (s) => s.id !== studentId,
+  );
+
+  if (typeof saveToCloud === "function") {
+    saveToCloud("students", studentId, null, true);
+  }
+
+  alert(`✅ تم حذف الطالب (${student.name}) بنجاح!`);
+  renderStudentsTable();
+  if (typeof renderAccountsTable === "function") renderAccountsTable();
 }
 
 function openModalEditStudentComprehensive(studentId) {
@@ -244,13 +570,14 @@ function handleSaveStudentComprehensive(e) {
     if (typeof saveToCloud === "function") {
       saveToCloud("students", student.id, student);
     }
-    alert("✅ تم حفظ التعديلات الشاملة للطالب بنجاح!");
+    alert("✅ تم حفظ التعديلات بنجاح!");
   }
 
   if (typeof closeModal === "function") {
     closeModal("modal-edit-student-comprehensive");
   }
   renderStudentsTable();
+  if (typeof renderAccountsTable === "function") renderAccountsTable();
 }
 
 function openTeacherStudentModal(studentId) {
@@ -272,7 +599,7 @@ function openTeacherStudentModal(studentId) {
 
   setVal("teacher-edit-stu-id", student.id);
   setVal("teacher-edit-stu-name", student.name);
-  setVal("teacher-edit-stu-att", attRecord.status || "present");
+  setVal("teacher-edit-stu-att", attRecord.status || "");
   setVal("teacher-edit-stu-notes", attRecord.notes || "");
 
   if (typeof openModal === "function") {
@@ -283,8 +610,7 @@ function openTeacherStudentModal(studentId) {
 function handleTeacherSaveStudentRecord(e) {
   e.preventDefault();
   const studentId = document.getElementById("teacher-edit-stu-id")?.value;
-  const status =
-    document.getElementById("teacher-edit-stu-att")?.value || "present";
+  const status = document.getElementById("teacher-edit-stu-att")?.value || "";
   const notes = document.getElementById("teacher-edit-stu-notes")?.value || "";
   const todayStr = new Date().toISOString().split("T")[0];
 
@@ -324,7 +650,7 @@ function handleTeacherSaveStudentRecord(e) {
 }
 
 // --------------------------------------------------------------------------
-// نظام استيراد ملف Excel الديناميكي المرن
+// نظام استيراد ملف Excel الديناميكي المرن (من 2 إلى 5 أعمدة)
 // --------------------------------------------------------------------------
 const AVAILABLE_EXCEL_FIELDS = [
   { key: "name", label: "اسم الطالب الرباعي (إجباري)" },
@@ -337,11 +663,6 @@ const AVAILABLE_EXCEL_FIELDS = [
   { key: "district", label: "الحي السكني" },
   { key: "birthDate", label: "تاريخ الميلاد" },
   { key: "notes", label: "ملاحظات إضافية" },
-  { key: "school", label: "اسم المدرسة" },
-  { key: "quranLevel", label: "مقدار الحفظ السابق" },
-  { key: "emergencyPhone", label: "رقم هاتف طوارئ بديل" },
-  { key: "email", label: "البريد الإلكتروني" },
-  { key: "customField", label: "حقل مخصص إضافي" },
 ];
 
 function renderExcelColumnMappingInputs() {
@@ -355,7 +676,7 @@ function renderExcelColumnMappingInputs() {
   for (let i = 0; i < count; i++) {
     const defaultField = AVAILABLE_EXCEL_FIELDS[i]
       ? AVAILABLE_EXCEL_FIELDS[i].key
-      : "customField";
+      : "notes";
 
     html += `
       <div class="form-group mb-2 p-2" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 6px;">
@@ -453,11 +774,12 @@ function executeDynamicExcelImport() {
       }
 
       alert(
-        `✅ تم بنجاح استيراد ومطابقة (${importedCount}) طالب في قاعدة بيانات جامع الهدى!`,
+        `✅ تم بنجاح استيراد ومطابقة (${importedCount}) طالب في قاعدة بيانات المجمع!`,
       );
       if (typeof closeModal === "function") closeModal("modal-excel-import");
       fileInput.value = "";
       renderStudentsTable();
+      if (typeof renderAccountsTable === "function") renderAccountsTable();
     } catch (err) {
       alert("❌ حدث خطأ أثناء معالجة ملف Excel: " + err.message);
     }
@@ -491,8 +813,8 @@ function renderPendingRequestsTable() {
         <td>${stu.parentRelation || "—"}</td>
         <td style="color: var(--primary-brown); font-weight: 700;">${stu.parentPhone || "—"}</td>
         <td>
-          <button class="btn btn-success btn-sm" onclick="approveStudentRequest('${stu.id}')">🟢 قبول</button>
-          <button class="btn btn-danger btn-sm" onclick="rejectStudentRequest('${stu.id}')">🔴 رفض</button>
+          <button class="btn btn-success btn-sm" onclick="approveStudentRequest('${stu.id}')">قبول</button>
+          <button class="btn btn-danger btn-sm" onclick="rejectStudentRequest('${stu.id}')">رفض</button>
         </td>
       </tr>
     `;
@@ -555,6 +877,7 @@ function handleSelfRegistration(e) {
     circleId: "",
     status: "pending",
     requestDate: new Date().toLocaleDateString("ar-SA"),
+    createdAt: Date.now(),
   };
 
   if (!window.appStore.students) window.appStore.students = [];
@@ -566,7 +889,7 @@ function handleSelfRegistration(e) {
 
   if (typeof closeModal === "function") closeModal("modal-self-register");
   e.target.reset();
-  alert("✅ تم إرسال طلب التقديم بنجاح! سيتم مراجعته من قبل إدارة جامع الهدى.");
+  alert("✅ تم إرسال طلب التقديم بنجاح! سيتم مراجعته من قبل إدارة المجمع.");
 }
 
 function approveStudentRequest(studentId) {
@@ -582,6 +905,7 @@ function approveStudentRequest(studentId) {
 
   alert(`✅ تم قبول انضمام الطالب (${student.name}) بنجاح!`);
   renderPendingRequestsTable();
+  if (typeof renderAccountsTable === "function") renderAccountsTable();
 }
 
 function rejectStudentRequest(studentId) {
@@ -594,6 +918,7 @@ function rejectStudentRequest(studentId) {
   renderPendingRequestsTable();
 }
 
+// تعديل حالة الطالب بين النشط والمؤرشف (إيقاف الحساب)
 function toggleArchiveStudent(studentId) {
   const student = (window.appStore.students || []).find(
     (s) => s.id === studentId,
@@ -605,11 +930,21 @@ function toggleArchiveStudent(studentId) {
     saveToCloud("students", student.id, student);
   }
 
+  // تحديث الحساب المقابل في قائمة المستخدمين إن وجد
+  const userRec = (window.appStore.users || []).find((u) => u.id === studentId);
+  if (userRec) {
+    userRec.status = student.status === "active" ? "active" : "suspended";
+    if (typeof saveToCloud === "function") {
+      saveToCloud("users", userRec.id, userRec);
+    }
+  }
+
   renderStudentsTable();
+  if (typeof renderAccountsTable === "function") renderAccountsTable();
 }
 
 // ==========================================================================
-// 2. إدارة المعلمين والمتابعة المدمجة بالكامل
+// 3. إدارة المعلمين والمتابعة
 // ==========================================================================
 function renderTeachersTable() {
   const tbody = document.getElementById("teachers-table-body");
@@ -626,7 +961,7 @@ function renderTeachersTable() {
   );
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">لا يوجد معلمون مطابقون</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">لا يوجد معلمون مطابقون</td></tr>`;
     return;
   }
 
@@ -643,36 +978,65 @@ function renderTeachersTable() {
         : "غير مكلف";
 
     const lastLogin = t.lastLogin || "اليوم 04:30 م";
-    const attRate =
-      t.customAttendanceRate !== null && t.customAttendanceRate !== undefined
-        ? t.customAttendanceRate
-        : 95;
-    const tasRate =
-      t.customTasmeeaRate !== null && t.customTasmeeaRate !== undefined
-        ? t.customTasmeeaRate
-        : 90;
+    const isSuspended = t.status !== "active";
 
     html += `
-            <tr>
-                <td style="font-weight: 700;">${t.name}</td>
-                <td>${t.phone || "—"}</td>
-                <td><span class="badge badge-warning">${circleNamesStr} (${teacherCircles.length} حلقة)</span></td>
-                <td dir="ltr" class="text-muted" style="text-align: right;">${lastLogin}</td>
-                <td><span class="badge badge-active">${attRate}%</span></td>
-                <td><span class="badge badge-warning">${tasRate}%</span></td>
-                <td>
-                    <div style="display: flex; gap: 0.4rem;">
-                      <button class="btn btn-outline-brown btn-sm" onclick="openModalEditTeacherMonitoring('${t.id}')">✏️ متابعة</button>
-                      <button class="btn btn-outline-brown btn-sm" onclick="toggleTeacherStatus('${t.id}')">
-                          ${t.status === "active" ? "إيقاف" : "تفعيل"}
-                      </button>
-                    </div>
-                </td>
-            </tr>
-        `;
+      <tr>
+        <td style="font-weight: 700;">${t.name}</td>
+        <td>${t.phone || "—"}</td>
+        <td><span style="font-weight: 600; color: var(--text-dark);">${circleNamesStr} (${teacherCircles.length} حلقة)</span></td>
+        <td dir="ltr" class="text-muted" style="text-align: right;">${lastLogin}</td>
+        <td>
+          <div style="display: flex; gap: 0.35rem;">
+            <button class="btn btn-outline-brown btn-sm" onclick="openModalEditTeacher('${t.id}')">تعديل</button>
+            <button class="btn ${isSuspended ? "btn-success" : "btn-danger"} btn-sm" onclick="toggleTeacherStatus('${t.id}')">
+              ${isSuspended ? "تفعيل" : "إيقاف"}
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="deleteTeacher('${t.id}')">حذف</button>
+          </div>
+        </td>
+      </tr>
+    `;
   });
 
   tbody.innerHTML = html;
+}
+
+function deleteTeacher(teacherId) {
+  const teacher = (window.appStore.teachers || []).find(
+    (t) => t.id === teacherId,
+  );
+  if (!teacher) return;
+
+  if (
+    !confirm(`هل أنت متأكد من حذف المعلم (${teacher.name}) نهائياً من النظام؟`)
+  ) {
+    return;
+  }
+
+  window.appStore.teachers = (window.appStore.teachers || []).filter(
+    (t) => t.id !== teacherId,
+  );
+
+  (window.appStore.circles || []).forEach((c) => {
+    if (Array.isArray(c.teacherIds) && c.teacherIds.includes(teacherId)) {
+      c.teacherIds = c.teacherIds.filter((id) => id !== teacherId);
+      if (c.teacherId === teacherId) {
+        c.teacherId = c.teacherIds[0] || "";
+      }
+      if (typeof saveToCloud === "function") saveToCloud("circles", c.id, c);
+    }
+  });
+
+  if (typeof saveToCloud === "function") {
+    saveToCloud("teachers", teacherId, null, true);
+  }
+
+  alert(`✅ تم حذف المعلم (${teacher.name}) بنجاح!`);
+  renderTeachersTable();
+  if (typeof renderCirclesCards === "function") renderCirclesCards();
+  if (typeof updateCircleDropdowns === "function") updateCircleDropdowns();
+  if (typeof renderAccountsTable === "function") renderAccountsTable();
 }
 
 function openModalAddTeacher() {
@@ -723,6 +1087,7 @@ function handleAddTeacher(e) {
     lastLogin: "لم يدخل بعد",
     customAttendanceRate: 100,
     customTasmeeaRate: 100,
+    createdAt: Date.now(),
   };
 
   if (!window.appStore.teachers) window.appStore.teachers = [];
@@ -758,10 +1123,21 @@ function toggleTeacherStatus(teacherId) {
     saveToCloud("teachers", teacher.id, teacher);
   }
 
+  const userRec = (window.appStore.users || []).find(
+    (u) => u.id === teacher.userId || u.username === `teacher_${teacher.id}`,
+  );
+  if (userRec) {
+    userRec.status = teacher.status;
+    if (typeof saveToCloud === "function") {
+      saveToCloud("users", userRec.id, userRec);
+    }
+  }
+
   renderTeachersTable();
+  if (typeof renderAccountsTable === "function") renderAccountsTable();
 }
 
-function openModalEditTeacherMonitoring(teacherId) {
+function openModalEditTeacher(teacherId) {
   const teacher = (window.appStore.teachers || []).find(
     (t) => t.id === teacherId,
   );
@@ -772,66 +1148,89 @@ function openModalEditTeacherMonitoring(teacherId) {
     if (el) el.value = val !== undefined && val !== null ? val : "";
   };
 
-  setVal("edit-monitoring-teacher-id", teacher.id);
-  setVal("edit-monitoring-name", teacher.name);
-  setVal("edit-monitoring-last-login", teacher.lastLogin || "اليوم 04:30 م");
-  setVal(
-    "edit-monitoring-att-rate",
-    teacher.customAttendanceRate !== null &&
-      teacher.customAttendanceRate !== undefined
-      ? teacher.customAttendanceRate
-      : 85,
-  );
-  setVal(
-    "edit-monitoring-tas-rate",
-    teacher.customTasmeeaRate !== null &&
-      teacher.customTasmeeaRate !== undefined
-      ? teacher.customTasmeeaRate
-      : 90,
-  );
+  setVal("edit-teach-id", teacher.id);
+  setVal("edit-teach-name", teacher.name);
+  setVal("edit-teach-phone", teacher.phone || "");
 
-  if (typeof openModal === "function")
-    openModal("modal-edit-teacher-monitoring");
+  const container = document.getElementById(
+    "edit-teacher-circles-checkbox-container",
+  );
+  if (container) {
+    let html = "";
+    (window.appStore.circles || []).forEach((c) => {
+      const isChecked =
+        (Array.isArray(c.teacherIds) && c.teacherIds.includes(teacher.id)) ||
+        c.teacherId === teacher.id
+          ? "checked"
+          : "";
+      html += `
+        <label class="checkbox-item-row">
+          <input type="checkbox" name="edit_teacher_circles" value="${c.id}" ${isChecked}>
+          <span>${c.name}</span>
+        </label>
+      `;
+    });
+    container.innerHTML =
+      html || '<p class="text-muted p-2">لا توجد حلقات معرفة</p>';
+  }
+
+  if (typeof openModal === "function") openModal("modal-edit-teacher");
 }
 
-function handleSaveTeacherMonitoring(e) {
+function handleSaveTeacherEdit(e) {
   e.preventDefault();
-  const teacherId = document.getElementById(
-    "edit-monitoring-teacher-id",
-  )?.value;
+  const teacherId = document.getElementById("edit-teach-id")?.value;
   const teacher = (window.appStore.teachers || []).find(
     (t) => t.id === teacherId,
   );
 
-  if (teacher) {
-    teacher.lastLogin =
-      document.getElementById("edit-monitoring-last-login")?.value || "";
-    teacher.customAttendanceRate = parseInt(
-      document.getElementById("edit-monitoring-att-rate")?.value || "0",
-      10,
-    );
-    teacher.customTasmeeaRate = parseInt(
-      document.getElementById("edit-monitoring-tas-rate")?.value || "0",
-      10,
-    );
+  if (!teacher) return;
 
-    if (typeof saveToCloud === "function") {
-      saveToCloud("teachers", teacher.id, teacher);
-    }
-    alert("✅ تم تعديل بيانات المتابعة بنجاح!");
+  const name =
+    document.getElementById("edit-teach-name")?.value.trim() || teacher.name;
+  const phone = document.getElementById("edit-teach-phone")?.value.trim() || "";
+
+  const selectedCircles = [];
+  document
+    .querySelectorAll('input[name="edit_teacher_circles"]:checked')
+    .forEach((cb) => {
+      selectedCircles.push(cb.value);
+    });
+
+  teacher.name = name;
+  teacher.phone = phone;
+
+  if (typeof saveToCloud === "function") {
+    saveToCloud("teachers", teacher.id, teacher);
   }
 
-  if (typeof closeModal === "function")
-    closeModal("modal-edit-teacher-monitoring");
+  (window.appStore.circles || []).forEach((c) => {
+    if (!Array.isArray(c.teacherIds)) c.teacherIds = [];
+    if (selectedCircles.includes(c.id)) {
+      if (!c.teacherIds.includes(teacher.id)) c.teacherIds.push(teacher.id);
+      if (!c.teacherId) c.teacherId = teacher.id;
+    } else {
+      c.teacherIds = c.teacherIds.filter((id) => id !== teacher.id);
+      if (c.teacherId === teacher.id) {
+        c.teacherId = c.teacherIds[0] || "";
+      }
+    }
+    if (typeof saveToCloud === "function") saveToCloud("circles", c.id, c);
+  });
+
+  if (typeof closeModal === "function") closeModal("modal-edit-teacher");
+  alert("✅ تم تعديل بيانات المعلم بنجاح!");
   renderTeachersTable();
+  if (typeof renderCirclesCards === "function") renderCirclesCards();
+  if (typeof updateCircleDropdowns === "function") updateCircleDropdowns();
+  if (typeof renderAccountsTable === "function") renderAccountsTable();
 }
 
 // ==========================================================================
-// 3. إدارة الحلقات مع فلاتر البحث وإظهار التكليفات في الحلقات الأخرى
+// 4. إدارة الحلقات
 // ==========================================================================
 function renderCirclesCards() {
   const container = document.getElementById("circles-cards-container");
-  const countTitle = document.getElementById("circles-count-title");
   if (!container) return;
 
   const searchVal = (document.getElementById("search-circles")?.value || "")
@@ -857,8 +1256,6 @@ function renderCirclesCards() {
   const filtered = circlesList.filter(
     (c) => c.name && c.name.toLowerCase().includes(searchVal),
   );
-
-  if (countTitle) countTitle.textContent = `${circlesList.length} حلقة`;
 
   if (filtered.length === 0) {
     container.innerHTML = `<div class="empty-state-card"><h3>لا توجد حلقات مطابقة</h3></div>`;
@@ -889,44 +1286,77 @@ function renderCirclesCards() {
     const isAdmin = !user || user.role === "admin";
 
     html += `
-            <div class="circle-card">
-                <div class="circle-header">
-                    <div class="circle-title">
-                        <h3>${circle.name}</h3>
-                        <p>جامع الهدى</p>
-                    </div>
-                    <span class="badge-circle-active">${circle.status || "نشطة"}</span>
-                </div>
+      <div class="circle-card">
+        <div class="circle-header">
+          <div class="circle-title">
+            <h3>${circle.name}</h3>
+            <p>جامع الهدى</p>
+          </div>
+          <span class="badge-circle-active">${circle.status || "نشطة"}</span>
+        </div>
 
-                <div class="circle-stats-row">
-                    <div>
-                        <div class="circle-stat-val">${circleStudents.length}</div>
-                        <div class="circle-stat-lbl">عدد الطلاب</div>
-                    </div>
-                    <div>
-                        <div class="circle-stat-val" style="color: var(--primary-brown);">${assignedTeachers.length}</div>
-                        <div class="circle-stat-lbl">عدد المعلمين</div>
-                    </div>
-                </div>
+        <div class="circle-stats-row">
+          <div>
+            <div class="circle-stat-val">${circleStudents.length}</div>
+            <div class="circle-stat-lbl">عدد الطلاب</div>
+          </div>
+          <div>
+            <div class="circle-stat-val" style="color: var(--primary-brown);">${assignedTeachers.length}</div>
+            <div class="circle-stat-lbl">عدد المعلمين</div>
+          </div>
+        </div>
 
-                <div class="circle-teacher-info" style="font-size: 0.85rem; margin-bottom: 0.8rem;">
-                    <strong>المعلمون:</strong> ${teacherNamesStr}
-                </div>
+        <div class="circle-teacher-info" style="font-size: 0.85rem; margin-bottom: 0.8rem;">
+          <strong>المعلمون:</strong> ${teacherNamesStr}
+        </div>
 
-                ${
-                  isAdmin
-                    ? `
-                    <div class="circle-card-actions">
-                        <button class="btn btn-outline-brown btn-block" onclick="openModalEditCircle('${circle.id}')">✏️ تعديل كامل للحلقة</button>
-                    </div>
-                `
-                    : ""
-                }
+        ${
+          isAdmin
+            ? `
+            <div class="circle-card-actions" style="display: flex; gap: 0.5rem; margin-top: 0.8rem;">
+              <button class="btn btn-outline-brown btn-sm" style="flex: 1;" onclick="openModalEditCircle('${circle.id}')">تعديل</button>
+              <button class="btn btn-danger btn-sm" style="flex: 1;" onclick="deleteCircle('${circle.id}')">حذف</button>
             </div>
-        `;
+        `
+            : ""
+        }
+      </div>
+    `;
   });
 
   container.innerHTML = html;
+}
+
+function deleteCircle(circleId) {
+  const circle = (window.appStore.circles || []).find((c) => c.id === circleId);
+  if (!circle) return;
+
+  if (
+    !confirm(
+      `هل أنت متأكد من حذف حلقة (${circle.name}) نهائياً؟ سيتم إلغاء تعيين الطلاب المسجلين بها.`,
+    )
+  ) {
+    return;
+  }
+
+  window.appStore.circles = (window.appStore.circles || []).filter(
+    (c) => c.id !== circleId,
+  );
+
+  (window.appStore.students || []).forEach((s) => {
+    if (s.circleId === circleId) {
+      s.circleId = "";
+      if (typeof saveToCloud === "function") saveToCloud("students", s.id, s);
+    }
+  });
+
+  if (typeof saveToCloud === "function") {
+    saveToCloud("circles", circleId, null, true);
+  }
+
+  alert(`✅ تم حذف حلقة (${circle.name}) بنجاح!`);
+  renderCirclesCards();
+  if (typeof updateCircleDropdowns === "function") updateCircleDropdowns();
 }
 
 function openModalAddCircle() {
@@ -939,7 +1369,7 @@ function openModalAddCircle() {
     if (el) el.textContent = text;
   };
 
-  setTitle("modal-circle-title", "إضافة حلقة جديدة بجامع الهدى");
+  setTitle("modal-circle-title", "إضافة حلقة جديدة بالمجمع");
   setVal("edit-circle-id", "");
   setVal("circle-name", "");
   setVal("search-modal-teachers", "");
@@ -1029,11 +1459,11 @@ function populateCircleTeachersList(selectedIds) {
       : `<small class="text-muted">[غير مكلف بحلقات]</small>`;
 
     html += `
-            <label class="checkbox-item-row">
-                <input type="checkbox" name="circle_teachers" value="${t.id}" ${isChecked}>
-                <span>${t.name} ${tag}</span>
-            </label>
-        `;
+      <label class="checkbox-item-row">
+        <input type="checkbox" name="circle_teachers" value="${t.id}" ${isChecked}>
+        <span>${t.name} ${tag}</span>
+      </label>
+    `;
   });
   container.innerHTML = html;
 }
@@ -1062,11 +1492,11 @@ function populateCircleStudentsList(selectedStudentIds) {
       : `<small class="text-muted">[غير مسجل بحلقة]</small>`;
 
     html += `
-            <label class="checkbox-item-row">
-                <input type="checkbox" name="circle_students" value="${s.id}" ${isChecked}>
-                <span>${s.name} ${currentCircleName}</span>
-            </label>
-        `;
+      <label class="checkbox-item-row">
+        <input type="checkbox" name="circle_students" value="${s.id}" ${isChecked}>
+        <span>${s.name} ${currentCircleName}</span>
+      </label>
+    `;
   });
   container.innerHTML = html;
 }
@@ -1142,7 +1572,7 @@ function handleSaveCircle(e) {
 }
 
 // ==========================================================================
-// 4. الحضور والغياب (Dropdown)
+// 5. التحضير اليومي
 // ==========================================================================
 function renderAttendanceTable() {
   const tbody = document.getElementById("attendance-table-body");
@@ -1157,7 +1587,7 @@ function renderAttendanceTable() {
   if (!tbody) return;
 
   if (!circleId) {
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted p-4">يرجى اختيار الحلقة لعرض قائمة الحضور والغياب</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted p-4">يرجى اختيار الحلقة لعرض قائمة التحضير</td></tr>`;
     return;
   }
 
@@ -1182,25 +1612,26 @@ function renderAttendanceTable() {
       (window.appStore.attendance || []).find(
         (a) => a.studentId === student.id && a.date === dateVal,
       ) || {};
-    const currentStatus = record.status || "present";
+    const currentStatus = record.status || "";
 
     html += `
-            <tr>
-                <td style="font-weight: 700;">${student.name}</td>
-                <td><span class="badge badge-warning">${getCircleName(student.circleId)}</span></td>
-                <td>
-                    <select class="form-control" style="font-weight: 700;" onchange="setStudentAttendance('${student.id}', this.value)">
-                        <option value="present" ${currentStatus === "present" ? "selected" : ""}>🟢 حاضر</option>
-                        <option value="absent" ${currentStatus === "absent" ? "selected" : ""}>🔴 غائب</option>
-                        <option value="late" ${currentStatus === "late" ? "selected" : ""}>🟡 متأخر</option>
-                        <option value="excused" ${currentStatus === "excused" ? "selected" : ""}>🔵 مستأذن</option>
-                    </select>
-                </td>
-                <td>
-                    <input type="text" class="form-control" placeholder="إضافة ملاحظة..." value="${record.notes || ""}" onchange="updateAttendanceNotes('${student.id}', this.value)">
-                </td>
-            </tr>
-        `;
+      <tr>
+        <td style="font-weight: 700;">${student.name}</td>
+        <td><span style="font-weight: 600; color: var(--text-dark);">${getCircleName(student.circleId)}</span></td>
+        <td>
+          <select class="form-control" style="font-weight: 700;" onchange="setStudentAttendance('${student.id}', this.value)">
+            <option value="" ${currentStatus === "" ? "selected" : ""}></option>
+            <option value="present" ${currentStatus === "present" ? "selected" : ""}>🟢 حاضر</option>
+            <option value="absent" ${currentStatus === "absent" ? "selected" : ""}>🔴 غائب</option>
+            <option value="late" ${currentStatus === "late" ? "selected" : ""}>🟡 متأخر</option>
+            <option value="excused" ${currentStatus === "excused" ? "selected" : ""}>🔵 مستأذن</option>
+          </select>
+        </td>
+        <td>
+          <input type="text" class="form-control" placeholder="إضافة ملاحظة..." value="${record.notes || ""}" onchange="updateAttendanceNotes('${student.id}', this.value)">
+        </td>
+      </tr>
+    `;
   });
 
   tbody.innerHTML = html;
@@ -1248,17 +1679,17 @@ function updateAttendanceNotes(studentId, notesVal) {
   }
 }
 
-function markAllPresent() {
+function markAllAbsent() {
   const circleId = document.getElementById("attendance-circle-select")?.value;
   if (!circleId) return alert("اختر حلقة أولاً!");
 
   const students = (window.appStore.students || []).filter(
     (s) => s.circleId === circleId && s.status === "active",
   );
-  students.forEach((s) => setStudentAttendance(s.id, "present"));
+  students.forEach((s) => setStudentAttendance(s.id, "absent"));
 
   renderAttendanceTable();
-  alert("✅ تم تحديد الجميع كـ (حاضر) بنجاح!");
+  alert("✅ تم تحديد الجميع كـ (غائب) بنجاح!");
 }
 
 function getCircleName(circleId) {
@@ -1267,7 +1698,7 @@ function getCircleName(circleId) {
 }
 
 // ==========================================================================
-// 5. الاختبارات (إضافة وحفظ وعرض)
+// 6. الاختبارات
 // ==========================================================================
 function openModalAddTest() {
   const circleSelect = document.getElementById("test-circle-select");
@@ -1304,7 +1735,7 @@ function handleSaveTest(e) {
   e.preventDefault();
   const circleId = document.getElementById("test-circle-select")?.value || "";
   const studentId = document.getElementById("test-student-select")?.value || "";
-  const type = document.getElementById("test-type")?.value || "شهري";
+  const type = document.getElementById("test-type")?.value || "";
   const score = document.getElementById("test-score")?.value || "100";
   const rating = document.getElementById("test-rating")?.value || "ممتاز";
 
@@ -1331,18 +1762,163 @@ function handleSaveTest(e) {
   alert("✅ تم حفظ الاختبار بنجاح!");
 }
 
+function openModalEditTest(testId) {
+  const test = (window.appStore.tests || []).find((t) => t.id === testId);
+  if (!test) return;
+
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val !== undefined && val !== null ? val : "";
+  };
+
+  setVal("edit-test-id", test.id);
+  setVal("edit-test-type", test.type || "");
+  setVal("edit-test-score", test.score || "100");
+  setVal("edit-test-rating", test.rating || "ممتاز");
+  setVal("edit-test-date", test.date || new Date().toISOString().split("T")[0]);
+
+  const circleSelect = document.getElementById("edit-test-circle-select");
+  if (circleSelect) {
+    let options = '<option value="">— اختر الحلقة —</option>';
+    (window.appStore.circles || []).forEach((c) => {
+      options += `<option value="${c.id}" ${c.id === test.circleId ? "selected" : ""}>${c.name}</option>`;
+    });
+    circleSelect.innerHTML = options;
+  }
+
+  populateEditTestStudentsDropdown(test.studentId);
+  if (typeof openModal === "function") openModal("modal-edit-test");
+}
+
+function populateEditTestStudentsDropdown(selectedStudentId) {
+  const circleId = document.getElementById("edit-test-circle-select")?.value;
+  const studentSelect = document.getElementById("edit-test-student-select");
+  if (!studentSelect) return;
+
+  let options = '<option value="">— اختر الطالب —</option>';
+  const list = circleId
+    ? (window.appStore.students || []).filter(
+        (s) => s.circleId === circleId && s.status === "active",
+      )
+    : (window.appStore.students || []).filter((s) => s.status === "active");
+
+  list.forEach((s) => {
+    options += `<option value="${s.id}" ${s.id === selectedStudentId ? "selected" : ""}>${s.name}</option>`;
+  });
+  studentSelect.innerHTML = options;
+}
+
+function handleSaveTestEdit(e) {
+  e.preventDefault();
+  const testId = document.getElementById("edit-test-id")?.value;
+  const test = (window.appStore.tests || []).find((t) => t.id === testId);
+
+  if (!test) return;
+
+  test.circleId =
+    document.getElementById("edit-test-circle-select")?.value || "";
+  test.studentId =
+    document.getElementById("edit-test-student-select")?.value || "";
+  test.type = document.getElementById("edit-test-type")?.value || "";
+  test.score = document.getElementById("edit-test-score")?.value || "100";
+  test.rating = document.getElementById("edit-test-rating")?.value || "ممتاز";
+  test.date = document.getElementById("edit-test-date")?.value || test.date;
+
+  if (typeof saveToCloud === "function") {
+    saveToCloud("tests", test.id, test);
+  }
+
+  if (typeof closeModal === "function") closeModal("modal-edit-test");
+  alert("✅ تم تعديل بيانات الاختبار بنجاح!");
+  renderTestsTable();
+}
+
+function deleteTest(testId) {
+  if (!confirm("هل أنت متأكد من حذف هذا الاختبار نهائياً؟")) return;
+
+  window.appStore.tests = (window.appStore.tests || []).filter(
+    (t) => t.id !== testId,
+  );
+
+  if (typeof saveToCloud === "function") {
+    saveToCloud("tests", testId, null, true);
+  }
+
+  alert("✅ تم حذف الاختبار بنجاح!");
+  renderTestsTable();
+}
+
+function openCustomTestsPrintModal() {
+  if (typeof openModal === "function") {
+    openModal("modal-print-tests-columns");
+  }
+}
+
+function executeCustomTestsPrint() {
+  const colStudent = document.getElementById("chk-col-student")?.checked;
+  const colCircle = document.getElementById("chk-col-circle")?.checked;
+  const colType = document.getElementById("chk-col-type")?.checked;
+  const colScore = document.getElementById("chk-col-score")?.checked;
+  const colRating = document.getElementById("chk-col-rating")?.checked;
+  const colDate = document.getElementById("chk-col-date")?.checked;
+
+  const table = document.getElementById("tests-table-element");
+  if (!table) return;
+
+  const toggleCol = (index, show) => {
+    table.querySelectorAll(`tr > :nth-child(${index})`).forEach((el) => {
+      if (show) {
+        el.classList.remove("hide-on-print");
+      } else {
+        el.classList.add("hide-on-print");
+      }
+    });
+  };
+
+  toggleCol(1, colStudent);
+  toggleCol(2, colCircle);
+  toggleCol(3, colType);
+  toggleCol(4, colScore);
+  toggleCol(5, colRating);
+  toggleCol(6, colDate);
+
+  if (typeof closeModal === "function") closeModal("modal-print-tests-columns");
+  window.print();
+}
+
 function renderTestsTable() {
   const tbody = document.getElementById("tests-table-body");
   if (!tbody) return;
 
-  const tests = window.appStore.tests || [];
-  if (tests.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted p-3">لا توجد اختبارات مسجلة بعد</td></tr>`;
+  const searchVal = (document.getElementById("search-tests")?.value || "")
+    .trim()
+    .toLowerCase();
+  const circleFilter =
+    document.getElementById("filter-test-circle")?.value || "all";
+
+  let tests = window.appStore.tests || [];
+
+  const filtered = tests.filter((t) => {
+    const student = (window.appStore.students || []).find(
+      (s) => s.id === t.studentId,
+    );
+    const studentName = student ? student.name.toLowerCase() : "";
+    const testType = (t.type || "").toLowerCase();
+
+    const matchesSearch =
+      studentName.includes(searchVal) || testType.includes(searchVal);
+    const matchesCircle = circleFilter === "all" || t.circleId === circleFilter;
+
+    return matchesSearch && matchesCircle;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted p-3">لا توجد اختبارات مطابقة</td></tr>`;
     return;
   }
 
   let html = "";
-  tests.forEach((t) => {
+  filtered.forEach((t) => {
     const student = (window.appStore.students || []).find(
       (s) => s.id === t.studentId,
     );
@@ -1353,11 +1929,17 @@ function renderTestsTable() {
     html += `
       <tr>
         <td style="font-weight:700;">${student ? student.name : "طالب"}</td>
-        <td><span class="badge badge-warning">${circle ? circle.name : "—"}</span></td>
+        <td><span style="font-weight: 600; color: var(--text-dark);">${circle ? circle.name : "—"}</span></td>
         <td>${t.type || "—"}</td>
         <td style="font-weight:700; color:var(--primary-brown);">${t.score || "0"} / 100</td>
         <td><span class="badge badge-active">${t.rating || "—"}</span></td>
         <td>${t.date || "—"}</td>
+        <td class="no-print">
+          <div style="display: flex; gap: 0.35rem;">
+            <button class="btn btn-outline-brown btn-sm" onclick="openModalEditTest('${t.id}')">تعديل</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteTest('${t.id}')">حذف</button>
+          </div>
+        </td>
       </tr>
     `;
   });
@@ -1365,11 +1947,10 @@ function renderTestsTable() {
 }
 
 // ==========================================================================
-// 6. لوحة الطلاب المتميزين (التميز الأسبوعي)
+// 7. لوحة الطلاب المتميزين (للمدير فقط)
 // ==========================================================================
 function renderTamayuzBoard() {
   const adminTbody = document.getElementById("tamayuz-students-body");
-  const stuHomeTbody = document.getElementById("stu-home-tamayuz-body");
 
   const activeStudents = (window.appStore.students || []).filter(
     (s) => s.status === "active",
@@ -1378,13 +1959,10 @@ function renderTamayuzBoard() {
   if (activeStudents.length === 0) {
     const emptyMsg = `<tr><td colspan="5" class="text-center text-muted p-3">لا يوجد طلاب متميزون مسجلون</td></tr>`;
     if (adminTbody) adminTbody.innerHTML = emptyMsg;
-    if (stuHomeTbody) stuHomeTbody.innerHTML = emptyMsg;
     return;
   }
 
   let adminHtml = "";
-  let stuHomeHtml = "";
-
   activeStudents.slice(0, 6).forEach((stu) => {
     const circle = (window.appStore.circles || []).find(
       (c) => c.id === stu.circleId,
@@ -1394,29 +1972,462 @@ function renderTamayuzBoard() {
     adminHtml += `
       <tr>
         <td style="font-weight: 800;">⭐ ${stu.name}</td>
-        <td><span class="badge badge-warning">${circleName}</span></td>
+        <td><span style="font-weight: 600; color: var(--text-dark);">${circleName}</span></td>
         <td><span class="badge badge-active">100% (حضور كامل)</span></td>
         <td><span class="badge badge-active">مكتمل 100%</span></td>
         <td><span class="badge badge-active">ممتاز مرتفع</span></td>
       </tr>
     `;
+  });
 
-    stuHomeHtml += `
+  if (adminTbody) adminTbody.innerHTML = adminHtml;
+}
+
+// ==========================================================================
+// 8. شاشة ملاحظات المعلمين للمدير
+// ==========================================================================
+function renderTeacherNotesTable() {
+  const tbody = document.getElementById("teacher-notes-table-body");
+  if (!tbody) return;
+
+  const searchVal = (
+    document.getElementById("search-teacher-notes")?.value || ""
+  )
+    .trim()
+    .toLowerCase();
+  const circleFilter =
+    document.getElementById("filter-teacher-notes-circle")?.value || "all";
+
+  let records = (window.appStore.tasmeea || []).filter(
+    (t) => t.adminNotes && t.adminNotes.trim() !== "",
+  );
+
+  records.sort(
+    (a, b) =>
+      (b.date || "").localeCompare(a.date || "") ||
+      (b.updatedAt || 0) - (a.updatedAt || 0),
+  );
+
+  const filtered = records.filter((t) => {
+    const student = (window.appStore.students || []).find(
+      (s) => s.id === t.studentId,
+    );
+    const studentName = student ? student.name.toLowerCase() : "";
+    const noteText = (t.adminNotes || "").toLowerCase();
+
+    const matchesSearch =
+      studentName.includes(searchVal) || noteText.includes(searchVal);
+    const matchesCircle = circleFilter === "all" || t.circleId === circleFilter;
+
+    return matchesSearch && matchesCircle;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted p-4">لا توجد ملاحظات مسجلة من المعلمين للإدارة</td></tr>`;
+    return;
+  }
+
+  let html = "";
+  filtered.forEach((t, idx) => {
+    const student = (window.appStore.students || []).find(
+      (s) => s.id === t.studentId,
+    );
+    const circle = (window.appStore.circles || []).find(
+      (c) => c.id === t.circleId,
+    );
+
+    let teacherName = "—";
+    if (circle) {
+      const teacher = (window.appStore.teachers || []).find(
+        (teach) =>
+          (Array.isArray(circle.teacherIds) &&
+            circle.teacherIds.includes(teach.id)) ||
+          circle.teacherId === teach.id,
+      );
+      if (teacher) teacherName = teacher.name;
+    }
+
+    html += `
       <tr>
-        <td style="font-weight: 800;">⭐ ${stu.name}</td>
-        <td><span class="badge badge-warning">${circleName}</span></td>
-        <td><span class="badge badge-active">100%</span></td>
-        <td><span class="badge badge-active">مكتمل 100%</span></td>
+        <td>${idx + 1}</td>
+        <td>${t.date || "—"}</td>
+        <td style="font-weight: 700;">${teacherName}</td>
+        <td><span style="font-weight: 600; color: var(--text-dark);">${circle ? circle.name : "—"}</span></td>
+        <td style="font-weight: 700; color: var(--primary-brown);">${student ? student.name : "طالب"}</td>
+        <td style="white-space: normal; min-width: 250px; line-height: 1.6;">${t.adminNotes}</td>
       </tr>
     `;
   });
 
-  if (adminTbody) adminTbody.innerHTML = adminHtml;
-  if (stuHomeTbody) stuHomeTbody.innerHTML = stuHomeHtml;
+  tbody.innerHTML = html;
 }
 
 // ==========================================================================
-// 7. إدارة الإشعارات والرسائل
+// 9. محرك شاشة المسجد (فرسان التميز والترتيب)
+// ==========================================================================
+function getQualifyingTamayuzStudents() {
+  const activeStudents = (window.appStore.students || []).filter(
+    (s) => s.status === "active",
+  );
+
+  const evaluatedStudents = activeStudents.map((s) => {
+    const attList = (window.appStore.attendance || []).filter(
+      (a) => a.studentId === s.id,
+    );
+    const presentCount = attList.filter(
+      (a) => a.status === "present" || a.status === "late",
+    ).length;
+    const attRate =
+      attList.length > 0 ? (presentCount / attList.length) * 100 : 100;
+
+    const tasmList = (window.appStore.tasmeea || []).filter(
+      (t) => t.studentId === s.id,
+    );
+    const mumtazCount = tasmList.filter((t) =>
+      (t.rating || "").includes("ممتاز"),
+    ).length;
+
+    return {
+      student: s,
+      attRate,
+      mumtazCount,
+    };
+  });
+
+  evaluatedStudents.sort((a, b) => {
+    if (b.attRate !== a.attRate) return b.attRate - a.attRate;
+    return b.mumtazCount - a.mumtazCount;
+  });
+
+  let orderedList = evaluatedStudents.map((item) => item.student);
+
+  const savedOrder = window.appStore.screenOrder || [];
+  if (savedOrder.length > 0) {
+    orderedList.sort((a, b) => {
+      const idxA = savedOrder.indexOf(a.id);
+      const idxB = savedOrder.indexOf(b.id);
+      if (idxA > -1 && idxB > -1) return idxA - idxB;
+      if (idxA > -1) return -1;
+      if (idxB > -1) return 1;
+      return 0;
+    });
+  }
+
+  return orderedList;
+}
+
+function renderScreenView() {
+  const screenGrid = document.getElementById("mosque-screen-grid");
+  const manageTbody = document.getElementById("screen-manage-table-body");
+
+  const students = getQualifyingTamayuzStudents();
+
+  if (screenGrid) {
+    if (students.length === 0) {
+      screenGrid.innerHTML = `
+        <div class="empty-state-card" style="grid-column: 1 / -1; background: #ffffff; border-radius: 12px; padding: 3rem;">
+          <h3>جاري تجهيز لوحة فرسان التميز لجامع الهدى...</h3>
+        </div>
+      `;
+    } else {
+      let gridHtml = "";
+      students.forEach((stu, index) => {
+        const circle = (window.appStore.circles || []).find(
+          (c) => c.id === stu.circleId,
+        );
+        const circleName = circle ? circle.name : "جامع الهدى";
+        const isFirst = index === 0;
+
+        gridHtml += `
+          <div class="card ${isFirst ? "screen-card-first" : ""}" style="text-align: center; border: ${isFirst ? "2px solid var(--primary-brown)" : "1px solid var(--border-color)"}; background: ${isFirst ? "#faf3eb" : "#ffffff"}; border-radius: 12px; padding: 1.5rem; position: relative;">
+            <div style="font-size: 1.8rem; font-weight: 900; color: var(--primary-brown); margin-bottom: 0.5rem;">
+              #${index + 1} ${isFirst ? '<span style="font-size: 2.2rem;">🏆</span>' : "⭐"}
+            </div>
+            <h2 style="font-size: 1.35rem; font-weight: 800; margin-bottom: 0.4rem; color: var(--text-dark);">${stu.name}</h2>
+            <p style="font-size: 0.95rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.8rem;">حلقة: ${circleName}</p>
+            <div style="display: flex; justify-content: center; gap: 0.5rem;">
+              <span class="badge badge-active" style="font-size: 0.85rem;">حضور 100%</span>
+              <span class="badge badge-active" style="font-size: 0.85rem;">ممتاز</span>
+            </div>
+          </div>
+        `;
+      });
+      screenGrid.innerHTML = gridHtml;
+    }
+  }
+
+  if (manageTbody) {
+    if (students.length === 0) {
+      manageTbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted p-3">لا يوجد طلاب</td></tr>`;
+    } else {
+      let tbodyHtml = "";
+      students.forEach((stu, index) => {
+        const circle = (window.appStore.circles || []).find(
+          (c) => c.id === stu.circleId,
+        );
+        const circleName = circle ? circle.name : "جامع الهدى";
+        const isFirst = index === 0;
+
+        tbodyHtml += `
+          <tr>
+            <td style="font-weight: 800; font-size: 1.1rem; width: 60px; text-align: center;">
+              ${index + 1} ${isFirst ? "🏆" : ""}
+            </td>
+            <td style="font-weight: 700;">${stu.name}</td>
+            <td><span style="font-weight: 600; color: var(--text-dark);">${circleName}</span></td>
+            <td><span class="badge badge-active">متميز</span></td>
+            <td style="text-align: center; width: 140px;">
+              <div style="display: flex; gap: 0.35rem; justify-content: center;">
+                <button class="btn btn-outline-brown btn-sm" onclick="moveScreenStudentUp(${index})" ${index === 0 ? "disabled" : ""}>⬆️ للأعلى</button>
+                <button class="btn btn-outline-brown btn-sm" onclick="moveScreenStudentDown(${index})" ${index === students.length - 1 ? "disabled" : ""}>⬇️ للأسفل</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+      manageTbody.innerHTML = tbodyHtml;
+    }
+  }
+}
+
+function moveScreenStudentUp(index) {
+  const students = getQualifyingTamayuzStudents();
+  if (index <= 0 || index >= students.length) return;
+
+  const currentIds = students.map((s) => s.id);
+  const temp = currentIds[index];
+  currentIds[index] = currentIds[index - 1];
+  currentIds[index - 1] = temp;
+
+  window.appStore.screenOrder = currentIds;
+  if (typeof saveToCloud === "function") {
+    saveToCloud("screenOrder", "current_order", { order: currentIds });
+  }
+
+  renderScreenView();
+}
+
+function moveScreenStudentDown(index) {
+  const students = getQualifyingTamayuzStudents();
+  if (index < 0 || index >= students.length - 1) return;
+
+  const currentIds = students.map((s) => s.id);
+  const temp = currentIds[index];
+  currentIds[index] = currentIds[index + 1];
+  currentIds[index + 1] = temp;
+
+  window.appStore.screenOrder = currentIds;
+  if (typeof saveToCloud === "function") {
+    saveToCloud("screenOrder", "current_order", { order: currentIds });
+  }
+
+  renderScreenView();
+}
+
+function resetScreenStudentOrder() {
+  if (!confirm("هل ترغب في إعادة ضبط الترتيب للأولوية التلقائية؟")) return;
+
+  window.appStore.screenOrder = [];
+  if (typeof saveToCloud === "function") {
+    saveToCloud("screenOrder", "current_order", { order: [] });
+  }
+
+  renderScreenView();
+  alert("✅ تمت إعادة الضبط للترتيب التلقائي بنجاح!");
+}
+
+// ==========================================================================
+// 10. شاشة إدارة الحسابات للمدير
+// ==========================================================================
+function renderAccountsTable() {
+  const tbody = document.getElementById("accounts-table-body");
+  if (!tbody) return;
+
+  const searchVal = (document.getElementById("search-accounts")?.value || "")
+    .trim()
+    .toLowerCase();
+  const roleFilter =
+    document.getElementById("filter-account-role")?.value || "all";
+  const statusFilter =
+    document.getElementById("filter-account-status")?.value || "all";
+
+  // دمج كافة الحسابات (المستخدمون الأساسيون، المعلمون، والطلاب)
+  const combinedAccounts = [];
+
+  (window.appStore.users || []).forEach((u) => {
+    combinedAccounts.push({
+      id: u.id,
+      name: u.name,
+      role: u.role,
+      username: u.username || u.phone || "—",
+      phone: u.phone || "—",
+      status: u.status || "active",
+      source: "user",
+    });
+  });
+
+  (window.appStore.students || []).forEach((s) => {
+    if (!combinedAccounts.some((a) => a.id === s.id)) {
+      combinedAccounts.push({
+        id: s.id,
+        name: s.name,
+        role: "student",
+        username: s.phone || s.nationalId || "طالب",
+        phone: s.phone || s.parentPhone || "—",
+        status: s.status === "active" ? "active" : "archived",
+        source: "student",
+      });
+    }
+  });
+
+  const filtered = combinedAccounts.filter((acc) => {
+    const matchesSearch =
+      (acc.name && acc.name.toLowerCase().includes(searchVal)) ||
+      (acc.username && String(acc.username).includes(searchVal)) ||
+      (acc.phone && String(acc.phone).includes(searchVal));
+
+    const matchesRole = roleFilter === "all" || acc.role === roleFilter;
+
+    let matchesStatus = true;
+    if (statusFilter === "active") {
+      matchesStatus = acc.status === "active";
+    } else if (statusFilter === "suspended") {
+      matchesStatus = acc.status === "suspended" || acc.status === "archived";
+    }
+
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted p-4">لا توجد حسابات مطابقة للبحث</td></tr>`;
+    return;
+  }
+
+  let html = "";
+  filtered.forEach((acc, idx) => {
+    const roleBadge =
+      acc.role === "admin"
+        ? '<span class="badge" style="background:#805333; color:#fff;">مدير</span>'
+        : acc.role === "teacher"
+          ? '<span class="badge" style="background:#9c6d47; color:#fff;">معلم</span>'
+          : acc.role === "screen"
+            ? '<span class="badge" style="background:#2e7d32; color:#fff;">شاشة المسجد</span>'
+            : '<span class="badge badge-warning">طالب</span>';
+
+    const isActive = acc.status === "active";
+
+    html += `
+      <tr>
+        <td>${idx + 1}</td>
+        <td style="font-weight: 700;">${acc.name}</td>
+        <td>${roleBadge}</td>
+        <td><code>${acc.username}</code></td>
+        <td>
+          <span class="badge ${isActive ? "badge-active" : "badge-danger"}">
+            ${isActive ? "نشط" : "موقوف (مؤرشف)"}
+          </span>
+        </td>
+        <td>
+          <div style="display: flex; gap: 0.35rem;">
+            <button class="btn ${isActive ? "btn-danger" : "btn-success"} btn-sm" onclick="toggleUserAccountStatus('${acc.id}', '${acc.source}', '${acc.role}')">
+              ${isActive ? "إيقاف الحساب" : "تفعيل الحساب"}
+            </button>
+            <button class="btn btn-outline-brown btn-sm" onclick="openModalEditUserAccount('${acc.id}', '${acc.source}')">تعديل</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+}
+
+function toggleUserAccountStatus(id, source, role) {
+  if (role === "admin" && window.currentUser && window.currentUser.id === id) {
+    alert("⚠️ لا يمكنك إيقاف حساب المدير المسجل به حالياً.");
+    return;
+  }
+
+  if (source === "student") {
+    toggleArchiveStudent(id);
+    return;
+  }
+
+  const user = (window.appStore.users || []).find((u) => u.id === id);
+  if (user) {
+    user.status = user.status === "suspended" ? "active" : "suspended";
+    if (typeof saveToCloud === "function") {
+      saveToCloud("users", user.id, user);
+    }
+  }
+
+  if (role === "teacher") {
+    const teach = (window.appStore.teachers || []).find(
+      (t) => t.userId === id || t.id === id,
+    );
+    if (teach) {
+      teach.status = teach.status === "suspended" ? "active" : "suspended";
+      if (typeof saveToCloud === "function") {
+        saveToCloud("teachers", teach.id, teach);
+      }
+    }
+  }
+
+  renderAccountsTable();
+  if (typeof renderTeachersTable === "function") renderTeachersTable();
+  if (typeof renderStudentsTable === "function") renderStudentsTable();
+}
+
+function openModalEditUserAccount(id, source) {
+  const setVal = (inputid, val) => {
+    const el = document.getElementById(inputid);
+    if (el) el.value = val !== undefined && val !== null ? val : "";
+  };
+
+  if (source === "student") {
+    openModalEditStudentComprehensive(id);
+    return;
+  }
+
+  const user = (window.appStore.users || []).find((u) => u.id === id);
+  if (!user) return;
+
+  setVal("edit-account-user-id", user.id);
+  setVal("edit-account-name", user.name);
+  setVal("edit-account-username", user.username || "");
+  setVal("edit-account-password", user.pass || "");
+
+  if (typeof openModal === "function") openModal("modal-edit-user-account");
+}
+
+function handleSaveUserAccount(e) {
+  e.preventDefault();
+  const id = document.getElementById("edit-account-user-id")?.value;
+  const user = (window.appStore.users || []).find((u) => u.id === id);
+
+  if (user) {
+    user.name =
+      document.getElementById("edit-account-name")?.value.trim() || user.name;
+    user.username =
+      document.getElementById("edit-account-username")?.value.trim() ||
+      user.username;
+    const newPass = document
+      .getElementById("edit-account-password")
+      ?.value.trim();
+    if (newPass) user.pass = newPass;
+
+    if (typeof saveToCloud === "function") {
+      saveToCloud("users", user.id, user);
+    }
+    alert("✅ تم حفظ تعديلات الحساب بنجاح!");
+  }
+
+  if (typeof closeModal === "function") closeModal("modal-edit-user-account");
+  renderAccountsTable();
+}
+
+// ==========================================================================
+// 11. إدارة الإشعارات والرسائل
 // ==========================================================================
 function handleRecipientTypeChange(selectEl) {
   const specificGroup = document.getElementById("msg-specific-recipient-group");
@@ -1448,7 +2459,7 @@ function handleRecipientTypeChange(selectEl) {
 }
 
 // ==========================================================================
-// 8. إدارة طلبات تعديل بيانات الطلاب
+// 12. إدارة طلبات تعديل بيانات الطلاب
 // ==========================================================================
 function renderProfileRequestsList() {
   const container = document.getElementById("profile-requests-list");
@@ -1477,8 +2488,8 @@ function renderProfileRequestsList() {
         </div>
         <p class="mt-1" style="color: var(--text-dark);">الاسم الجديد: <strong>${req.newName || "—"}</strong> | الجوال: <strong>${req.newPhone || "—"}</strong></p>
         <div class="mt-1 flex-align-gap">
-          <button class="btn btn-success btn-sm" onclick="approveProfileRequest('${req.id}')">🟢 اعتماد</button>
-          <button class="btn btn-danger btn-sm" onclick="rejectProfileRequest('${req.id}')">🔴 رفض</button>
+          <button class="btn btn-success btn-sm" onclick="approveProfileRequest('${req.id}')">قبول</button>
+          <button class="btn btn-danger btn-sm" onclick="rejectProfileRequest('${req.id}')">رفض</button>
         </div>
       </div>
     `;
