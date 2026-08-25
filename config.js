@@ -1,10 +1,10 @@
 /**
  * ==========================================================================
- * config.js - الثوابت والإعدادات العامة لنظام حلقات جامع الهدى
+ * config.js - الثوابت والإعدادات العامة لنظام مَجْمَع عبدالله بن مهدي القرآني
  * ==========================================================================
  */
 
-// 1. إعدادات Firebase (قم باستبدال البيانات أدناه ببيانات مشروعك الحقيقي عند النشر)
+// 1. إعدادات Firebase
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDemoKey_HalaqatAlHuda2026_Project",
   authDomain: "halaqat-alhuda.firebaseapp.com",
@@ -19,20 +19,25 @@ const ROLES = {
   ADMIN: "admin",
   TEACHER: "teacher",
   STUDENT: "student",
+  SCREEN: "screen",
 };
 
 // 3. التقديرات الافتراضية
-const DEFAULT_RATINGS = ["ممتاز", "جيد جداً", "جيد", "مقبول", "ضعيف"];
+const DEFAULT_RATINGS = ["ممتاز", "جيد جداً", "جيد", "يعيد"];
 
-// 4. الإعدادات الافتراضية للجمعية
+// 4. الإعدادات الافتراضية للمجمع
 const DEFAULT_SETTINGS = {
-  orgName: "حلقات جامع الهدى لتحفيظ القرآن الكريم",
+  orgName: "مَجْمَع عبدالله بن مهدي القرآني",
+  subTitle: "جامع الهدى",
+  directorName: "أحمد بن عبدالله بن مهدي",
+  logoNew: "logo12.jpeg",
+  logoOld: "logo11.jpeg",
   pageSize: 20,
   sessionTimeoutMinutes: 60,
   ratings: [...DEFAULT_RATINGS],
 };
 
-// 5. قائمة سور القرآن الكريم كاملة (114 سورة) للتسميع والمراجعة
+// 5. قائمة سور القرآن الكريم كاملة (114 سورة)
 const QURAN_SURAHS = [
   { id: 1, name: "الفاتحة", verses: 7 },
   { id: 2, name: "البقرة", verses: 286 },
@@ -150,5 +155,5 @@ const QURAN_SURAHS = [
   { id: 114, name: "الناس", verses: 6 },
 ];
 
-// 6. مفتاح التخزين المحلي الاحتياطي LocalStorage Key
+// 6. مفتاح التخزين المحلي الاحتياطي
 const LOCAL_STORAGE_KEY = "HALAQAT_ALHUDA_DB_V1";
