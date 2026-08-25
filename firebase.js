@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * firebase.js - محرك الاتصال بـ Firebase ومزامنة قواعد البيانات والسجلات
+ * firebase.js - محرك الاتصال بـ Firebase وقاعدة البيانات النظيفة للمجمع
  * ==========================================================================
  */
 
@@ -8,7 +8,7 @@ let dbFirestore = null;
 let firebaseAuth = null;
 let isFirebaseOnline = false;
 
-// كائن تخزين البيانات المحلي (الديناميكي في الذاكرة وفي LocalStorage)
+// كائن تخزين البيانات العام
 window.appStore = {
   users: [],
   students: [],
@@ -19,6 +19,7 @@ window.appStore = {
   tests: [],
   notifications: [],
   messages: [],
+  screenOrder: [],
   settings: { ...DEFAULT_SETTINGS },
   logs: [],
 };
@@ -49,27 +50,36 @@ function initFirebaseApp() {
   loadInitialData();
 }
 
-// تحميل البيانات الأولية (من LocalStorage أو إنشائها تجريبياً)
+// تحميل البيانات الأولية
 function loadInitialData() {
   const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
   if (localData) {
     try {
       window.appStore = JSON.parse(localData);
+      if (!window.appStore.screenOrder) window.appStore.screenOrder = [];
+
+      // التأكد من وجود حساب المدير الفعلي
+      const hasAdmin = (window.appStore.users || []).some(
+        (u) => u.username === "123456" && u.role === ROLES.ADMIN,
+      );
+      if (!hasAdmin) {
+        seedProductionAdminOnly();
+      }
     } catch (e) {
       console.error("خطأ في قراءة LocalStorage:", e);
-      seedDefaultDemoData();
+      seedProductionAdminOnly();
     }
   } else {
-    seedDefaultDemoData();
+    seedProductionAdminOnly();
   }
 
-  // إذا كان الفايربيز متصلاً، جلب البيانات الحية من السحابة
+  // مزامنة البيانات مع Firestore إذا كان متصلاً
   if (isFirebaseOnline && dbFirestore) {
     syncDataFromCloud();
   }
 }
 
-// حفظ الحالة الحالية في التخزين المحلي
+// حفظ الحالة في التخزين المحلي
 function saveLocalStore() {
   try {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(window.appStore));
@@ -78,205 +88,38 @@ function saveLocalStore() {
   }
 }
 
-// تعبئة البيانات الافتراضية التجريبية (المطابقة للصور المطلوبة)
-function seedDefaultDemoData() {
+// إنشاء حساب المدير الفعلي وتصفير بقية البيانات
+function seedProductionAdminOnly() {
+  const baseTime = Date.now();
   window.appStore = {
     users: [
       {
-        id: "u_admin",
-        name: "الأستاذ عبدالله المدير",
+        id: "u_admin_main",
+        name: "أحمد بن عبدالله بن مهدي",
         role: ROLES.ADMIN,
-        username: "admin",
-        pass: "123456",
+        username: "123456",
+        pass: "1234",
         phone: "0500000000",
-      },
-      {
-        id: "u_t1",
-        name: "الشيخ أحمد بن يوسف",
-        role: ROLES.TEACHER,
-        username: "teacher1",
-        pass: "123456",
-        phone: "0501234567",
-        qualification: "بكالوريوس شريعة",
-        hireDate: "2020-09-01",
         status: "active",
-      },
-      {
-        id: "u_t2",
-        name: "الشيخ محمد بن سالم",
-        role: ROLES.TEACHER,
-        username: "teacher2",
-        pass: "123456",
-        phone: "0507654321",
-        qualification: "ماجستير قراءات",
-        hireDate: "2019-01-15",
-        status: "active",
-      },
-      {
-        id: "u_t3",
-        name: "الشيخ عمر بن ناصر",
-        role: ROLES.TEACHER,
-        username: "teacher3",
-        pass: "123456",
-        phone: "0509998887",
-        qualification: "بكالوريوس قرآن",
-        hireDate: "2022-03-20",
-        status: "active",
+        createdAt: baseTime,
       },
     ],
-    teachers: [
-      {
-        id: "t1",
-        userId: "u_t1",
-        name: "الشيخ أحمد بن يوسف",
-        phone: "0501234567",
-        qualification: "بكالوريوس شريعة",
-        hireDate: "2020-09-01",
-        circlesCount: 2,
-        studentsCount: 4,
-        lastLogin: "2026-08-05 12:36 ص",
-        status: "active",
-      },
-      {
-        id: "t2",
-        userId: "u_t2",
-        name: "الشيخ محمد بن سالم",
-        phone: "0507654321",
-        qualification: "ماجستير قراءات",
-        hireDate: "2019-01-15",
-        circlesCount: 1,
-        studentsCount: 2,
-        lastLogin: "2026-08-05 12:36 ص",
-        status: "active",
-      },
-      {
-        id: "t3",
-        userId: "u_t3",
-        name: "الشيخ عمر بن ناصر",
-        phone: "0509998887",
-        qualification: "بكالوريوس قرآن",
-        hireDate: "2022-03-20",
-        circlesCount: 0,
-        studentsCount: 0,
-        lastLogin: "—",
-        status: "active",
-      },
-    ],
-    circles: [
-      {
-        id: "c1",
-        name: "حلقة الفجر",
-        mosque: "جامع الملك فهد",
-        teacherId: "t1",
-        capacity: 15,
-        studentsCount: 3,
-        status: "نشطة",
-      },
-      {
-        id: "c2",
-        name: "حلقة العصر",
-        mosque: "جامع النور",
-        teacherId: "t2",
-        capacity: 20,
-        studentsCount: 2,
-        status: "نشطة",
-      },
-      {
-        id: "c3",
-        name: "حلقة المغرب",
-        mosque: "جامع الرحمة",
-        teacherId: "t1",
-        capacity: 12,
-        studentsCount: 1,
-        status: "نشطة",
-      },
-    ],
-    students: [
-      {
-        id: "s1",
-        name: "عبدالرحمن محمد العتيبي",
-        nationalId: "1098765432",
-        phone: "0551112233",
-        level: "المتوسطة",
-        circleId: "c1",
-        status: "active",
-      },
-      {
-        id: "s2",
-        name: "سعد بن خالد الدوسري",
-        nationalId: "1087654321",
-        phone: "0552223344",
-        level: "الابتدائية",
-        circleId: "c1",
-        status: "active",
-      },
-      {
-        id: "s3",
-        name: "عمر فهد القحطاني",
-        nationalId: "1076543210",
-        phone: "0553334455",
-        level: "الثانوية",
-        circleId: "c1",
-        status: "active",
-      },
-      {
-        id: "s4",
-        name: "إبراهيم يوسف الغامدي",
-        nationalId: "1065432109",
-        phone: "0554445566",
-        level: "المتوسطة",
-        circleId: "c2",
-        status: "active",
-      },
-      {
-        id: "s5",
-        name: "ياسر بن صالح الزهراني",
-        nationalId: "1054321098",
-        phone: "0555556677",
-        level: "الابتدائية",
-        circleId: "c2",
-        status: "active",
-      },
-      {
-        id: "s6",
-        name: "علي بن حسن الشمري",
-        nationalId: "1043210987",
-        phone: "0556667788",
-        level: "الجامعية",
-        circleId: "c3",
-        status: "active",
-      },
-    ],
+    teachers: [],
+    circles: [],
+    students: [],
     attendance: [],
     tasmeea: [],
     tests: [],
     notifications: [],
     messages: [],
+    screenOrder: [],
     settings: { ...DEFAULT_SETTINGS },
     logs: [
       {
-        id: "log_1",
-        userName: "الأستاذ عبدالله المدير",
-        action: "دخول . النظام",
-        timestamp: "2026/8/5 6:44 م",
-      },
-      {
-        id: "log_2",
-        userName: "خالد بن سعد",
-        action: "خروج . النظام",
-        timestamp: "2026/8/5 6:43 م",
-      },
-      {
-        id: "log_3",
-        userName: "خالد بن سعد",
-        action: "دخول . النظام",
-        timestamp: "2026/8/5 6:41 م",
-      },
-      {
-        id: "log_4",
-        userName: "الأستاذ عبدالله المدير",
-        action: "خروج . النظام",
-        timestamp: "2026/8/5 6:39 م",
+        id: "log_" + baseTime,
+        userName: "أحمد بن عبدالله بن مهدي",
+        action: "تهيئة النظام وتدشين الحسابات",
+        timestamp: new Date().toLocaleDateString("ar-SA"),
       },
     ],
   };
@@ -288,6 +131,7 @@ async function syncDataFromCloud() {
   if (!dbFirestore) return;
   try {
     const collections = [
+      "users",
       "students",
       "teachers",
       "circles",
@@ -296,6 +140,7 @@ async function syncDataFromCloud() {
       "tests",
       "notifications",
       "messages",
+      "screenOrder",
       "settings",
       "logs",
     ];
@@ -308,6 +153,8 @@ async function syncDataFromCloud() {
         }));
         if (col === "settings") {
           window.appStore.settings = items[0] || DEFAULT_SETTINGS;
+        } else if (col === "screenOrder") {
+          window.appStore.screenOrder = items[0]?.order || [];
         } else {
           window.appStore[col] = items;
         }
@@ -325,15 +172,19 @@ async function syncDataFromCloud() {
   }
 }
 
-// حفظ مستند في السحابة
-async function saveToCloud(collectionName, docId, data) {
+// حفظ أو حذف مستند في السحابة
+async function saveToCloud(collectionName, docId, data, isDelete = false) {
   saveLocalStore();
   if (isFirebaseOnline && dbFirestore) {
     try {
-      await dbFirestore
-        .collection(collectionName)
-        .doc(docId)
-        .set(data, { merge: true });
+      if (isDelete) {
+        await dbFirestore.collection(collectionName).doc(docId).delete();
+      } else {
+        await dbFirestore
+          .collection(collectionName)
+          .doc(docId)
+          .set(data, { merge: true });
+      }
     } catch (e) {
       console.error(`خطأ أثناء الحفظ في Firestore [${collectionName}]:`, e);
     }
