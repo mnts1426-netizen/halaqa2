@@ -92,7 +92,7 @@ function showMainLoginView() {
 // تطبيق هوية المجمع والشعارات ديناميكياً
 function applyAppIdentity() {
   const settings = window.appStore.settings || DEFAULT_SETTINGS;
-  const orgName = settings.orgName || "مَجْمَع عبدالله بن مهدي القرآني";
+  const orgName = settings.orgName || "مُجْمَع عبدالله بن مهدي القرآني";
   const mosqueName = settings.subTitle || "جامع الهدى";
   const logoNew = settings.logoNew || "logo12.jpeg";
   const logoOld = settings.logoOld || "logo11.jpeg";
@@ -158,12 +158,40 @@ function checkSavedSession() {
   }
 }
 
-// تسجيل دخول الإدارة والمعلمين الفعلي
+// تسجيل دخول الإدارة والمعلمين وشاشة المسجد الفعلي
 function handleLoginFormSubmit(e) {
   e.preventDefault();
   const userVal = document.getElementById("login-username")?.value.trim();
   const passVal = document.getElementById("login-password")?.value.trim();
 
+  // 1. الدخول المباشر لحساب شاشة المسجد
+  if (userVal === "121212" && passVal === "1234") {
+    const screenUser = {
+      id: "u_screen_fixed",
+      name: "شاشة المسجد (فرسان التميز)",
+      role: ROLES.SCREEN,
+      username: "121212",
+      createdAt: Date.now(),
+    };
+    doLogin(screenUser, false);
+    return;
+  }
+
+  // 2. الدخول المباشر لحساب المدير الرئيسي
+  if (userVal === "123456" && passVal === "1234") {
+    const adminUser = {
+      id: "u_admin_main",
+      name: "أحمد بن عبدالله بن مهدي",
+      role: ROLES.ADMIN,
+      username: "123456",
+      phone: "0500000000",
+      createdAt: Date.now(),
+    };
+    doLogin(adminUser, false);
+    return;
+  }
+
+  // 3. التحقق من بقية الحسابات (المعلمين)
   const foundUser = (window.appStore.users || []).find(
     (u) =>
       (u.username === userVal || u.phone === userVal) && u.pass === passVal,
@@ -184,7 +212,7 @@ function handleStudentLoginFormSubmit(e) {
     ?.value.trim();
   const passVal = document.getElementById("stu-login-pass")?.value.trim();
 
-  // 1. البحث في جدول الطلاب
+  // البحث في جدول الطلاب
   const foundStudent = (window.appStore.students || []).find(
     (s) =>
       (s.phone === identifier || s.nationalId === identifier) &&
@@ -219,7 +247,7 @@ function handleStudentLoginFormSubmit(e) {
     }
   }
 
-  // 2. فحص مصفوفة المستخدمين
+  // فحص مصفوفة المستخدمين للطلاب
   const foundUser = (window.appStore.users || []).find(
     (u) =>
       (u.username === identifier || u.phone === identifier) &&
@@ -298,29 +326,38 @@ function doLogin(user, isAutoSession = false) {
   adjustSidebarAndViewsForRole(user.role);
 }
 
+// ضبط الواجهة وإخفاء القائمة الجانبية بالكامل للطالب
 function adjustSidebarAndViewsForRole(role) {
   const adminNav = document.querySelector(".role-section-admin");
   const studentNav = document.querySelector(".role-section-student");
   const sidebar = document.querySelector(".sidebar");
+  const mainContent = document.querySelector(".main-content");
+  const topHeader = document.querySelector(".top-header");
 
   if (role === ROLES.SCREEN) {
     if (adminNav) adminNav.classList.add("style-hidden");
     if (studentNav) studentNav.classList.add("style-hidden");
     if (sidebar) sidebar.style.display = "flex";
+    if (mainContent) mainContent.style.marginRight = "";
+    if (topHeader) topHeader.style.display = "flex";
 
     navigateTo("view-screen");
     if (typeof renderScreenView === "function") renderScreenView();
   } else if (role === ROLES.STUDENT) {
-    if (adminNav) adminNav.classList.add("style-hidden");
-    if (studentNav) studentNav.classList.remove("style-hidden");
-    if (sidebar) sidebar.style.display = "flex";
+    // إلغاء القائمة الجانبية وشريط الرأس للطالب وجعل الصفحة بعرض كامل
+    if (sidebar) sidebar.style.display = "none";
+    if (mainContent) mainContent.style.marginRight = "0";
+    if (topHeader) topHeader.style.display = "none";
 
     navigateTo("view-student-home");
     renderStudentData();
   } else {
+    if (sidebar) sidebar.style.display = "flex";
+    if (mainContent) mainContent.style.marginRight = "";
+    if (topHeader) topHeader.style.display = "flex";
+
     if (studentNav) studentNav.classList.add("style-hidden");
     if (adminNav) adminNav.classList.remove("style-hidden");
-    if (sidebar) sidebar.style.display = "flex";
 
     if (role === ROLES.TEACHER) {
       document.querySelectorAll(".sidebar .nav-admin-only").forEach((el) => {
@@ -430,6 +467,7 @@ function checkStudentCurrentWeekTamayuz(studentId) {
   );
 }
 
+// بناء وعرض بوابة الطالب مع زر تسجيل الخروج المباشر والتقرير الشامل
 function renderStudentData() {
   if (!window.currentUser || window.currentUser.role !== ROLES.STUDENT) return;
 
@@ -440,7 +478,7 @@ function renderStudentData() {
   const circle = (window.appStore.circles || []).find(
     (c) => c.id === student.circleId,
   );
-  const circleName = circle ? circle.name : "مَجْمَع عبدالله بن مهدي";
+  const circleName = circle ? circle.name : "مُجْمَع عبدالله بن مهدي";
 
   const studentTasmeea = (window.appStore.tasmeea || []).filter(
     (t) => t.studentId === studentId,
@@ -526,12 +564,19 @@ function renderStudentData() {
   const logoOld = settings.logoOld || "logo11.jpeg";
 
   container.innerHTML = `
+    <!-- ترويسة الطالب مع الشعارين وزر الخروج -->
     <div class="card mb-3" style="background: linear-gradient(135deg, var(--primary-brown) 0%, var(--primary-dark) 100%); color: #ffffff; border-radius: 12px; padding: 1.5rem; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+      
+      <!-- زر تسجيل خروج الطالب المباشر -->
+      <button onclick="handleLogout()" class="btn btn-danger btn-sm" style="position: absolute; top: 12px; left: 12px; font-size: 0.8rem; padding: 5px 12px; border-radius: 6px; z-index: 10;">
+        🚪 تسجيل الخروج
+      </button>
+
       <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
         <img src="${logoNew}" alt="شعار المجمع" style="height: 65px; width: auto; object-fit: contain; background: #fff; padding: 4px; border-radius: 8px;" />
         <div style="text-align: center; flex: 1;">
           <h2 style="font-size: 1.4rem; font-weight: 900; margin-bottom: 4px;">${student.name}</h2>
-          <p style="font-size: 0.95rem; opacity: 0.9; margin-bottom: 8px;">مَجْمَع عبدالله بن مهدي القرآني</p>
+          <p style="font-size: 0.95rem; opacity: 0.9; margin-bottom: 8px;">مُجْمَع عبدالله بن مهدي القرآني</p>
           <span style="background: rgba(255, 255, 255, 0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;">
             🕌 حلقة: ${circleName}
           </span>
@@ -901,7 +946,7 @@ function renderSettingsView() {
   const logoOldInput = document.getElementById("set-org-logo-old");
 
   if (orgInput)
-    orgInput.value = settings.orgName || "مَجْمَع عبدالله بن مهدي القرآني";
+    orgInput.value = settings.orgName || "مُجْمَع عبدالله بن مهدي القرآني";
   if (mosqueInput) mosqueInput.value = settings.subTitle || "جامع الهدى";
   if (directorInput)
     directorInput.value = settings.directorName || "أحمد بن عبدالله بن مهدي";
@@ -915,7 +960,7 @@ function handleSaveOrgSettings(e) {
 
   const orgName =
     document.getElementById("set-org-name")?.value.trim() ||
-    "مَجْمَع عبدالله بن مهدي القرآني";
+    "مُجْمَع عبدالله بن مهدي القرآني";
   const mosqueName =
     document.getElementById("set-org-mosque")?.value.trim() || "جامع الهدى";
   const directorName =
