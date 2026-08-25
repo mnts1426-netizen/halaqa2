@@ -191,7 +191,24 @@ function handleLoginFormSubmit(e) {
     return;
   }
 
-  // 3. التحقق من بقية الحسابات (المعلمين)
+  // 3. الدخول المباشر لحساب المعلم
+  if (userVal === "123123" && passVal === "1234") {
+    const teacherUser = (window.appStore.users || []).find(
+      (u) => u.username === "123123",
+    ) || {
+      id: "u_teacher_main",
+      teacherId: "t_main",
+      name: "معلم الحلقة",
+      role: ROLES.TEACHER,
+      username: "123123",
+      phone: "0501111111",
+      createdAt: Date.now(),
+    };
+    doLogin(teacherUser, false);
+    return;
+  }
+
+  // 4. التحقق من بقية الحسابات
   const foundUser = (window.appStore.users || []).find(
     (u) =>
       (u.username === userVal || u.phone === userVal) && u.pass === passVal,
@@ -211,6 +228,20 @@ function handleStudentLoginFormSubmit(e) {
     .getElementById("stu-login-identifier")
     ?.value.trim();
   const passVal = document.getElementById("stu-login-pass")?.value.trim();
+
+  // الدخول المباشر لحساب الطالب المحدد
+  if (identifier === "0537466925" && passVal === "1234") {
+    const studentSessionUser = {
+      id: "s_main_user",
+      name: "طالب المجمع",
+      phone: "0537466925",
+      role: ROLES.STUDENT,
+      circleId: "c_main",
+      createdAt: Date.now(),
+    };
+    doLogin(studentSessionUser, false);
+    return;
+  }
 
   // البحث في جدول الطلاب
   const foundStudent = (window.appStore.students || []).find(
