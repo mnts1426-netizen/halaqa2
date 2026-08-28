@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * firebase.js - محرك الاتصال بـ Firebase وقاعدة البيانات النظيفة للمجمع
+ * firebase.js - محرك الاتصال بـ Firebase وقاعدة البيانات المحمية للمجمع
  * ==========================================================================
  */
 
@@ -8,8 +8,30 @@ let dbFirestore = null;
 let firebaseAuth = null;
 let isFirebaseOnline = false;
 
-// كائن تخزين البيانات العام
-window.appStore = {
+// الإعدادات والمفاتيح الافتراضية الآمنة لمنع أي خطأ توقف برمجي[cite: 15]
+const SAFE_DEFAULT_SETTINGS = window.DEFAULT_SETTINGS || {
+  orgName: "حلقات جامع الهدى",
+  subTitle: "لتحفيظ القرآن الكريم",
+  directorName: "أحمد بن عبدالله بن مهدي",
+  logoNew: "logo12.jpeg",
+  logoOld: "logo11.jpeg",
+  headerFontSize: "13px",
+};
+
+const SAFE_ROLES = window.ROLES || {
+  ADMIN: "admin",
+  TEACHER: "teacher",
+  STUDENT: "student",
+  SCREEN: "screen",
+};
+
+const STORAGE_KEY =
+  typeof LOCAL_STORAGE_KEY !== "undefined"
+    ? LOCAL_STORAGE_KEY
+    : window.LOCAL_STORAGE_KEY || "HALAQAT_DATA_STORAGE_V1";
+
+// كائن تخزين البيانات العام المحمي[cite: 15]
+window.appStore = window.appStore || {
   users: [],
   students: [],
   teachers: [],
@@ -20,16 +42,23 @@ window.appStore = {
   notifications: [],
   messages: [],
   screenOrder: [],
-  settings: { ...DEFAULT_SETTINGS },
+  circlesOrder: [],
+  trophyStudentId: null,
+  settings: { ...SAFE_DEFAULT_SETTINGS },
   logs: [],
 };
 
-// تهيئة Firebase والاتصال بـ Firestore
+// تهيئة Firebase والاتصال بـ Firestore[cite: 15]
 function initFirebaseApp() {
   try {
-    if (typeof firebase !== "undefined") {
+    const config =
+      typeof FIREBASE_CONFIG !== "undefined"
+        ? FIREBASE_CONFIG
+        : window.FIREBASE_CONFIG;
+
+    if (typeof firebase !== "undefined" && config) {
       if (!firebase.apps.length) {
-        firebase.initializeApp(FIREBASE_CONFIG);
+        firebase.initializeApp(config);
       }
       dbFirestore = firebase.firestore();
       firebaseAuth = firebase.auth();
@@ -50,28 +79,69 @@ function initFirebaseApp() {
   loadInitialData();
 }
 
-// تحميل البيانات الأولية
+// تحميل البيانات وحمايتها من التلف أو الحذف غير المقصود[cite: 15]
 function loadInitialData() {
-  const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
+  const localData = localStorage.getItem(STORAGE_KEY);
   if (localData) {
     try {
-      window.appStore = JSON.parse(localData);
-      if (!window.appStore.screenOrder) window.appStore.screenOrder = [];
+      const parsedData = JSON.parse(localData);
+      window.appStore = Object.assign(window.appStore, parsedData);
 
-      // التأكد من وجود الحسابات الرسمية
-      const hasAdmin = (window.appStore.users || []).some(
-        (u) => u.username === "123456" && u.role === ROLES.ADMIN,
-      );
-      const hasTeacher = (window.appStore.users || []).some(
-        (u) => u.username === "123123" && u.role === ROLES.TEACHER,
-      );
-      const hasStudent = (window.appStore.students || []).some(
-        (s) => s.phone === "0537466925",
+      // التأكد من تهيئة المصفوفات الأساسية[cite: 15]
+      if (!Array.isArray(window.appStore.users)) window.appStore.users = [];
+      if (!Array.isArray(window.appStore.students))
+        window.appStore.students = [];
+      if (!Array.isArray(window.appStore.teachers))
+        window.appStore.teachers = [];
+      if (!Array.isArray(window.appStore.circles)) window.appStore.circles = [];
+      if (!Array.isArray(window.appStore.attendance))
+        window.appStore.attendance = [];
+      if (!Array.isArray(window.appStore.tasmeea)) window.appStore.tasmeea = [];
+      if (!Array.isArray(window.appStore.tests)) window.appStore.tests = [];
+      if (!Array.isArray(window.appStore.notifications))
+        window.appStore.notifications = [];
+      if (!Array.isArray(window.appStore.logs)) window.appStore.logs = [];
+      if (!Array.isArray(window.appStore.screenOrder))
+        window.appStore.screenOrder = [];
+
+      // ضمان وجود حساب المدير وحساب التميز الأسبوعي دون مساس ببيانات الطلاب[cite: 15]
+      const hasAdmin = window.appStore.users.some(
+        (u) =>
+          (u.username === "123456" || u.username === "admin") &&
+          u.role === SAFE_ROLES.ADMIN,
       );
 
-      if (!hasAdmin || !hasTeacher || !hasStudent) {
-        seedProductionAdminOnly();
+      const hasScreen = window.appStore.users.some(
+        (u) => u.username === "121212" && u.role === SAFE_ROLES.SCREEN,
+      );
+
+      if (!hasAdmin) {
+        window.appStore.users.push({
+          id: "u_admin_main",
+          name: "أحمد بن عبدالله بن مهدي",
+          role: SAFE_ROLES.ADMIN,
+          username: "123456",
+          pass: "1234",
+          phone: "0500000000",
+          status: "active",
+          createdAt: Date.now(),
+        });
       }
+
+      if (!hasScreen) {
+        window.appStore.users.push({
+          id: "u_screen_fixed",
+          name: "التميز الأسبوعي",
+          role: SAFE_ROLES.SCREEN,
+          username: "121212",
+          pass: "1234",
+          phone: "0500000000",
+          status: "active",
+          createdAt: Date.now(),
+        });
+      }
+
+      saveLocalStore();
     } catch (e) {
       console.error("خطأ في قراءة LocalStorage:", e);
       seedProductionAdminOnly();
@@ -80,22 +150,22 @@ function loadInitialData() {
     seedProductionAdminOnly();
   }
 
-  // مزامنة البيانات مع Firestore إذا كان متصلاً
+  // مزامنة البيانات مع Firestore إذا كان متصلاً[cite: 15]
   if (isFirebaseOnline && dbFirestore) {
     syncDataFromCloud();
   }
 }
 
-// حفظ الحالة في التخزين المحلي
+// حفظ الحالة في التخزين المحلي[cite: 15]
 function saveLocalStore() {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(window.appStore));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(window.appStore));
   } catch (e) {
     console.error("فشل حفظ البيانات في LocalStorage:", e);
   }
 }
 
-// إنشاء الحسابات الرسمية وتجهيز قاعدة البيانات
+// إنشاء الحسابات الافتراضية مع المحافظة على الهيكل العام[cite: 15]
 function seedProductionAdminOnly() {
   const baseTime = Date.now();
   window.appStore = {
@@ -103,7 +173,7 @@ function seedProductionAdminOnly() {
       {
         id: "u_admin_main",
         name: "أحمد بن عبدالله بن مهدي",
-        role: ROLES.ADMIN,
+        role: SAFE_ROLES.ADMIN,
         username: "123456",
         pass: "1234",
         phone: "0500000000",
@@ -112,79 +182,27 @@ function seedProductionAdminOnly() {
       },
       {
         id: "u_screen_fixed",
-        name: "شاشة المسجد (فرسان التميز)",
-        role: ROLES.SCREEN,
+        name: "التميز الأسبوعي",
+        role: SAFE_ROLES.SCREEN,
         username: "121212",
         pass: "1234",
         phone: "0500000000",
         status: "active",
         createdAt: baseTime,
       },
-      {
-        id: "u_teacher_main",
-        teacherId: "t_main",
-        name: "معلم الحلقة",
-        role: ROLES.TEACHER,
-        username: "123123",
-        pass: "1234",
-        phone: "0501111111",
-        status: "active",
-        createdAt: baseTime,
-      },
-      {
-        id: "s_main_user",
-        name: "طالب المجمع",
-        role: ROLES.STUDENT,
-        username: "0537466925",
-        pass: "1234",
-        phone: "0537466925",
-        circleId: "c_main",
-        status: "active",
-        createdAt: baseTime,
-      },
     ],
-    teachers: [
-      {
-        id: "t_main",
-        userId: "u_teacher_main",
-        name: "معلم الحلقة",
-        phone: "0501111111",
-        status: "active",
-        lastLogin: "—",
-        createdAt: baseTime,
-      },
-    ],
-    circles: [
-      {
-        id: "c_main",
-        name: "حلقة النور",
-        mosque: "جامع الهدى",
-        teacherId: "t_main",
-        teacherIds: ["t_main"],
-        status: "نشطة",
-      },
-    ],
-    students: [
-      {
-        id: "s_main_user",
-        name: "طالب المجمع",
-        nationalId: "1000000001",
-        phone: "0537466925",
-        parentName: "ولي الأمر",
-        parentRelation: "أب",
-        parentPhone: "0500000000",
-        circleId: "c_main",
-        status: "active",
-        createdAt: baseTime,
-      },
-    ],
+    teachers: [],
+    circles: [],
+    students: [],
     attendance: [],
     tasmeea: [],
     tests: [],
     notifications: [],
     messages: [],
     screenOrder: [],
-    settings: { ...DEFAULT_SETTINGS },
+    circlesOrder: [],
+    trophyStudentId: null,
+    settings: { ...SAFE_DEFAULT_SETTINGS },
     logs: [
       {
         id: "log_" + baseTime,
@@ -197,7 +215,7 @@ function seedProductionAdminOnly() {
   saveLocalStore();
 }
 
-// مزامنة البيانات السحابية من Firestore
+// مزامنة البيانات السحابية من Firestore[cite: 15]
 async function syncDataFromCloud() {
   if (!dbFirestore) return;
   try {
@@ -223,7 +241,7 @@ async function syncDataFromCloud() {
           ...doc.data(),
         }));
         if (col === "settings") {
-          window.appStore.settings = items[0] || DEFAULT_SETTINGS;
+          window.appStore.settings = items[0] || SAFE_DEFAULT_SETTINGS;
         } else if (col === "screenOrder") {
           window.appStore.screenOrder = items[0]?.order || [];
         } else {
@@ -243,7 +261,7 @@ async function syncDataFromCloud() {
   }
 }
 
-// حفظ أو حذف مستند في السحابة
+// حفظ أو حذف مستند في السحابة بأمان[cite: 15]
 async function saveToCloud(collectionName, docId, data, isDelete = false) {
   saveLocalStore();
   if (isFirebaseOnline && dbFirestore) {
@@ -262,7 +280,7 @@ async function saveToCloud(collectionName, docId, data, isDelete = false) {
   }
 }
 
-// تسجيل عملية جديدة في سجل العمليات Logs
+// تسجيل عملية جديدة في سجل العمليات Logs[cite: 15]
 function addSystemLog(actionDesc) {
   const currentUser = window.currentUser || { name: "النظام" };
   const now = new Date();
@@ -276,6 +294,7 @@ function addSystemLog(actionDesc) {
     createdAt: Date.now(),
   };
 
+  if (!Array.isArray(window.appStore.logs)) window.appStore.logs = [];
   window.appStore.logs.unshift(newLog);
   if (window.appStore.logs.length > 200) {
     window.appStore.logs.pop();
@@ -284,7 +303,7 @@ function addSystemLog(actionDesc) {
   saveToCloud("logs", newLog.id, newLog);
 }
 
-// تشغيل الفايربيز عند تحميل الصفحة
+// تشغيل الفايربيز عند تحميل الصفحة[cite: 15]
 document.addEventListener("DOMContentLoaded", () => {
   initFirebaseApp();
 });
