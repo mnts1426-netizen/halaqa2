@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * reports.js - محرك التقارير الشاملة الرقمية، إنجاز طالب، والتميز الأسبوعي
+ * reports.js - محرك التقارير الشاملة الرقمية، إنجاز طالب، وتصدير PDF المباشر
  * ==========================================================================
  */
 
@@ -143,7 +143,7 @@ function generateReport() {
   let headHtml = "";
   let bodyHtml = "";
 
-  // 1. تقرير إنجاز طالب (تم استبدال مسمى الحفظ بـ الدرس الجديد)
+  // 1. تقرير إنجاز طالب
   if (reportType === "student_achievement") {
     if (printTitle) printTitle.textContent = "تقرير إنجاز طالب";
 
@@ -235,7 +235,7 @@ function generateReport() {
     }
   }
 
-  // 2. التقرير الإحصائي الشامل للطلاب (تم استبدال مسمى الحفظ بـ الدرس الجديد)
+  // 2. التقرير الإحصائي الشامل للطلاب
   else if (reportType === "students") {
     if (printTitle)
       printTitle.textContent =
@@ -387,7 +387,7 @@ function generateReport() {
     }
   }
 
-  // 3. تقرير سجل التسميع اليومي (تم استبدال مسمى الحفظ بـ الدرس الجديد)
+  // 3. تقرير سجل التسميع اليومي
   else if (reportType === "tasmeea") {
     if (printTitle)
       printTitle.textContent = "تقرير إنجاز وسجل التسميع والدرس الجديد";
@@ -546,7 +546,7 @@ function generateReport() {
         const circle = (window.appStore?.circles || []).find(
           (c) => c.id === item.student.circleId,
         );
-        const circleName = circle ? circle.name : "حلقات جامع الهدى";
+        const circleName = circle ? circle.name : "جامع الهدى";
 
         bodyHtml += `
           <tr>
@@ -579,14 +579,32 @@ function exportReportExcel() {
   const wb = XLSX.utils.table_to_book(table, { sheet: "التقرير الرسمي" });
   XLSX.writeFile(
     wb,
-    `تقرير_التميز_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `تقرير_المجمع_${new Date().toISOString().split("T")[0]}.xlsx`,
   );
 }
 
-function printOfficialReport() {
-  window.print();
+// دالة تنزيل التقرير الرسمي PDF
+function downloadReportPDF() {
+  const element = document.getElementById("report-results-wrapper");
+  if (!element) return;
+
+  const reportTitle =
+    document.getElementById("print-report-title")?.textContent || "تقرير_رسمي";
+
+  if (typeof html2pdf !== "undefined") {
+    const opt = {
+      margin: [10, 10, 10, 10],
+      filename: `${reportTitle.trim().replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+    };
+    html2pdf().set(opt).from(element).save();
+  } else {
+    window.print();
+  }
 }
 
-function downloadReportPDF() {
-  printOfficialReport();
+function printOfficialReport() {
+  downloadReportPDF();
 }
