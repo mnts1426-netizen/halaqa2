@@ -1,17 +1,18 @@
 /**
  * ==========================================================================
- * config.js - الثوابت والإعدادات العامة لنظام مُجْمَع عبدالله بن مهدي القرآني
+ * config.js - الثوابت والإعدادات العامة لنظام مَجْمَع عبدالله بن مهدي القرآني
  * ==========================================================================
  */
 
-// 1. إعدادات Firebase
+// 1. إعدادات Firebase الحقيقية للمشروع الجديد (halaqa2-hoda)
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDemoKey_HalaqatAlHuda2026_Project",
-  authDomain: "halaqat-alhuda.firebaseapp.com",
-  projectId: "halaqat-alhuda",
-  storageBucket: "halaqat-alhuda.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:a1b2c3d4e5f6g7h8",
+  apiKey: "AIzaSyC-rJVz16sg1o71y47VMDyTBBPGK9azHWw",
+  authDomain: "halaqa2-hoda.firebaseapp.com",
+  projectId: "halaqa2-hoda",
+  storageBucket: "halaqa2-hoda.firebasestorage.app",
+  messagingSenderId: "895399552776",
+  appId: "1:895399552776:web:e7ace5143cbd3c10f9eebd",
+  measurementId: "G-S2XZ24QN9S",
 };
 
 // 2. أدوار وصلاحيات المستخدمين
@@ -27,11 +28,12 @@ const DEFAULT_RATINGS = ["ممتاز", "جيد جداً", "جيد", "يعيد"];
 
 // 4. الإعدادات الافتراضية للمجمع
 const DEFAULT_SETTINGS = {
-  orgName: "مُجْمَع عبدالله بن مهدي القرآني",
+  orgName: "مَجْمَع عبدالله بن مهدي القرآني",
   subTitle: "جامع الهدى",
   directorName: "أحمد بن عبدالله بن مهدي",
   logoNew: "logo12.jpeg",
   logoOld: "logo11.jpeg",
+  headerFontSize: "13px",
   pageSize: 20,
   sessionTimeoutMinutes: 60,
   ratings: [...DEFAULT_RATINGS],
