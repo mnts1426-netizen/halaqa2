@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <title>مُجْمَع عبدالله بن مهدي القرآني - بجامع الهدى</title>
+    <title>حلقات تحفيظ القرآن الكريم - بجامع الهدى</title>
     <!-- الخط الرسمي: Cairo & Tajawal -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -26,25 +26,30 @@
   </head>
   <body>
     <!-- ========================================== -->
-    <!-- 1. شاشة تسجيل الدخول للإدارة والمعلمين وشاشة المسجد -->
+    <!-- 1. شاشة تسجيل الدخول الموحدة للجميع -->
     <!-- ========================================== -->
     <div id="view-login" class="page-view active">
       <div class="login-wrapper">
         <div class="login-left-panel">
           <div class="login-box">
             <h2 class="login-title">تسجيل الدخول</h2>
-            <p class="login-subtitle">
-              بوابة دخول الإدارة والمعلمين وشاشة المسجد
-            </p>
 
-            <form id="login-form">
+            <form
+              id="login-form"
+              onsubmit="
+                event.preventDefault();
+                return handleLoginFormSubmit(event);
+              "
+            >
               <div class="form-group">
-                <label for="login-username">اسم المستخدم</label>
+                <label for="login-username"
+                  >اسم المستخدم / رقم الهوية الوطنية</label
+                >
                 <input
                   type="text"
                   id="login-username"
                   class="form-control"
-                  placeholder="أدخل اسم المستخدم..."
+                  placeholder="admin أو رقم الهوية للطالب أو الجوال..."
                   required
                 />
               </div>
@@ -59,7 +64,7 @@
                 />
               </div>
               <button type="submit" class="btn btn-primary btn-block btn-lg">
-                دخول
+                دخول للنظام
               </button>
             </form>
 
@@ -74,22 +79,10 @@
               <button
                 type="button"
                 class="btn btn-outline-brown btn-block"
-                onclick="showStudentLoginView()"
-              >
-                👨‍🎓 الانتقال إلى بوابة دخول الطلاب
-              </button>
-
-              <button
-                type="button"
-                class="btn btn-outline-brown btn-block"
                 onclick="openModal('modal-self-register')"
               >
-                📝 رابط تسجيل طالب جديد (التحاق بالمجمع)
+                📝 رابط تسجيل طالب جديد (التحاق بالحلقات)
               </button>
-            </div>
-
-            <div class="login-footer-info" id="login-footer-text">
-              مُجْمَع عبدالله بن مهدي القرآني — بجامع الهدى
             </div>
           </div>
         </div>
@@ -97,16 +90,33 @@
         <div class="login-right-panel">
           <div class="brand-hero">
             <div class="brand-logo-hero">
-              <div class="logo-icon-big">
+              <div
+                class="logo-icon-big"
+                style="background: transparent; border: none; box-shadow: none"
+              >
                 <img
                   id="login-hero-logo"
-                  src="logo12.jpeg"
-                  alt="شعار المجمع"
-                  style="width: 100%; height: 100%; object-fit: contain"
+                  src="logo2.png"
+                  onerror="
+                    if (this.src.indexOf('logo2.png') !== -1) {
+                      this.src = 'logo_transparent_2.jpg';
+                    } else if (
+                      this.src.indexOf('logo_transparent_2.jpg') !== -1
+                    ) {
+                      this.src = 'logo111.png';
+                    }
+                  "
+                  alt="شعار الحلقات"
+                  style="
+                    width: 100%;
+                    height: 100%;
+                    object-fit: contain;
+                    mix-blend-mode: screen;
+                  "
                 />
               </div>
               <h1 class="brand-name-big" id="login-hero-title">
-                مُجْمَع عبدالله بن مهدي القرآني
+                مَجْمَع عبدالله بن مهدي القرآني
               </h1>
               <p class="brand-sub-big" id="login-hero-sub">جامع الهدى</p>
             </div>
@@ -115,98 +125,14 @@
               «خيرُكُم مَن تعلَّمَ القرآنَ وعلَّمَهُ»
             </div>
 
-            <p class="brand-desc">
-              نظام احترافي متكامل لإدارة الحلقات والطلاب ومتابعة التسميع
-              والاختبارات.
-            </p>
+            <p class="brand-desc"></p>
           </div>
         </div>
       </div>
     </div>
 
     <!-- ========================================== -->
-    <!-- 2. بوابة دخول الطلاب المستقلة -->
-    <!-- ========================================== -->
-    <div id="view-student-login" class="page-view style-hidden">
-      <div class="login-wrapper">
-        <div class="login-left-panel">
-          <div class="login-box">
-            <h2 class="login-title" style="color: var(--primary-brown)">
-              بوابة الطالب
-            </h2>
-            <p class="login-subtitle">متابعة الدروس، الحضور، والتسميع اليومي</p>
-
-            <form
-              id="student-login-form"
-              onsubmit="handleStudentLoginFormSubmit(event)"
-            >
-              <div class="form-group">
-                <label for="stu-login-identifier"
-                  >رقم الجوال أو رقم الهوية</label
-                >
-                <input
-                  type="text"
-                  id="stu-login-identifier"
-                  class="form-control"
-                  placeholder="05xxxxxxxx أو السجل المدني..."
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label for="stu-login-pass">الرقم السري</label>
-                <input
-                  type="password"
-                  id="stu-login-pass"
-                  class="form-control"
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
-              <button type="submit" class="btn btn-primary btn-block btn-lg">
-                دخول الطالب 📖
-              </button>
-            </form>
-
-            <div style="margin-top: 1.25rem">
-              <button
-                type="button"
-                class="btn btn-outline-brown btn-block"
-                onclick="showMainLoginView()"
-              >
-                ⬅️ العودة لتسجيل دخول الإدارة والمعلمين
-              </button>
-            </div>
-
-            <div class="login-footer-info">
-              مُجْمَع عبدالله بن مهدي القرآني — بوابة الطالب
-            </div>
-          </div>
-        </div>
-
-        <div class="login-right-panel">
-          <div class="brand-hero">
-            <div class="brand-logo-hero">
-              <div class="logo-icon-big">
-                <img
-                  src="logo12.jpeg"
-                  alt="شعار المجمع"
-                  style="width: 100%; height: 100%; object-fit: contain"
-                />
-              </div>
-              <h1 class="brand-name-big">بوابة الطالب القرآنية</h1>
-              <p class="brand-sub-big">مُجْمَع عبدالله بن مهدي القرآني</p>
-            </div>
-            <div class="quran-quote">«اقْرَأْ وَارْتَقِ وَرَتِّلْ»</div>
-            <p class="brand-desc">
-              تابع مقرراتك اليومية، خطة الغد، وحضورك وإنجازاتك أولاً بأول.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- 3. الهيكل العام للتطبيق والقائمة الجانبية -->
+    <!-- 2. الهيكل العام للتطبيق والقائمة الجانبية -->
     <!-- ========================================== -->
     <div id="app-container" class="app-layout style-hidden">
       <aside class="sidebar">
@@ -216,13 +142,13 @@
               <img
                 id="sidebar-logo-img"
                 src="logo12.jpeg"
-                alt="شعار المجمع"
+                alt="شعار الحلقات"
                 style="width: 100%; height: 100%; object-fit: contain"
               />
             </div>
             <div class="logo-text">
-              <h2 id="sidebar-org-name">مُجْمَع عبدالله بن مهدي</h2>
-              <p id="sidebar-mosque-name">جامع الهدى</p>
+              <h2 id="sidebar-org-name">حلقات جامع الهدى</h2>
+              <p id="sidebar-mosque-name">لتحفيظ القرآن الكريم</p>
             </div>
           </div>
         </div>
@@ -357,7 +283,7 @@
                 <line x1="8" y1="21" x2="16" y2="21" />
                 <line x1="12" y1="17" x2="12" y2="21" />
               </svg>
-              <span>شاشة المسجد</span>
+              <span>التميز الأسبوعي</span>
             </a>
             <a
               href="#"
@@ -376,8 +302,6 @@
                   d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
                 />
                 <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
               </svg>
               <span>الاختبارات</span>
             </a>
@@ -415,7 +339,6 @@
               </svg>
               <span>الإشعارات والرسائل</span>
             </a>
-            <!-- الإعدادات للمدير فقط -->
             <a
               href="#"
               class="nav-link nav-admin-only"
@@ -431,7 +354,7 @@
               >
                 <circle cx="12" cy="12" r="3" />
                 <path
-                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
                 />
               </svg>
               <span>الإعدادات</span>
@@ -451,7 +374,6 @@
         </div>
       </aside>
 
-      <!-- المحتوى الرئيسي للمشروع -->
       <main class="main-content">
         <header class="top-header">
           <div class="top-header-left">
@@ -465,6 +387,7 @@
 
         <!-- 1. لوحة التحكم -->
         <section id="view-dashboard" class="content-view active">
+          <!-- شبكة المربعات الإحصائية الموحدة بالكامل في الشكل والحجم واللون -->
           <div class="stats-grid" id="dashboard-stats-grid">
             <div class="stat-card">
               <div class="stat-icon icon-brown">
@@ -545,8 +468,110 @@
                 <h3 class="stat-value" id="val-stat-4">0</h3>
               </div>
             </div>
+
+            <!-- المربع 5: سمّعوا اليوم بنفس التنسيق القياسي التام -->
+            <div
+              class="stat-card nav-admin-only"
+              style="cursor: pointer"
+              onclick="openTasmeeaDetailsModal('recited')"
+              title="انقر لعرض قائمة وتفاصيل الطلاب الذين سمّعوا اليوم"
+            >
+              <div class="stat-icon icon-green">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                </svg>
+              </div>
+              <div class="stat-details">
+                <span class="stat-label" id="lbl-stat-recited-today"
+                  >سمّعوا اليوم</span
+                >
+                <h3 class="stat-value" id="val-stat-recited-today">0</h3>
+              </div>
+            </div>
+
+            <!-- المربع 6: لم يسمّعوا اليوم بنفس التنسيق القياسي التام -->
+            <div
+              class="stat-card nav-admin-only"
+              style="cursor: pointer"
+              onclick="openTasmeeaDetailsModal('not_recited')"
+              title="انقر لعرض قائمة وتفاصيل الطلاب الذين لم يسمّعوا اليوم"
+            >
+              <div class="stat-icon icon-red-soft">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+              </div>
+              <div class="stat-details">
+                <span class="stat-label" id="lbl-stat-not-recited-today"
+                  >لم يسمّعوا اليوم</span
+                >
+                <h3 class="stat-value" id="val-stat-not-recited-today">0</h3>
+              </div>
+            </div>
           </div>
 
+          <!-- بطاقة التحضير الذاتي للمعلم فقط فور تواجده بالمسجد -->
+          <div
+            class="card mb-3 nav-teacher-only"
+            id="teacher-self-attendance-card"
+          >
+            <div class="card-header flex-between">
+              <div>
+                <h3
+                  style="
+                    color: var(--primary-brown);
+                    font-weight: 800;
+                    margin: 0;
+                  "
+                >
+                  📍 تسجيل الحضور الذاتي بالمسجد
+                </h3>
+                <small class="text-muted"
+                  >تسجيل حضورك المباشر في المجمع لهذا اليوم</small
+                >
+              </div>
+              <div id="teacher-self-checkin-status-badge">
+                <span class="badge" style="background: #e0e0e0; color: #555"
+                  >لم يتم التحضير بعد</span
+                >
+              </div>
+            </div>
+            <div
+              class="card-body p-2 flex-between"
+              style="flex-wrap: wrap; gap: 1rem"
+            >
+              <p style="margin: 0; font-size: 0.9rem; color: #444">
+                يرجى الضغط على الزر أدناه لتأكيد حضورك اليومي فور دخولك للمسجد:
+              </p>
+              <button
+                type="button"
+                id="btn-teacher-self-checkin"
+                class="btn btn-success"
+                onclick="handleTeacherSelfCheckIn()"
+              >
+                ✅ تسجيل حضوري اليوم بالمسجد
+              </button>
+            </div>
+          </div>
+
+          <!-- لوحة التميز خاصة بالمدير فقط ومحذوفة تماماً من واجهة المعلم -->
           <div class="card mb-3 nav-admin-only" id="tamayuz-board-card">
             <div class="card-header flex-between">
               <div>
@@ -576,7 +601,7 @@
                 </select>
               </div>
             </div>
-            <div class="table-responsive">
+            <div class="table-responsive" style="display: none">
               <table class="data-table">
                 <thead>
                   <tr>
@@ -584,7 +609,7 @@
                     <th>الحلقة</th>
                     <th>نسبة الحضور الأسبوعي</th>
                     <th>إنجاز مقرر التسميع</th>
-                    <th>التقدير العام</th>
+                    <th>إجراء الكأس</th>
                   </tr>
                 </thead>
                 <tbody id="tamayuz-students-body">
@@ -670,7 +695,7 @@
                 إدارة المعلمين
               </h3>
               <p class="text-muted" style="font-size: 0.8rem; margin: 0">
-                بيانات المعلمين، التكليفات، والمتابعة
+                بيانات المعلمين، التكليفات، ومتابعة التحضير
               </p>
             </div>
             <div
@@ -716,12 +741,43 @@
 
           <div id="sec-complex-teachers" class="style-hidden">
             <div class="flex-between mb-3">
-              <div></div>
-              <button class="btn btn-primary" onclick="openModalAddTeacher()">
-                ➕ إضافة معلم
-              </button>
+              <div
+                class="sub-tabs-bar nav-admin-only"
+                style="margin-bottom: 0; border: none"
+              >
+                <button
+                  class="tab-btn active"
+                  id="tab-btn-teachers-list"
+                  onclick="switchTeacherSubTab('list')"
+                >
+                  قائمة المعلمين
+                </button>
+                <button
+                  class="tab-btn"
+                  id="tab-btn-teachers-attendance"
+                  onclick="switchTeacherSubTab('attendance')"
+                >
+                  📋 متابعة تحضير المعلمين اليومي
+                </button>
+              </div>
+              <div class="header-actions">
+                <button
+                  class="btn btn-outline-brown"
+                  onclick="exportTeachersExcel()"
+                >
+                  📤 تصدير Excel
+                </button>
+                <button class="btn btn-outline-brown" onclick="window.print()">
+                  طباعة
+                </button>
+                <button class="btn btn-primary" onclick="openModalAddTeacher()">
+                  ➕ إضافة معلم
+                </button>
+              </div>
             </div>
-            <div class="card">
+
+            <!-- جدول المعلمين الرئيسي -->
+            <div class="card" id="box-teachers-list-table">
               <div class="card-filter-bar">
                 <input
                   type="text"
@@ -731,7 +787,7 @@
                 />
               </div>
               <div class="table-responsive">
-                <table class="data-table">
+                <table class="data-table" id="teachers-table-element">
                   <thead>
                     <tr>
                       <th>اسم المعلم</th>
@@ -742,6 +798,57 @@
                     </tr>
                   </thead>
                   <tbody id="teachers-table-body"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- جدول متابعة وتعديل تحضير المعلمين للمدير -->
+            <div class="card style-hidden" id="box-teachers-attendance-table">
+              <div class="card-filter-bar flex-between">
+                <div style="display: flex; gap: 0.8rem; flex: 1">
+                  <input
+                    type="date"
+                    id="teacher-attendance-date-select"
+                    class="form-control select-input"
+                    onchange="renderTeachersAttendanceTable()"
+                  />
+                  <input
+                    type="text"
+                    id="search-teacher-attendance"
+                    class="form-control search-input"
+                    placeholder="🔍 ابحث باسم المعلم..."
+                    oninput="renderTeachersAttendanceTable()"
+                  />
+                </div>
+                <div class="flex-align-gap">
+                  <button
+                    class="btn btn-outline-brown btn-sm"
+                    onclick="exportTeachersAttendanceExcel()"
+                  >
+                    📤 تصدير التحضير Excel
+                  </button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 45px; text-align: center">م</th>
+                      <th>اسم المعلم</th>
+                      <th>رقم الجوال</th>
+                      <th>الحلقات المكلف بها</th>
+                      <th>وقت التحضير الذاتي</th>
+                      <th>حالة الحضور (تعديل المدير)</th>
+                      <th>ملاحظة المدير</th>
+                    </tr>
+                  </thead>
+                  <tbody id="teachers-attendance-table-body">
+                    <tr>
+                      <td colspan="7" class="text-center text-muted p-3">
+                        جاري تجهيز السجل...
+                      </td>
+                    </tr>
+                  </tbody>
                 </table>
               </div>
             </div>
@@ -778,19 +885,24 @@
                   📥 استيراد طلاب من Excel
                 </button>
                 <button
+                  class="btn btn-outline-brown"
+                  onclick="executeBulkExportStudentsExcel()"
+                >
+                  📤 تصدير Excel
+                </button>
+                <button class="btn btn-outline-brown" onclick="window.print()">
+                  طباعة
+                </button>
+                <button
                   class="btn btn-primary nav-admin-only"
                   onclick="openModal('modal-add-student')"
                 >
                   ➕ إضافة طالب
                 </button>
-                <button class="btn btn-outline-brown" onclick="window.print()">
-                  طباعة
-                </button>
               </div>
             </div>
 
             <div class="card" id="box-active-students-table">
-              <!-- شريط الأدوات للعمليات الجماعية على الطلاب المحددين -->
               <div
                 class="bulk-actions-bar p-2 mb-3 flex-between no-print"
                 id="students-bulk-bar"
@@ -871,7 +983,7 @@
               </div>
 
               <div class="table-responsive">
-                <table class="data-table">
+                <table class="data-table" id="students-table-element">
                   <thead>
                     <tr>
                       <th style="width: 40px; text-align: center">
@@ -905,10 +1017,11 @@
                     <tr>
                       <th>اسم الطالب</th>
                       <th>رقم الهوية</th>
-                      <th>جوال الطالب</th>
+                      <th>مقدار الحفظ والدراسة السابقة</th>
                       <th>اسم ولي الأمر</th>
                       <th>صلة القرابة</th>
                       <th>جوال ولي الأمر</th>
+                      <th>مكان السكن</th>
                       <th>القرار</th>
                     </tr>
                   </thead>
@@ -945,12 +1058,29 @@
                   placeholder="🔍 ابحث عن طالب بالحلقة..."
                 />
               </div>
-              <button class="btn btn-outline-brown" onclick="markAllAbsent()">
-                الكل غائب
-              </button>
+              <div class="flex-align-gap">
+                <button
+                  class="btn btn-outline-brown btn-sm"
+                  onclick="exportAttendanceExcel()"
+                >
+                  📤 تصدير Excel
+                </button>
+                <button
+                  class="btn btn-outline-brown btn-sm"
+                  onclick="window.print()"
+                >
+                  طباعة
+                </button>
+                <button
+                  class="btn btn-outline-brown btn-sm"
+                  onclick="markAllAbsent()"
+                >
+                  الكل غائب
+                </button>
+              </div>
             </div>
             <div class="table-responsive" id="attendance-table-wrapper">
-              <table class="data-table">
+              <table class="data-table" id="attendance-table-element">
                 <thead>
                   <tr>
                     <th>اسم الطالب</th>
@@ -1006,6 +1136,20 @@
                   للطلاب</small
                 >
               </div>
+              <div class="flex-align-gap no-print">
+                <button
+                  class="btn btn-outline-brown btn-sm"
+                  onclick="exportTeacherNotesExcel()"
+                >
+                  📤 تصدير Excel
+                </button>
+                <button
+                  class="btn btn-outline-brown btn-sm"
+                  onclick="window.print()"
+                >
+                  طباعة
+                </button>
+              </div>
             </div>
             <div class="card-filter-bar no-print mt-2">
               <input
@@ -1022,7 +1166,7 @@
               </select>
             </div>
             <div class="table-responsive">
-              <table class="data-table">
+              <table class="data-table" id="teacher-notes-table-element">
                 <thead>
                   <tr>
                     <th style="width: 50px">م</th>
@@ -1046,9 +1190,23 @@
               <div>
                 <h3>👥 إدارة جميع حسابات النظام</h3>
                 <small class="text-muted"
-                  >التحكم في بيانات وصلاحيات وحالات الحسابات (المعلمون، الطلاب،
-                  وشاشة المسجد)</small
+                  >التحكم في بيانات وصلاحيات وحالات الحسابات وتعديل الأرقام
+                  السرية</small
                 >
+              </div>
+              <div class="flex-align-gap no-print">
+                <button
+                  class="btn btn-outline-brown btn-sm"
+                  onclick="exportAccountsExcel()"
+                >
+                  📤 تصدير Excel
+                </button>
+                <button
+                  class="btn btn-outline-brown btn-sm"
+                  onclick="window.print()"
+                >
+                  طباعة
+                </button>
               </div>
             </div>
             <div class="card-filter-bar no-print mt-2">
@@ -1065,7 +1223,7 @@
                 <option value="all">كل الأدوار</option>
                 <option value="teacher">المعلمون</option>
                 <option value="student">الطلاب</option>
-                <option value="screen">شاشة المسجد</option>
+                <option value="screen">التميز الأسبوعي</option>
               </select>
               <select
                 id="filter-account-status"
@@ -1077,13 +1235,13 @@
               </select>
             </div>
             <div class="table-responsive">
-              <table class="data-table">
+              <table class="data-table" id="accounts-table-element">
                 <thead>
                   <tr>
                     <th style="width: 50px">م</th>
                     <th>الاسم الكامل</th>
                     <th>الدور / الصلاحية</th>
-                    <th>اسم المستخدم</th>
+                    <th>اسم المستخدم (رقم الهوية للطالب)</th>
                     <th>الحالة</th>
                     <th>إجراءات</th>
                   </tr>
@@ -1094,7 +1252,7 @@
           </div>
         </section>
 
-        <!-- 7. شاشة المسجد المستقلة -->
+        <!-- 7. شاشة التميز الأسبوعي -->
         <section id="view-screen" class="content-view">
           <div class="card mb-3">
             <div class="card-header flex-between">
@@ -1107,10 +1265,11 @@
                     margin: 0;
                   "
                 >
-                  📺 شاشة عرض فرسان التميز
+                  📺 لوحة عرض التميز الأسبوعي
                 </h2>
                 <small class="text-muted"
-                  >عرض مباشر للطلاب المتميزين مع إمكانية ضبط الترتيب</small
+                  >عرض مباشر للطلاب الحاصلين على بطاقات التميز مع إمكانية ضبط
+                  الترتيب</small
                 >
               </div>
               <div class="flex-align-gap">
@@ -1158,12 +1317,20 @@
         <!-- 8. شاشة الاختبارات -->
         <section id="view-tests" class="content-view">
           <div class="flex-between mb-3 no-print">
-            <button
-              class="btn btn-outline-brown"
-              onclick="openCustomTestsPrintModal()"
-            >
-              طباعة
-            </button>
+            <div class="flex-align-gap">
+              <button
+                class="btn btn-outline-brown"
+                onclick="exportTestsExcel()"
+              >
+                📤 تصدير Excel
+              </button>
+              <button
+                class="btn btn-outline-brown"
+                onclick="openCustomTestsPrintModal()"
+              >
+                طباعة
+              </button>
+            </div>
             <button class="btn btn-primary" onclick="openModalAddTest()">
               إضافة اختبار
             </button>
@@ -1204,7 +1371,7 @@
           </div>
         </section>
 
-        <!-- 9. شاشة التقارير الرسمية المحدثة -->
+        <!-- 9. شاشة التقارير الرسمية -->
         <section id="view-reports" class="content-view">
           <div class="card no-print">
             <div
@@ -1234,7 +1401,7 @@
                   </option>
                   <option value="tasmeea">تقرير إنجاز التسميع</option>
                   <option value="tamayuz">
-                    تقرير لوحة الطلاب المتميزين (التميز الأسبوعي)
+                    تقرير التميز الأسبوعي (عدد البطاقات)
                   </option>
                 </select>
               </div>
@@ -1248,9 +1415,12 @@
                   <option value="all">كل الحلقات</option>
                 </select>
               </div>
-              <div class="form-group style-hidden" id="report-week-group">
-                <label>أسبوع التميز</label>
-                <select id="report-week-select" class="form-control"></select>
+              <div class="form-group style-hidden" id="report-week-range-group">
+                <label>نطاق الأسابيع (من - إلى)</label>
+                <div style="display: flex; gap: 0.5rem">
+                  <select id="report-week-from" class="form-control"></select>
+                  <select id="report-week-to" class="form-control"></select>
+                </div>
               </div>
               <div class="form-group" id="report-date-from-group">
                 <label>من تاريخ</label>
@@ -1267,6 +1437,12 @@
               </button>
               <button
                 class="btn btn-outline-brown"
+                onclick="exportReportExcel()"
+              >
+                📤 تصدير Excel
+              </button>
+              <button
+                class="btn btn-outline-brown"
                 onclick="printOfficialReport()"
               >
                 طباعة
@@ -1275,7 +1451,7 @@
                 class="btn btn-outline-brown"
                 onclick="downloadReportPDF()"
               >
-                📥 تنزيل PDF
+                تنزيل PDF
               </button>
             </div>
           </div>
@@ -1283,42 +1459,15 @@
           <div class="card mt-3" id="report-results-wrapper">
             <div class="print-official-header">
               <div class="print-header-center-logos">
-                <img
-                  id="print-logo-new"
-                  src="logo12.jpeg"
-                  alt="شعار المجمع الجديد"
-                />
-                <div style="text-align: center">
-                  <h2
-                    id="print-org-name"
-                    style="
-                      color: var(--primary-brown);
-                      font-size: 1.5rem;
-                      font-weight: 900;
-                      margin-bottom: 2px;
-                    "
-                  >
-                    مُجْمَع عبدالله بن مهدي القرآني
-                  </h2>
-                  <p
-                    id="print-mosque-name"
-                    style="font-size: 1rem; font-weight: 700; color: #555"
-                  >
-                    بجامع الهدى
-                  </p>
-                </div>
-                <img
-                  id="print-logo-old"
-                  src="logo11.jpeg"
-                  alt="شعار الحلقات السابق"
-                />
+                <img id="print-logo-new" src="logo12.jpeg" alt="شعار الحلقات" />
+                <img id="print-logo-old" src="logo1.png" alt="شعار الحلقات" />
               </div>
               <div class="print-header-title-box">
                 <h3
                   id="print-report-title"
                   style="
                     margin: 0;
-                    font-size: 1.25rem;
+                    font-size: 1.15rem;
                     font-weight: 800;
                     color: var(--primary-brown);
                   "
@@ -1328,26 +1477,17 @@
                 <p
                   id="print-report-period"
                   style="
-                    margin: 4px 0 0 0;
-                    font-size: 0.9rem;
+                    margin: 3px 0 0 0;
+                    font-size: 0.88rem;
                     color: #333;
                     font-weight: 700;
                   "
-                ></p>
-              </div>
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  margin-top: 0.5rem;
-                  font-size: 0.8rem;
-                  color: #666;
-                "
-              >
-                <span id="print-header-date"></span
-                ><span id="print-header-time"></span>
+                >
+                  كامل الفترة المسجلة
+                </p>
               </div>
             </div>
+
             <div class="table-responsive">
               <table class="data-table" id="report-results-table">
                 <thead id="report-thead"></thead>
@@ -1359,31 +1499,6 @@
                   </tr>
                 </tbody>
               </table>
-            </div>
-            <div class="print-report-footer" id="report-print-footer">
-              <div style="font-size: 0.88rem; color: #444">
-                <span>حرر بتاريخ: </span
-                ><strong id="print-footer-date"></strong>
-              </div>
-              <div style="text-align: center; min-width: 220px">
-                <p style="font-size: 0.9rem; color: #555; margin-bottom: 4px">
-                  مدير المجمع
-                </p>
-                <p
-                  style="
-                    font-size: 1.15rem;
-                    font-weight: 900;
-                    color: var(--text-dark);
-                    margin-bottom: 6px;
-                  "
-                  id="print-director-name"
-                >
-                  أحمد بن عبدالله بن مهدي
-                </p>
-                <p style="font-size: 0.8rem; color: #888">
-                  التوقيع / الختم: ........................
-                </p>
-              </div>
             </div>
           </div>
         </section>
@@ -1415,7 +1530,7 @@
           </div>
         </section>
 
-        <!-- 11. شاشة الإعدادات (للمدير فقط) -->
+        <!-- 11. شاشة الإعدادات -->
         <section id="view-settings" class="content-view">
           <div class="dashboard-columns">
             <div class="card nav-admin-only" id="admin-org-settings-card">
@@ -1446,15 +1561,23 @@
                   />
                 </div>
                 <div class="form-group">
-                  <label
-                    >اسم مدير المجمع والبرنامج (يظهر بالتوقيع في
-                    التقارير)</label
+                  <label>اسم مدير المجمع</label
                   ><input
                     type="text"
                     id="set-org-director"
                     class="form-control"
                     required
                   />
+                </div>
+                <div class="form-group">
+                  <label>حجم خط العناوين ورأس الصفحة</label>
+                  <select id="set-header-font-size" class="form-control">
+                    <option value="11px">صغير جداً (11px)</option>
+                    <option value="12px">صغير (12px)</option>
+                    <option value="13px" selected>متوسط قياسي (13px)</option>
+                    <option value="15px">متوسط كبير (15px)</option>
+                    <option value="17px">كبير (17px)</option>
+                  </select>
                 </div>
                 <div class="form-row">
                   <div class="form-group flex-1">
@@ -1526,7 +1649,7 @@
           </div>
         </section>
 
-        <!-- 12. شاشات الطالب (تُبنى ديناميكياً بواسطة app.js) -->
+        <!-- 12. شاشات الطالب (تتضمن صندوق الإشعارات الواردة من المدير) -->
         <section id="view-student-home" class="content-view"></section>
         <section id="view-student-lessons" class="content-view">
           <div id="stu-lessons-container">
@@ -1539,6 +1662,80 @@
     </div>
 
     <!-- MODALS: النوافذ المنبثقة -->
+
+    <!-- نافذة عرض تفاصيل من سمّع ومن لم يسمّع اليوم -->
+    <div id="modal-tasmeea-status-details" class="modal-overlay">
+      <div class="modal-card modal-lg">
+        <div class="modal-header">
+          <h3 id="tasmeea-details-modal-title">تفاصيل تسميع الطلاب اليوم</h3>
+          <button
+            class="modal-close"
+            onclick="closeModal('modal-tasmeea-status-details')"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="flex-between mb-2 no-print">
+            <input
+              type="text"
+              id="search-modal-tasmeea-status"
+              class="form-control search-input"
+              placeholder="🔍 ابحث بالاسم أو الحلقة..."
+              oninput="filterTasmeeaDetailsModal()"
+            />
+            <div class="flex-align-gap">
+              <button
+                class="btn btn-outline-brown btn-sm"
+                onclick="exportTasmeeaDetailsExcel()"
+              >
+                📤 تصدير Excel
+              </button>
+              <button
+                class="btn btn-outline-brown btn-sm"
+                onclick="printTasmeeaDetails()"
+              >
+                📄 طباعة
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table" id="tasmeea-details-table">
+              <thead>
+                <tr>
+                  <th style="width: 45px; text-align: center">م</th>
+                  <th>اسم الطالب</th>
+                  <th>الحلقة</th>
+                  <th>حالة التسميع</th>
+                  <th>الدرس الجديد</th>
+                  <th>المراجعة</th>
+                  <th>التلاوة</th>
+                  <th>التقدير العام</th>
+                  <th>ملاحظات المعلم</th>
+                </tr>
+              </thead>
+              <tbody id="tasmeea-details-tbody">
+                <tr>
+                  <td colspan="9" class="text-center text-muted p-3">
+                    جاري التحميل...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-outline-brown"
+            onclick="closeModal('modal-tasmeea-status-details')"
+          >
+            إغلاق
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div id="modal-add-circle" class="modal-overlay">
       <div class="modal-card modal-lg">
         <div class="modal-header">
@@ -1694,10 +1891,11 @@
       </div>
     </div>
 
+    <!-- نافذة تعديل بيانات الطالب وحسابه مع الرقم السري -->
     <div id="modal-edit-student-comprehensive" class="modal-overlay">
       <div class="modal-card modal-lg">
         <div class="modal-header">
-          <h3>تعديل بيانات الطالب</h3>
+          <h3>تعديل بيانات الطالب وحسابه</h3>
           <button
             class="modal-close"
             onclick="closeModal('modal-edit-student-comprehensive')"
@@ -1773,6 +1971,17 @@
                   <option value="active">🟢 نشط</option>
                   <option value="archived">🔴 موقوف (مؤرشف)</option>
                 </select>
+              </div>
+              <div class="form-group flex-1">
+                <label style="color: var(--primary-brown); font-weight: 800"
+                  >🔑 الرقم السري للطالب</label
+                >
+                <input
+                  type="text"
+                  id="edit-comp-password"
+                  class="form-control"
+                  placeholder="كلمة المرور..."
+                />
               </div>
             </div>
           </div>
@@ -1898,10 +2107,11 @@
       </div>
     </div>
 
+    <!-- نافذة تعديل بيانات المعلم وحسابه مع الرقم السري -->
     <div id="modal-edit-teacher" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
-          <h3>تعديل بيانات المعلم</h3>
+          <h3>تعديل بيانات المعلم وحسابه</h3>
           <button
             class="modal-close"
             onclick="closeModal('modal-edit-teacher')"
@@ -1931,6 +2141,17 @@
               />
             </div>
             <div class="form-group">
+              <label style="color: var(--primary-brown); font-weight: 800"
+                >🔑 الرقم السري للمعلم</label
+              >
+              <input
+                type="text"
+                id="edit-teach-password"
+                class="form-control"
+                placeholder="كلمة المرور..."
+              />
+            </div>
+            <div class="form-group">
               <label>الحلقات المكلف بها:</label>
               <div
                 id="edit-teacher-circles-checkbox-container"
@@ -1955,7 +2176,7 @@
     <div id="modal-edit-user-account" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
-          <h3>تعديل بيانات الحساب</h3>
+          <h3>تعديل بيانات الحساب والرقم السري</h3>
           <button
             class="modal-close"
             onclick="closeModal('modal-edit-user-account')"
@@ -1988,13 +2209,11 @@
               />
             </div>
             <div class="form-group">
-              <label
-                >كلمة المرور الجديدة
-                <small class="text-muted"
-                  >(اتركها فارغة إذا لم ترغب بالتغيير)</small
-                ></label
-              ><input
-                type="password"
+              <label style="color: var(--primary-brown); font-weight: 800"
+                >الرقم السري الجديد</label
+              >
+              <input
+                type="text"
                 id="edit-account-password"
                 class="form-control"
                 placeholder="••••••••"
@@ -2015,10 +2234,11 @@
       </div>
     </div>
 
+    <!-- نافذة طلب الالتحاق بالمجمع -->
     <div id="modal-self-register" class="modal-overlay">
-      <div class="modal-card">
+      <div class="modal-card word-doc-style">
         <div class="modal-header">
-          <h3>طلب الالتحاق بمُجْمَع عبدالله بن مهدي القرآني</h3>
+          <h3>استمارة طلب التحاق بمَجْمَع عبدالله بن مهدي القرآني</h3>
           <button
             class="modal-close"
             onclick="closeModal('modal-self-register')"
@@ -2028,65 +2248,434 @@
         </div>
         <form id="form-self-register" onsubmit="handleSelfRegistration(event)">
           <div class="modal-body">
-            <div class="form-group">
-              <label
-                >الاسم الرباعي للطالب <span style="color: red">*</span></label
-              ><input
-                type="text"
-                id="reg-stu-name"
-                class="form-control"
-                required
-              />
-            </div>
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>رقم هوية الطالب <span style="color: red">*</span></label
-                ><input
+            <div class="word-page-container">
+              <div class="word-doc-header">
+                <h2>مَجْمَع عبدالله بن مهدي القرآني</h2>
+                <p>بجامع الهدى — استمارة تسجيل طالب جديد</p>
+              </div>
+
+              <div
+                style="
+                  background: #fffdf8;
+                  border: 1.5px solid var(--primary-brown);
+                  border-radius: 6px;
+                  padding: 1.25rem;
+                  margin-bottom: 1.25rem;
+                  line-height: 1.7;
+                "
+              >
+                <h4
+                  style="
+                    color: var(--primary-brown);
+                    font-weight: 900;
+                    margin-bottom: 0.6rem;
+                    font-size: 1.05rem;
+                  "
+                >
+                  📜 شروط الالتحاق بالمَجْمَع:
+                </h4>
+                <ol
+                  style="
+                    padding-right: 1.2rem;
+                    margin: 0;
+                    font-size: 0.92rem;
+                    color: #333;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.4rem;
+                  "
+                >
+                  <li>
+                    تبدأ حلقات البنين للفصل الدراسي الأول يوم الأحد 17 / 3 /
+                    1448هـ وينتهي يوم 22 / 7 / 1448هـ.
+                  </li>
+                  <li>
+                    لا يحق للطالب الغياب بدون عذر أكثر من 5 أيام خلال الفصل
+                    الدراسي.
+                  </li>
+                  <li>
+                    الإلتزام بلبس الثوب وعدم التأخر عن الحلقة، وستبدأ الحلقة
+                    يوميًا بعد صلاة العصر بـ 10 دقائق.
+                  </li>
+                  <li>التزام الطالب باحضار مصحفه الخاص والادوات المطلوبة.</li>
+                  <li>
+                    عند تكليف ابنكم بمهام إستماع أو حفظ نأمل متابعته متابعة
+                    جاده.
+                  </li>
+                  <li>أن يكون الطالب يدرس في الصف الثاني الإبتدائي فما فوق.</li>
+                </ol>
+                <div
+                  style="
+                    text-align: center;
+                    margin-top: 1rem;
+                    padding-top: 0.75rem;
+                    border-top: 1px dashed #d7ccc8;
+                  "
+                >
+                  <p
+                    style="
+                      font-weight: 800;
+                      color: var(--primary-brown);
+                      margin-bottom: 4px;
+                    "
+                  >
+                    «الحلقات جادة ، و نتطلع لجديتكم ، والنوعيات إهتمامُنا»
+                  </p>
+                  <small style="color: #6d4c41; font-weight: 700">
+                    نرجوا لكم ولأبنائكم التوفيق والسداد
+                  </small>
+                </div>
+                <div
+                  style="
+                    margin-top: 1rem;
+                    background: #fff;
+                    padding: 0.75rem;
+                    border-radius: 4px;
+                    border: 1px solid var(--border-color);
+                  "
+                >
+                  <label
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 0.6rem;
+                      cursor: pointer;
+                      font-weight: 800;
+                      color: #1b5e20;
+                      margin: 0;
+                    "
+                  >
+                    <input
+                      type="checkbox"
+                      id="reg-terms-agree"
+                      style="width: 18px; height: 18px; accent-color: #2e7d32"
+                      required
+                    />
+                    <span>اطلعت على الشروط وأوافق عليها *</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="word-section-title">بيانات الطالب الشخصية</div>
+              <div class="form-group">
+                <label
+                  >اسم الطالب الثلاثي <span style="color: red">*</span></label
+                >
+                <input
                   type="text"
-                  id="reg-stu-id"
+                  id="reg-stu-name"
                   class="form-control"
+                  placeholder="إجابتك"
                   required
                 />
               </div>
-              <div class="form-group flex-1">
-                <label>رقم جوال الطالب</label>
-                <input type="tel" id="reg-stu-phone" class="form-control" />
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label
+                    >رقم هوية الطالب <span style="color: red">*</span></label
+                  >
+                  <input
+                    type="text"
+                    id="reg-stu-id"
+                    class="form-control"
+                    placeholder="إجابتك"
+                    required
+                  />
+                </div>
+                <div class="form-group flex-1">
+                  <label>عمر الطالب <span style="color: red">*</span></label>
+                  <input
+                    type="number"
+                    id="reg-stu-age"
+                    class="form-control"
+                    placeholder="إجابتك"
+                    min="5"
+                    max="25"
+                    required
+                  />
+                </div>
               </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>اسم ولي الأمر <span style="color: red">*</span></label
-                ><input
+              <div class="form-group">
+                <label style="font-weight: 800"
+                  >الالتحاق سابقاً بحلقات أو مجامع قرانية
+                  <span style="color: red">*</span></label
+                >
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.5rem;
+                    margin-top: 0.4rem;
+                    padding: 0.75rem;
+                    background: #fdfdfd;
+                    border: 1px solid var(--border-color);
+                    border-radius: 4px;
+                  "
+                >
+                  <label
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 0.5rem;
+                      cursor: pointer;
+                      margin: 0;
+                    "
+                  >
+                    <input
+                      type="radio"
+                      name="reg_prev_study"
+                      value="مَجْمَع عبدالله بن مهدي ( حلقات جامع الهُدى أو دار المُهتدية )"
+                      required
+                    />
+                    <span
+                      >مَجْمَع عبدالله بن مهدي ( حلقات جامع الهُدى أو دار
+                      المُهتدية )</span
+                    >
+                  </label>
+                  <label
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 0.5rem;
+                      cursor: pointer;
+                      margin: 0;
+                    "
+                  >
+                    <input
+                      type="radio"
+                      name="reg_prev_study"
+                      value="حلقات أخرى"
+                    />
+                    <span>حلقات أخرى</span>
+                  </label>
+                </div>
+              </div>
+              <div class="form-group">
+                <label style="font-weight: 800">
+                  مقدار الحفظ لمن سبق له الالتحاق بأي حلقات اخرى
+                  <span style="color: red">*</span><br />
+                  <small style="color: #666; font-weight: normal"
+                    >تكون الاجابة بهذه الطريقة من سورة ( ........... ) إلى سورة
+                    ( ............. )</small
+                  >
+                </label>
+                <input
                   type="text"
-                  id="reg-parent-name"
+                  id="reg-hifz-amount"
                   class="form-control"
+                  placeholder="إجابتك"
                   required
                 />
               </div>
-              <div class="form-group flex-1">
-                <label>صلة القرابة <span style="color: red">*</span></label
-                ><input
+
+              <div class="word-section-title">بيانات ولي الأمر والتواصل</div>
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label>اسم ولي الأمر <span style="color: red">*</span></label>
+                  <input
+                    type="text"
+                    id="reg-parent-name"
+                    class="form-control"
+                    placeholder="إجابتك"
+                    required
+                  />
+                </div>
+                <div class="form-group flex-1">
+                  <label
+                    >رقم جوال ولي الأمر <span style="color: red">*</span>
+                    <small style="color: #777"
+                      >(يكتب بالصيغة 966555555)</small
+                    ></label
+                  >
+                  <input
+                    type="tel"
+                    id="reg-parent-phone"
+                    class="form-control"
+                    placeholder="إجابتك"
+                    required
+                  />
+                </div>
+              </div>
+              <div class="form-group">
+                <label style="font-weight: 800"
+                  >صلة قرابة ولي الأمر بالطالب
+                  <span style="color: red">*</span></label
+                >
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.5rem;
+                    margin-top: 0.4rem;
+                    padding: 0.75rem;
+                    background: #fdfdfd;
+                    border: 1px solid var(--border-color);
+                    border-radius: 4px;
+                  "
+                >
+                  <label
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 0.5rem;
+                      cursor: pointer;
+                      margin: 0;
+                    "
+                  >
+                    <input
+                      type="radio"
+                      name="reg_parent_relation"
+                      value="أب"
+                      required
+                      onclick="
+                        document.getElementById(
+                          'reg-relation-other-text',
+                        ).style.display = 'none'
+                      "
+                    /><span>أب</span>
+                  </label>
+                  <label
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 0.5rem;
+                      cursor: pointer;
+                      margin: 0;
+                    "
+                  >
+                    <input
+                      type="radio"
+                      name="reg_parent_relation"
+                      value="أم"
+                      onclick="
+                        document.getElementById(
+                          'reg-relation-other-text',
+                        ).style.display = 'none'
+                      "
+                    /><span>أم</span>
+                  </label>
+                  <label
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 0.5rem;
+                      cursor: pointer;
+                      margin: 0;
+                    "
+                  >
+                    <input
+                      type="radio"
+                      name="reg_parent_relation"
+                      value="أخ"
+                      onclick="
+                        document.getElementById(
+                          'reg-relation-other-text',
+                        ).style.display = 'none'
+                      "
+                    /><span>أخ</span>
+                  </label>
+                  <label
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 0.5rem;
+                      cursor: pointer;
+                      margin: 0;
+                    "
+                  >
+                    <input
+                      type="radio"
+                      name="reg_parent_relation"
+                      value="أخت"
+                      onclick="
+                        document.getElementById(
+                          'reg-relation-other-text',
+                        ).style.display = 'none'
+                      "
+                    /><span>أخت</span>
+                  </label>
+                  <label
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 0.5rem;
+                      cursor: pointer;
+                      margin: 0;
+                    "
+                  >
+                    <input
+                      type="radio"
+                      name="reg_parent_relation"
+                      value="أخرى"
+                      onclick="
+                        document.getElementById(
+                          'reg-relation-other-text',
+                        ).style.display = 'block'
+                      "
+                    /><span>أخرى:</span>
+                  </label>
+                  <input
+                    type="text"
+                    id="reg-relation-other-text"
+                    class="form-control mt-1"
+                    placeholder="حدد صلة القرابة..."
+                    style="display: none"
+                  />
+                </div>
+              </div>
+              <div class="form-group">
+                <label
+                  >مكان السكن ( أو الحي )
+                  <span style="color: red">*</span></label
+                >
+                <input
                   type="text"
-                  id="reg-parent-relation"
+                  id="reg-residence"
                   class="form-control"
-                  placeholder="أب / عم / أخ"
+                  placeholder="إجابتك"
                   required
                 />
               </div>
-            </div>
-            <div class="form-group">
-              <label>رقم جوال ولي الأمر <span style="color: red">*</span></label
-              ><input
-                type="tel"
-                id="reg-parent-phone"
-                class="form-control"
-                required
-              />
+              <div
+                class="form-group"
+                style="
+                  background: #fff8e1;
+                  border: 1px solid #ffe082;
+                  border-radius: 4px;
+                  padding: 1rem;
+                "
+              >
+                <label style="font-weight: 900; color: #b78103"
+                  >تعهد <span style="color: red">*</span></label
+                >
+                <label
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 0.6rem;
+                    cursor: pointer;
+                    margin-top: 0.5rem;
+                    font-weight: 700;
+                    color: #333;
+                  "
+                >
+                  <input
+                    type="checkbox"
+                    id="reg-pledge-agree"
+                    style="width: 18px; height: 18px; accent-color: #2e7d32"
+                    required
+                  />
+                  <span
+                    >أتعهد بصحة البيانات وتحمل مسؤولية الإدلاء بمعلومات
+                    خاطئة</span
+                  >
+                </label>
+              </div>
             </div>
           </div>
           <div class="modal-footer">
             <button type="submit" class="btn btn-primary">
-              إرسال الطلب للإدارة
+              إرسال طلب الالتحاق
             </button>
             <button
               type="button"
@@ -2465,7 +3054,7 @@
     <div id="modal-bulk-circle" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
-          <h3 id="modal-bulk-circle-title">إضافة الطلاب المحددين إلى حلقة</h3>
+          <h3>إضافة الطلاب المحددين إلى حلقة</h3>
           <button class="modal-close" onclick="closeModal('modal-bulk-circle')">
             &times;
           </button>
