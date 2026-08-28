@@ -401,7 +401,7 @@
               >
                 <circle cx="12" cy="12" r="3" />
                 <path
-                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
                 />
               </svg>
               <span>الإعدادات</span>
@@ -614,14 +614,14 @@
             </div>
           </div>
 
-          <!-- لوحة التميز خاصة بالمدير فقط -->
+          <!-- لوحة التميز خاصة بالمدير فقط (تم إزالة الإخفاء لعرض الطلاب المؤهلين) -->
           <div class="card mb-3 nav-admin-only" id="tamayuz-board-card">
             <div class="card-header flex-between">
               <div>
                 <h3>🌟 لوحة الطلاب المتميزين (التميز الأسبوعي)</h3>
                 <small class="text-muted"
-                  >الطلاب المحققون لنسبة حضور 100% وإنجاز مقرر التسميع الأسبوعي
-                  كاملاً</small
+                  >الطلاب المحققون لنسبة حضور 100% (4 أيام كاملة من الأحد إلى
+                  الأربعاء) وإتقان الحفظ والمراجعة (ممتاز)</small
                 >
               </div>
               <div
@@ -644,7 +644,7 @@
                 </select>
               </div>
             </div>
-            <div class="table-responsive" style="display: none">
+            <div class="table-responsive">
               <table class="data-table">
                 <thead>
                   <tr>
@@ -652,7 +652,7 @@
                     <th>الحلقة</th>
                     <th>نسبة الحضور الأسبوعي</th>
                     <th>إنجاز مقرر التسميع</th>
-                    <th>إجراء الكأس</th>
+                    <th>المرتبة</th>
                   </tr>
                 </thead>
                 <tbody id="tamayuz-students-body">
@@ -1758,6 +1758,85 @@
 
     <!-- MODALS: النوافذ المنبثقة -->
 
+    <!-- 1. نافذة إضافة اختبار (تمت إضافتها وتثبيتها بشكل سليم) -->
+    <div id="modal-add-test" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>تسجيل اختبار جديد</h3>
+          <button class="modal-close" onclick="closeModal('modal-add-test')">
+            &times;
+          </button>
+        </div>
+        <form id="form-add-test" onsubmit="handleSaveTest(event)">
+          <div class="modal-body">
+            <div class="form-group">
+              <label>الحلقة</label>
+              <select
+                id="test-circle-select"
+                class="form-control"
+                onchange="populateTestStudentsDropdown()"
+                required
+              >
+                <option value="">— اختر الحلقة —</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>الطالب</label>
+              <select id="test-student-select" class="form-control" required>
+                <option value="">— اختر الطالب —</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>نوع الاختبار / المقرر</label>
+                <input
+                  type="text"
+                  id="test-type"
+                  class="form-control"
+                  placeholder="مثال: اختبار جزء عم..."
+                  required
+                />
+              </div>
+              <div class="form-group flex-1">
+                <label>الدرجة من (100)</label>
+                <input
+                  type="number"
+                  id="test-score"
+                  class="form-control"
+                  min="0"
+                  max="100"
+                  required
+                />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>التقدير</label>
+              <select id="test-rating" class="form-control" required>
+                <option value="ممتاز مرتفع">ممتاز مرتفع</option>
+                <option value="ممتاز">ممتاز</option>
+                <option value="جيد جداً مرتفع">جيد جداً مرتفع</option>
+                <option value="جيد جداً">جيد جداً</option>
+                <option value="جيد مرتفع">جيد مرتفع</option>
+                <option value="جيد">جيد</option>
+                <option value="ضعيف">ضعيف</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">حفظ الاختبار</button>
+            <button
+              type="button"
+              class="btn btn-outline-brown"
+              onclick="closeModal('modal-add-test')"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 2. نافذة تفاصيل تسميع اليوم -->
     <div id="modal-tasmeea-status-details" class="modal-overlay">
       <div class="modal-card modal-lg">
         <div class="modal-header">
@@ -1830,7 +1909,7 @@
       </div>
     </div>
 
-    <!-- نافذة إضافة وتعديل حلقة -->
+    <!-- 3. نافذة إضافة وتعديل حلقة -->
     <div id="modal-add-circle" class="modal-overlay">
       <div class="modal-card modal-lg">
         <div class="modal-header">
@@ -1896,6 +1975,7 @@
       </div>
     </div>
 
+    <!-- 4. نافذة إضافة طالب -->
     <div id="modal-add-student" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
@@ -1986,6 +2066,7 @@
       </div>
     </div>
 
+    <!-- 5. نافذة تعديل بيانات الطالب -->
     <div id="modal-edit-student-comprehensive" class="modal-overlay">
       <div class="modal-card modal-lg">
         <div class="modal-header">
@@ -2038,16 +2119,16 @@
             </div>
             <div class="form-row">
               <div class="form-group flex-1">
-                <label>اسم ولي الأمر</label
-                ><input
+                <label>اسم ولي الأمر</label>
+                <input
                   type="text"
                   id="edit-comp-parent-name"
                   class="form-control"
                 />
               </div>
               <div class="form-group flex-1">
-                <label>صلة القرابة</label
-                ><input
+                <label>صلة القرابة</label>
+                <input
                   type="text"
                   id="edit-comp-parent-relation"
                   class="form-control"
@@ -2093,6 +2174,7 @@
       </div>
     </div>
 
+    <!-- 6. نافذة تعديل سجل الطالب للمعلم -->
     <div id="modal-teacher-edit-student-record" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
@@ -2151,6 +2233,7 @@
       </div>
     </div>
 
+    <!-- 7. نافذة إضافة معلم -->
     <div id="modal-add-teacher" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
@@ -2227,6 +2310,7 @@
       </div>
     </div>
 
+    <!-- 8. نافذة تعديل بيانات المعلم -->
     <div id="modal-edit-teacher" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
@@ -2318,6 +2402,7 @@
       </div>
     </div>
 
+    <!-- 9. نافذة تعديل بيانات الحساب -->
     <div id="modal-edit-user-account" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
@@ -2379,7 +2464,7 @@
       </div>
     </div>
 
-    <!-- نافذة استيراد Excel المحدثة بـ 7 أعمدة -->
+    <!-- 10. نافذة استيراد Excel -->
     <div id="modal-excel-import" class="modal-overlay">
       <div class="modal-card modal-lg">
         <div class="modal-header">
@@ -2434,6 +2519,7 @@
       </div>
     </div>
 
+    <!-- 11. نافذة إرسال رسالة / إشعار -->
     <div id="modal-send-unified-msg" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
@@ -2506,6 +2592,7 @@
       </div>
     </div>
 
+    <!-- 12. نافذة الإجراءات الجماعية للحلقات -->
     <div id="modal-bulk-circle" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
@@ -2550,6 +2637,7 @@
       </div>
     </div>
 
+    <!-- 13. استمارة التسجيل الذاتي -->
     <div id="modal-self-register" class="modal-overlay">
       <div class="modal-card word-doc-style">
         <div class="modal-header">
