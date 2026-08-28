@@ -8,7 +8,7 @@ let dbFirestore = null;
 let firebaseAuth = null;
 let isFirebaseOnline = false;
 
-// الإعدادات والمفاتيح الافتراضية الآمنة لمنع أي خطأ توقف برمجي[cite: 15]
+// الإعدادات والمفاتيح الافتراضية الآمنة لمنع أي خطأ توقف برمجي
 const SAFE_DEFAULT_SETTINGS = window.DEFAULT_SETTINGS || {
   orgName: "مَجْمَع عبدالله بن مهدي القرآني",
   subTitle: "جامع الهدى",
@@ -32,13 +32,14 @@ const STORAGE_KEY =
     ? LOCAL_STORAGE_KEY
     : window.LOCAL_STORAGE_KEY || "HALAQAT_DATA_STORAGE_V1";
 
-// كائن تخزين البيانات العام المحمي (يبدأ نظيفاً تماماً بدون أي طلاب أو معلمين)[cite: 15]
+// كائن تخزين البيانات العام المحمي (يبدأ نظيفاً تماماً بدون أي طلاب أو معلمين)
 window.appStore = window.appStore || {
   users: [],
   students: [],
   teachers: [],
   circles: [],
   attendance: [],
+  teacherAttendance: [],
   tasmeea: [],
   tests: [],
   notifications: [],
@@ -50,7 +51,7 @@ window.appStore = window.appStore || {
   logs: [],
 };
 
-// تهيئة Firebase والاتصال بـ Firestore[cite: 15]
+// تهيئة Firebase والاتصال بـ Firestore
 function initFirebaseApp() {
   try {
     const config =
@@ -81,7 +82,7 @@ function initFirebaseApp() {
   loadInitialData();
 }
 
-// تحميل البيانات والتحقق من حساب المدير المعتمد فقط[cite: 15]
+// تحميل البيانات والتحقق من حساب المدير المعتمد فقط
 function loadInitialData() {
   const localData = localStorage.getItem(STORAGE_KEY);
   if (localData) {
@@ -97,6 +98,8 @@ function loadInitialData() {
       if (!Array.isArray(window.appStore.circles)) window.appStore.circles = [];
       if (!Array.isArray(window.appStore.attendance))
         window.appStore.attendance = [];
+      if (!Array.isArray(window.appStore.teacherAttendance))
+        window.appStore.teacherAttendance = [];
       if (!Array.isArray(window.appStore.tasmeea)) window.appStore.tasmeea = [];
       if (!Array.isArray(window.appStore.tests)) window.appStore.tests = [];
       if (!Array.isArray(window.appStore.notifications))
@@ -105,7 +108,7 @@ function loadInitialData() {
       if (!Array.isArray(window.appStore.screenOrder))
         window.appStore.screenOrder = [];
 
-      // ضمان وجود حساب المدير (صالح ال ناشع) وحساب الشاشة فقط[cite: 15]
+      // ضمان وجود حساب المدير (صالح ال ناشع) وحساب الشاشة فقط
       let adminUser = window.appStore.users.find(
         (u) =>
           (u.username === "123456" || u.username === "admin") &&
@@ -153,13 +156,13 @@ function loadInitialData() {
     seedProductionAdminOnly();
   }
 
-  // مزامنة البيانات السحابية من Firestore[cite: 15]
+  // مزامنة البيانات السحابية من Firestore
   if (isFirebaseOnline && dbFirestore) {
     syncDataFromCloud();
   }
 }
 
-// حفظ الحالة في التخزين المحلي[cite: 15]
+// حفظ الحالة في التخزين المحلي
 function saveLocalStore() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(window.appStore));
@@ -168,7 +171,7 @@ function saveLocalStore() {
   }
 }
 
-// إنشاء الحسابات النظيفة الافتراضية دون أي طلاب أو معلمين مسبقين[cite: 15]
+// إنشاء الحسابات النظيفة الافتراضية دون أي طلاب أو معلمين مسبقين
 function seedProductionAdminOnly() {
   const baseTime = Date.now();
   window.appStore = {
@@ -198,6 +201,7 @@ function seedProductionAdminOnly() {
     circles: [],
     students: [],
     attendance: [],
+    teacherAttendance: [],
     tasmeea: [],
     tests: [],
     notifications: [],
@@ -218,7 +222,7 @@ function seedProductionAdminOnly() {
   saveLocalStore();
 }
 
-// مزامنة البيانات السحابية من Firestore[cite: 15]
+// مزامنة البيانات السحابية من Firestore
 async function syncDataFromCloud() {
   if (!dbFirestore) return;
   try {
@@ -228,6 +232,7 @@ async function syncDataFromCloud() {
       "teachers",
       "circles",
       "attendance",
+      "teacherAttendance",
       "tasmeea",
       "tests",
       "notifications",
@@ -264,7 +269,7 @@ async function syncDataFromCloud() {
   }
 }
 
-// حفظ أو حذف مستند في السحابة بأمان[cite: 15]
+// حفظ أو حذف مستند في السحابة بأمان
 async function saveToCloud(collectionName, docId, data, isDelete = false) {
   saveLocalStore();
   if (isFirebaseOnline && dbFirestore) {
@@ -283,7 +288,7 @@ async function saveToCloud(collectionName, docId, data, isDelete = false) {
   }
 }
 
-// تسجيل عملية جديدة في سجل العمليات Logs[cite: 15]
+// تسجيل عملية جديدة في سجل العمليات Logs
 function addSystemLog(actionDesc) {
   const currentUser = window.currentUser || { name: "النظام" };
   const now = new Date();
@@ -306,7 +311,7 @@ function addSystemLog(actionDesc) {
   saveToCloud("logs", newLog.id, newLog);
 }
 
-// تشغيل الفايربيز عند تحميل الصفحة[cite: 15]
+// تشغيل الفايربيز عند تحميل الصفحة
 document.addEventListener("DOMContentLoaded", () => {
   initFirebaseApp();
 });
