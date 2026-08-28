@@ -1,12 +1,12 @@
 /**
  * ==========================================================================
- * app.js - المحرك الرئيسي للنظام، الصلاحيات، التحضير الذاتي للمعلم، وصندوق إشعارات الطالب
+ * app.js - المحرك الرئيسي للنظام، الصلاحيات، صلاحية التقارير المالية، والتحضير الذاتي
  * ==========================================================================
  */
 
 window.currentUser = null;
 
-// المخزن العام وحمايته من أخطاء عدم التعريف
+// المخزن العام - يبدأ نظيفاً تماماً بدون أي طلاب أو معلمين افتراضيين
 window.appStore = window.appStore || {
   users: [],
   students: [],
@@ -19,18 +19,21 @@ window.appStore = window.appStore || {
   tasmeea: [],
   screenOrder: [],
   circlesOrder: [],
+  notifications: [],
   trophyStudentId: null,
   settings: null,
 };
 
-// الإعدادات الافتراضية
+// الإعدادات الافتراضية المعتمدة للهوية واسم المدير
 window.DEFAULT_SETTINGS = {
-  orgName: "حلقات جامع الهدى",
-  subTitle: "لتحفيظ القرآن الكريم",
-  directorName: "أحمد بن عبدالله بن مهدي",
+  orgName: "مَجْمَع عبدالله بن مهدي القرآني",
+  subTitle: "جامع الهدى",
+  directorName: "صالح ال ناشع",
   logoNew: "logo12.jpeg",
-  logoOld: "logo1.png",
+  logoOld: "logo_transparent_1.png",
+  logoLogin: "logo_transparent_2.png",
   headerFontSize: "13px",
+  location: "",
 };
 
 // تعريف الأدوار والصلاحيات
@@ -41,12 +44,10 @@ window.ROLES = {
   SCREEN: "screen",
 };
 
-const ROLE_PERMISSIONS = {
+window.ROLE_PERMISSIONS = {
   admin: [
     "view-dashboard",
     "view-circles",
-    "view-students",
-    "view-teachers",
     "view-attendance",
     "view-tasmeea",
     "view-teacher-notes",
@@ -54,6 +55,7 @@ const ROLE_PERMISSIONS = {
     "view-accounts",
     "view-tests",
     "view-reports",
+    "view-finance",
     "view-notifications",
     "view-settings",
   ],
@@ -70,7 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.warn("Init notice:", e);
   }
 
-  // ربط نموذج الدخول المباشر
+  // ربط نماذج تسجيل الدخول
   const loginForm = document.getElementById("login-form");
   if (loginForm) {
     loginForm.onsubmit = function (e) {
@@ -115,7 +117,7 @@ document.addEventListener("DOMContentLoaded", () => {
   checkSavedSession();
 });
 
-// دالة تسجيل الدخول الفورية الشاملة
+// دالة تسجيل الدخول الموحدة
 window.handleLoginFormSubmit = function (e) {
   if (e && e.preventDefault) e.preventDefault();
 
@@ -138,7 +140,8 @@ window.handleLoginFormSubmit = function (e) {
     userLower === "admin" ||
     userVal === "123456" ||
     userVal === "مدير" ||
-    userVal === "المدير"
+    userVal === "المدير" ||
+    userVal === "صالح ال ناشع"
   ) {
     const adminUser = (window.appStore?.users || []).find(
       (u) =>
@@ -147,7 +150,7 @@ window.handleLoginFormSubmit = function (e) {
         u.role === window.ROLES.ADMIN,
     ) || {
       id: "u_admin_main",
-      name: "أحمد بن عبدالله بن مهدي",
+      name: "صالح ال ناشع",
       role: window.ROLES.ADMIN,
       username: userVal,
       phone: "0500000000",
@@ -170,7 +173,7 @@ window.handleLoginFormSubmit = function (e) {
     return false;
   }
 
-  // 3. التحقق من المعلمين
+  // 3. حسابات المعلمين
   const teachers = window.appStore?.teachers || [];
   const foundTeacher = teachers.find(
     (t) =>
@@ -198,7 +201,7 @@ window.handleLoginFormSubmit = function (e) {
     return false;
   }
 
-  // 4. التحقق من الطلاب
+  // 4. حسابات الطلاب
   const students = window.appStore?.students || [];
   const foundStudent = students.find(
     (s) =>
@@ -225,7 +228,7 @@ window.handleLoginFormSubmit = function (e) {
     return false;
   }
 
-  // 5. التحقق من جدول المستخدمين العام
+  // 5. حسابات المستخدمين العامة
   const users = window.appStore?.users || [];
   const foundUser = users.find(
     (u) => u.username === userVal || u.phone === userVal || u.id === userVal,
@@ -236,15 +239,9 @@ window.handleLoginFormSubmit = function (e) {
     return false;
   }
 
-  // دخول مباشر آمن لضمان عدم توقف النظام
-  const fallbackUser = {
-    id: "u_admin_" + Date.now(),
-    name: userVal,
-    role: window.ROLES.ADMIN,
-    username: userVal,
-    createdAt: Date.now(),
-  };
-  doLogin(fallbackUser, false);
+  alert(
+    "⚠️ اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير مسجل بالنظام.",
+  );
   return false;
 };
 
@@ -279,14 +276,9 @@ window.handleStudentLoginFormSubmit = function (e) {
     return false;
   }
 
-  const demoStudent = {
-    id: "s_" + Date.now(),
-    name: identifier,
-    role: window.ROLES.STUDENT,
-    circleId: "",
-    createdAt: Date.now(),
-  };
-  doLogin(demoStudent, false);
+  alert(
+    "⚠️ رقم الهوية أو الجوال غير مسجل بالنظام. يرجى مراجعة إدارة المَجْمَع.",
+  );
   return false;
 };
 
@@ -333,7 +325,7 @@ window.doLogin = function (user, isAutoSession = false) {
             ? "التميز الأسبوعي"
             : "طالب";
   }
-  if (avatarEl) avatarEl.textContent = user.name ? user.name.charAt(0) : "أ";
+  if (avatarEl) avatarEl.textContent = user.name ? user.name.charAt(0) : "ص";
   if (welcomeEl) welcomeEl.textContent = `مرحباً ${user.name || ""}`;
 
   try {
@@ -385,6 +377,13 @@ function adjustSidebarAndViewsForRole(role) {
     if (studentNav) studentNav.style.display = "none";
     if (adminNav) adminNav.style.display = "block";
 
+    const user = window.currentUser;
+    const isFinancialTeacher =
+      user &&
+      user.role === window.ROLES.TEACHER &&
+      window.appStore?.settings?.financialTeacherId ===
+        (user.teacherId || user.id);
+
     if (role === window.ROLES.TEACHER) {
       document.querySelectorAll(".sidebar .nav-admin-only").forEach((el) => {
         el.style.display = "none";
@@ -392,6 +391,11 @@ function adjustSidebarAndViewsForRole(role) {
       document.querySelectorAll(".sidebar .nav-teacher-only").forEach((el) => {
         el.style.display = "flex";
       });
+
+      const financeNav = document.getElementById("nav-finance-link");
+      if (financeNav) {
+        financeNav.style.display = isFinancialTeacher ? "flex" : "none";
+      }
     } else {
       document.querySelectorAll(".sidebar .nav-admin-only").forEach((el) => {
         el.style.display = "flex";
@@ -399,6 +403,8 @@ function adjustSidebarAndViewsForRole(role) {
       document.querySelectorAll(".sidebar .nav-teacher-only").forEach((el) => {
         el.style.display = "none";
       });
+      const financeNav = document.getElementById("nav-finance-link");
+      if (financeNav) financeNav.style.display = "flex";
     }
 
     navigateTo("view-dashboard");
@@ -414,6 +420,21 @@ window.navigateTo = function (targetViewId) {
   if (!window.currentUser) {
     showMainLoginView();
     return;
+  }
+
+  // التحقق من صلاحية شاشة التقارير المالية
+  if (targetViewId === "view-finance") {
+    const user = window.currentUser;
+    const isAllowed =
+      user.role === window.ROLES.ADMIN ||
+      (user.role === window.ROLES.TEACHER &&
+        window.appStore?.settings?.financialTeacherId ===
+          (user.teacherId || user.id));
+
+    if (!isAllowed) {
+      alert("⚠️ غير مصرح لك بالدخول إلى قسم التقارير المالية.");
+      return;
+    }
   }
 
   document.querySelectorAll(".content-view").forEach((view) => {
@@ -490,12 +511,12 @@ function showMainLoginView() {
 
 function applyAppIdentity() {
   const settings = window.appStore?.settings || window.DEFAULT_SETTINGS;
-  const orgName = settings.orgName || "حلقات جامع الهدى";
-  const mosqueName = settings.subTitle || "لتحفيظ القرآن الكريم";
+  const orgName = settings.orgName || "مَجْمَع عبدالله بن مهدي القرآني";
+  const mosqueName = settings.subTitle || "جامع الهدى";
   const logoNew = settings.logoNew || "logo12.jpeg";
-  const logoOld = settings.logoOld || "logo1.png";
-  const logoLogin = "logo2.png";
-  const directorName = settings.directorName || "أحمد بن عبدالله بن مهدي";
+  const logoOld = settings.logoOld || "logo_transparent_1.png";
+  const logoLogin = settings.logoLogin || "logo_transparent_2.png";
+  const directorName = settings.directorName || "صالح ال ناشع";
 
   const sidebarOrg = document.getElementById("sidebar-org-name");
   if (sidebarOrg) sidebarOrg.textContent = orgName;
@@ -505,10 +526,9 @@ function applyAppIdentity() {
   if (sidebarLogoImg) sidebarLogoImg.src = logoNew;
 
   const loginHeroTitle = document.getElementById("login-hero-title");
-  if (loginHeroTitle)
-    loginHeroTitle.textContent = "مَجْمَع عبدالله بن مهدي القرآني";
+  if (loginHeroTitle) loginHeroTitle.textContent = orgName;
   const loginHeroSub = document.getElementById("login-hero-sub");
-  if (loginHeroSub) loginHeroSub.textContent = "جامع الهدى";
+  if (loginHeroSub) loginHeroSub.textContent = mosqueName;
   const loginHeroLogo = document.getElementById("login-hero-logo");
   if (loginHeroLogo) loginHeroLogo.src = logoLogin;
 
@@ -607,21 +627,25 @@ function checkStudentCurrentWeekTamayuz(studentId) {
   return attendedCount === 4 && !hasDisqualifyingRating;
 }
 
-// دالة تسجيل الحضور الذاتي للمعلم فقط فور دخوله المسجد
+// دالة تسجيل الحضور الذاتي للمدير والمعلم
 window.handleTeacherSelfCheckIn = function () {
   const user = window.currentUser;
-  if (!user || user.role !== window.ROLES.TEACHER) {
-    alert("⚠️ هذه الخاصية متاحة لحساب المعلم فقط.");
+  if (
+    !user ||
+    (user.role !== window.ROLES.TEACHER && user.role !== window.ROLES.ADMIN)
+  ) {
+    alert("⚠️ هذه الخاصية متاحة للمدير والمعلم فقط.");
     return;
   }
 
-  const teacherId = user.teacherId || user.id;
+  const attId =
+    user.role === window.ROLES.ADMIN ? "admin_main" : user.teacherId || user.id;
   const todayStr = new Date().toISOString().split("T")[0];
   const nowTime = new Date().toLocaleTimeString("ar-SA", {
     hour: "2-digit",
     minute: "2-digit",
   });
-  const recordId = `t_att_${teacherId}_${todayStr}`;
+  const recordId = `t_att_${attId}_${todayStr}`;
 
   if (!window.appStore.teacherAttendance)
     window.appStore.teacherAttendance = [];
@@ -629,7 +653,7 @@ window.handleTeacherSelfCheckIn = function () {
   let record = window.appStore.teacherAttendance.find((a) => a.id === recordId);
   if (record && record.status === "present") {
     alert(
-      `ℹ️ لقد قمت بتسجيل حضورك مسبقاً اليوم في تمام الساعة (${record.time || nowTime}).`,
+      `ℹ️ لقد تم تسجيل حضورك مسبقاً اليوم في تمام الساعة (${record.time || nowTime}).`,
     );
     return;
   }
@@ -637,12 +661,15 @@ window.handleTeacherSelfCheckIn = function () {
   if (!record) {
     record = {
       id: recordId,
-      teacherId: teacherId,
+      teacherId: attId,
       teacherName: user.name,
       date: todayStr,
       time: nowTime,
       status: "present",
-      notes: "تحضير ذاتي من التطبيق",
+      notes:
+        user.role === window.ROLES.ADMIN
+          ? "تحضير ذاتي (المدير)"
+          : "تحضير ذاتي (معلم)",
       updatedBy: "self",
       createdAt: Date.now(),
     };
@@ -650,7 +677,10 @@ window.handleTeacherSelfCheckIn = function () {
   } else {
     record.status = "present";
     record.time = nowTime;
-    record.notes = "تحضير ذاتي من التطبيق";
+    record.notes =
+      user.role === window.ROLES.ADMIN
+        ? "تحضير ذاتي (المدير)"
+        : "تحضير ذاتي (معلم)";
   }
 
   if (typeof saveToCloud === "function") {
@@ -664,7 +694,6 @@ window.handleTeacherSelfCheckIn = function () {
   renderDashboardView();
 };
 
-// عرض بيانات الطالب وربط الشعارين بدقة
 function renderStudentData() {
   if (!window.currentUser || window.currentUser.role !== window.ROLES.STUDENT)
     return;
@@ -676,7 +705,7 @@ function renderStudentData() {
   const circle = (window.appStore?.circles || []).find(
     (c) => c.id === student.circleId,
   );
-  const circleName = circle ? circle.name : "حلقات جامع الهدى";
+  const circleName = circle ? circle.name : "جامع الهدى";
 
   const studentTasmeea = (window.appStore?.tasmeea || []).filter(
     (t) => t.studentId === studentId,
@@ -754,7 +783,6 @@ function renderStudentData() {
         '<span class="badge" style="background:#e3f2fd; color:#1565c0;">🔵 مستأذن</span>';
   }
 
-  // تصفية الإشعارات والرسائل الواردة للطالب من الإدارة
   const studentNotifs = (window.appStore?.notifications || []).filter((n) => {
     return (
       n.recipient === "all" ||
@@ -767,9 +795,8 @@ function renderStudentData() {
   const container = document.getElementById("view-student-home");
   if (!container) return;
 
-  const settings = window.appStore?.settings || window.DEFAULT_SETTINGS;
-  const logoNew = settings.logoNew || "logo12.jpeg";
-  const logoOld = "logo1.png"; // وضع شعار 1.png على اليسار
+  const logoNew = "logo12.jpeg";
+  const logoOld = "logo_transparent_1.png";
 
   container.innerHTML = `
     <div class="card mb-3" style="background: linear-gradient(135deg, var(--primary-brown) 0%, var(--primary-dark) 100%); color: #ffffff; border-radius: 12px; padding: 1.5rem; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
@@ -778,19 +805,19 @@ function renderStudentData() {
       </button>
 
       <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
-        <img src="${logoNew}" alt="شعار الحلقات" style="height: 65px; width: auto; object-fit: contain; background: transparent; padding: 4px; border-radius: 8px;" />
+        <img src="${logoNew}" alt="شعار المَجْمَع" style="height: 65px; width: auto; object-fit: contain; background: transparent; padding: 4px; border-radius: 8px;" />
         <div style="text-align: center; flex: 1;">
           <h2 style="font-size: 1.4rem; font-weight: 900; margin-bottom: 4px;">${student.name}</h2>
-          <p style="font-size: 0.95rem; opacity: 0.9; margin-bottom: 8px;">حلقات جامع الهدى لتحفيظ القرآن الكريم</p>
+          <p style="font-size: 0.95rem; opacity: 0.9; margin-bottom: 8px;">مَجْمَع عبدالله بن مهدي القرآني — جامع الهدى</p>
           <span style="background: rgba(255, 255, 255, 0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;">
             🕌 حلقة: ${circleName}
           </span>
         </div>
-        <img src="${logoOld}" alt="شعار الحلقات" style="height: 65px; width: auto; object-fit: contain; background: transparent; padding: 4px; border-radius: 8px; mix-blend-mode: screen;" />
+        <img src="${logoOld}" alt="شعار المَجْمَع" style="height: 65px; width: auto; object-fit: contain; background: transparent; padding: 4px; border-radius: 8px; mix-blend-mode: screen;" />
       </div>
     </div>
 
-    <!-- صندوق الإشعارات والرسائل الواردة من إدارة المجمع للطالب -->
+    <!-- صندوق الإشعارات -->
     <div class="card mb-3" style="border-right: 4px solid #0b6b7d;">
       <div class="card-header flex-between">
         <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--primary-brown); margin: 0;">
@@ -811,7 +838,7 @@ function renderStudentData() {
                   <small class="text-muted">${n.date || ""}</small>
                 </div>
                 <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #333;">${n.body || ""}</p>
-                <div style="font-size:0.75rem; color:#777; margin-top:3px;">المرسل: ${n.sender || "إدارة المجمع"}</div>
+                <div style="font-size:0.75rem; color:#777; margin-top:3px;">المرسل: ${n.sender || "إدارة المَجْمَع"}</div>
               </div>
             `,
                 )
@@ -930,6 +957,9 @@ function updateCircleDropdowns() {
     "tasmeea-circle-select",
     "report-circle-select",
     "test-circle-select",
+    "edit-test-circle-select",
+    "edit-comp-circle",
+    "bulk-target-circle",
     "filter-teacher-notes-circle",
   ];
 
@@ -942,7 +972,8 @@ function updateCircleDropdowns() {
     if (
       id === "filter-student-circle" ||
       id === "report-circle-select" ||
-      id === "filter-teacher-notes-circle"
+      id === "filter-teacher-notes-circle" ||
+      id === "filter-test-circle"
     ) {
       defaultText = "كل الحلقات";
     }
@@ -1016,33 +1047,27 @@ function refreshActiveView(viewId) {
   }
 }
 
-// تحديث لوحة التحكم
 function renderDashboardView() {
   const user = window.currentUser;
   if (!user) return;
 
   const isTeacher = user.role === window.ROLES.TEACHER;
+  const isAdmin = user.role === window.ROLES.ADMIN;
   const teacherDashCols = document.getElementById("teacher-dash-columns");
   const tamayuzBoardCard = document.getElementById("tamayuz-board-card");
+  const selfAttCard = document.getElementById("teacher-self-attendance-card");
   const todayStr = new Date().toISOString().split("T")[0];
 
   if (tamayuzBoardCard) {
     tamayuzBoardCard.style.display = isTeacher ? "none" : "block";
   }
 
-  if (isTeacher) {
-    if (teacherDashCols) teacherDashCols.style.display = "grid";
-
-    const teacherObj =
-      (window.appStore?.teachers || []).find(
-        (t) =>
-          t.userId === user.id || t.id === user.teacherId || t.id === user.id,
-      ) || (window.appStore?.teachers || [])[0];
-    const teacherId = teacherObj ? teacherObj.id : "t1";
-
-    // التحقق من حالة الحضور الذاتي للمعلم اليوم
-    const teacherAttRecord = (window.appStore?.teacherAttendance || []).find(
-      (a) => a.teacherId === teacherId && a.date === todayStr,
+  // بطاقة التحضير الذاتي
+  if (selfAttCard) {
+    selfAttCard.style.display = isAdmin || isTeacher ? "block" : "none";
+    const attId = isAdmin ? "admin_main" : user.teacherId || user.id;
+    const selfAttRecord = (window.appStore?.teacherAttendance || []).find(
+      (a) => a.teacherId === attId && a.date === todayStr,
     );
     const checkinBadge = document.getElementById(
       "teacher-self-checkin-status-badge",
@@ -1050,15 +1075,15 @@ function renderDashboardView() {
     const checkinBtn = document.getElementById("btn-teacher-self-checkin");
 
     if (checkinBadge) {
-      if (teacherAttRecord && teacherAttRecord.status === "present") {
-        checkinBadge.innerHTML = `<span class="badge badge-active">🟢 حاضر اليوم (${teacherAttRecord.time || "تم التحضير"})</span>`;
+      if (selfAttRecord && selfAttRecord.status === "present") {
+        checkinBadge.innerHTML = `<span class="badge badge-active">🟢 حاضر اليوم (${selfAttRecord.time || "تم التحضير"})</span>`;
         if (checkinBtn) {
-          checkinBtn.textContent = "✅ تم تحضيرك بنجاح اليوم";
+          checkinBtn.textContent = "✅ تم تسجيل حضورك اليوم بنجاح";
           checkinBtn.classList.remove("btn-success");
           checkinBtn.classList.add("btn-outline-brown");
         }
       } else {
-        checkinBadge.innerHTML = `<span class="badge" style="background:#fff8e1; color:#b78103;">⏳ بانتظار تأكيد حضورك بالمسجد</span>`;
+        checkinBadge.innerHTML = `<span class="badge" style="background:#fff8e1; color:#b78103;">⏳ بانتظار تأكيد حضورك اليوم بالمسجد</span>`;
         if (checkinBtn) {
           checkinBtn.textContent = "✅ تسجيل حضوري اليوم بالمسجد";
           checkinBtn.classList.remove("btn-outline-brown");
@@ -1066,6 +1091,16 @@ function renderDashboardView() {
         }
       }
     }
+  }
+
+  if (isTeacher) {
+    if (teacherDashCols) teacherDashCols.style.display = "grid";
+
+    const teacherObj = (window.appStore?.teachers || []).find(
+      (t) =>
+        t.userId === user.id || t.id === user.teacherId || t.id === user.id,
+    );
+    const teacherId = teacherObj ? teacherObj.id : user.id;
 
     const teacherCircles = (window.appStore?.circles || []).filter(
       (c) =>
@@ -1177,7 +1212,7 @@ function renderDashboardView() {
   }
 }
 
-// دالة فتح نافذة تفاصيل من سمّع ومن لم يسمّع اليوم
+// نافذة تفاصيل من سمّع ومن لم يسمّع اليوم
 window.currentTasmeeaModalType = "recited";
 window.openTasmeeaDetailsModal = function (type) {
   window.currentTasmeeaModalType = type;
@@ -1242,7 +1277,6 @@ window.openTasmeeaDetailsModal = function (type) {
   openModal("modal-tasmeea-status-details");
 };
 
-// تصفية نتائج النافذة
 window.filterTasmeeaDetailsModal = function () {
   const query = (
     document.getElementById("search-modal-tasmeea-status")?.value || ""
@@ -1256,7 +1290,6 @@ window.filterTasmeeaDetailsModal = function () {
   });
 };
 
-// تصدير جدول التسميع اليومي إلى Excel
 window.exportTasmeeaDetailsExcel = function () {
   const table = document.getElementById("tasmeea-details-table");
   if (!table || table.rows.length <= 1) {
@@ -1278,9 +1311,20 @@ window.exportTasmeeaDetailsExcel = function () {
   );
 };
 
-// طباعة جدول التسميع اليومي
+window.exportTasmeeaDetailsPDF = function () {
+  if (typeof exportElementToPDF === "function") {
+    exportElementToPDF(
+      "modal-tasmeea-status-details",
+      "تفاصيل_تسميع_الطلاب",
+      "تفاصيل تسميع الطلاب",
+    );
+  } else {
+    window.print();
+  }
+};
+
 window.printTasmeeaDetails = function () {
-  window.print();
+  window.exportTasmeeaDetailsPDF();
 };
 
 function renderNotificationsView() {
@@ -1311,14 +1355,13 @@ function renderNotificationsView() {
     .join("");
 }
 
-// تعديل وحفظ بيانات الحساب الشخصي للمدير وتثبيتها بشكل دائم
 window.handleUserProfileSave = function (e) {
   if (e && e.preventDefault) e.preventDefault();
   const user = window.currentUser;
   if (!user) return;
 
   if (user.role !== window.ROLES.ADMIN) {
-    alert("⚠️ هذه الخاصية متاحة لمدير المجمع فقط.");
+    alert("⚠️ هذه الخاصية متاحة لمدير المَجْمَع فقط.");
     return;
   }
 
@@ -1383,7 +1426,7 @@ window.handleUserProfileSave = function (e) {
   const avatarEl = document.getElementById("current-user-avatar");
   if (nameEl) nameEl.textContent = newName;
   if (welcomeEl) welcomeEl.textContent = `مرحباً ${newName}`;
-  if (avatarEl) avatarEl.textContent = newName ? newName.charAt(0) : "أ";
+  if (avatarEl) avatarEl.textContent = newName ? newName.charAt(0) : "ص";
 
   alert("✅ تم حفظ وتحديث البيانات الشخصية للمدير بنجاح!");
 };
