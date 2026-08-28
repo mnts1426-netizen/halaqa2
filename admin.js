@@ -1,10 +1,10 @@
 /**
  * ==========================================================================
- * admin.js - المحرك الإداري الشامل، إدارة الحسابات، تحضير المعلمين، والأرقام السرية
+ * admin.js - المحرك الإداري الشامل، استيراد الطلاب بـ 7 أعمدة، تصدير PDF، وتحديد الموقع
  * ==========================================================================
  */
 
-// تهيئة المخزن العام للحماية من أخطاء عدم التعريف
+// تهيئة المخزن العام بقوائم نظيفة تماماً بدون أي بيانات افتراضية
 window.appStore = window.appStore || {
   users: [],
   students: [],
@@ -66,7 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (attSearchInput)
     attSearchInput.addEventListener("input", renderAttendanceTable);
 
-  // تاريخ تحضير المعلمين الافتراضي
+  // تاريخ تحضير المعلمين والمدير الافتراضي
   const teachAttDateSelect = document.getElementById(
     "teacher-attendance-date-select",
   );
@@ -114,7 +114,271 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// 1. التنقل بين الأقسام داخل شاشة إدارة المجمع
+// دالة تصدير أي جدول أو قسم إلى PDF مباشرة
+window.exportElementToPDF = function (elementId, fileName, titleText) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+
+  if (typeof html2pdf === "undefined") {
+    window.print();
+    return;
+  }
+
+  const opt = {
+    margin: [10, 10, 10, 10],
+    filename: `${fileName}_${new Date().toISOString().split("T")[0]}.pdf`,
+    image: { type: "jpeg", quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+  };
+
+  html2pdf().set(opt).from(el).save();
+};
+
+window.exportTeachersPDF = function () {
+  exportElementToPDF(
+    "box-teachers-list-table",
+    "قائمة_المعلمين",
+    "قائمة المعلمين",
+  );
+};
+
+window.exportTeachersAttendancePDF = function () {
+  exportElementToPDF(
+    "box-teachers-attendance-table",
+    "تحضير_المعلمين_اليومي",
+    "تحضير المعلمين اليومي",
+  );
+};
+
+window.exportStudentsPDF = function () {
+  exportElementToPDF(
+    "box-active-students-table",
+    "قائمة_الطلاب",
+    "قائمة الطلاب",
+  );
+};
+
+window.exportAttendancePDF = function () {
+  exportElementToPDF("attendance-table-wrapper", "سجل_التحضير", "سجل التحضير");
+};
+
+window.exportTeacherNotesPDF = function () {
+  exportElementToPDF(
+    "view-teacher-notes",
+    "ملاحظات_المعلمين",
+    "ملاحظات المعلمين",
+  );
+};
+
+window.exportAccountsPDF = function () {
+  exportElementToPDF("view-accounts", "إدارة_الحسابات", "إدارة الحسابات");
+};
+
+window.exportTestsPDF = function () {
+  exportElementToPDF("tests-list-card", "سجل_الاختبارات", "سجل الاختبارات");
+};
+
+// خاصية تحديد الموقع الجغرافي التلقائي للمَجْمَع
+window.getCurrentLocationCoords = function () {
+  if (!navigator.geolocation) {
+    alert("⚠️ خاصية تحديد الموقع غير مدعومة في جهازك أو متصفحك.");
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const coords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+      const locInput = document.getElementById("set-org-location");
+      if (locInput) locInput.value = coords;
+      alert(`✅ تم تحديد موقع المَجْمَع بنجاح: (${coords})`);
+    },
+    (err) => {
+      alert(
+        "⚠️ تعذر جلب الموقع تلقائياً. يرجى تفعيل إذن الموقع الجغرافي في المتصفح أو إدخال رابط خرائط Google يدوياً.",
+      );
+    },
+  );
+};
+
+// حفظ إعدادات وهوية وموقع المَجْمَع للمدير
+window.handleSaveOrgSettings = function (e) {
+  if (e && e.preventDefault) e.preventDefault();
+  if (!window.appStore.settings) window.appStore.settings = {};
+
+  const orgName =
+    document.getElementById("set-org-name")?.value.trim() ||
+    "مَجْمَع عبدالله بن مهدي القرآني";
+  const subTitle =
+    document.getElementById("set-org-mosque")?.value.trim() || "جامع الهدى";
+  const directorName =
+    document.getElementById("set-org-director")?.value.trim() || "صالح ال ناشع";
+  const headerFontSize =
+    document.getElementById("set-header-font-size")?.value || "13px";
+  const logoNew =
+    document.getElementById("set-org-logo-new")?.value.trim() || "logo12.jpeg";
+  const logoOld =
+    document.getElementById("set-org-logo-old")?.value.trim() ||
+    "logo_transparent_1.png";
+  const location =
+    document.getElementById("set-org-location")?.value.trim() || "";
+
+  window.appStore.settings.orgName = orgName;
+  window.appStore.settings.subTitle = subTitle;
+  window.appStore.settings.directorName = directorName;
+  window.appStore.settings.headerFontSize = headerFontSize;
+  window.appStore.settings.logoNew = logoNew;
+  window.appStore.settings.logoOld = logoOld;
+  window.appStore.settings.location = location;
+
+  if (typeof saveToCloud === "function") {
+    saveToCloud("settings", "general", window.appStore.settings);
+  }
+  if (typeof saveLocalStore === "function") saveLocalStore();
+  if (typeof applyAppIdentity === "function") applyAppIdentity();
+
+  alert("✅ تم حفظ وتثبيت إعدادات وهوية وموقع المَجْمَع بنجاح!");
+};
+
+// إعداد خريطة الأعمدة الـ 7 المطلوبة لاستيراد الطلاب من ملف Excel
+window.renderExcelColumnMappingInputs = function () {
+  const container = document.getElementById("excel-columns-mapping-container");
+  if (!container) return;
+
+  const default7Labels = [
+    "1. اسم الطالب",
+    "2. رقم الهوية الوطنية",
+    "3. عمر الطالب",
+    "4. اسم ولي الأمر",
+    "5. رقم جوال ولي الأمر",
+    "6. صلة القرابة",
+    "7. مكان السكن (أو الحي)",
+  ];
+
+  let html = "";
+  default7Labels.forEach((label, i) => {
+    html += `
+      <div class="p-2" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 6px;">
+        <small style="font-weight: 800; color: var(--primary-brown);">${label}</small>
+        <input type="text" class="form-control mt-1" value="العمود رقم (${i + 1})" style="font-size: 0.82rem; font-weight: 700; background: #fafcfb;" readonly />
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+};
+
+// تنفيذ الاستيراد الذكي للطلاب بـ 7 أعمدة كاملة
+window.executeDynamicExcelImport = function () {
+  const fileInput = document.getElementById("excel-dynamic-file");
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    alert("⚠️ يرجى اختيار ملف Excel أولاً!");
+    return;
+  }
+
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+
+  reader.onload = function (e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      if (rows.length === 0) {
+        alert("⚠️ ملف Excel فارغ!");
+        return;
+      }
+
+      let importedCount = 0;
+      if (!window.appStore.students) window.appStore.students = [];
+      if (!window.appStore.users) window.appStore.users = [];
+
+      // تخطي صف العناوين إن وجد والبدء بقراءة البيانات
+      const startIndex =
+        typeof rows[0][0] === "string" &&
+        (rows[0][0].includes("اسم") || rows[0][0].includes("طالب"))
+          ? 1
+          : 0;
+
+      for (let i = startIndex; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0 || !row[0]) continue;
+
+        const stuName = String(row[0] || "").trim();
+        const stuNatId = String(row[1] || "").trim();
+        const stuAge = String(row[2] || "").trim();
+        const stuParentName = String(row[3] || "").trim();
+        const stuParentPhone = String(row[4] || "").trim();
+        const stuParentRelation = String(row[5] || "أب").trim();
+        const stuResidence = String(row[6] || "").trim();
+
+        if (!stuName) continue;
+
+        const studentId =
+          "stu_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
+
+        const newStudent = {
+          id: studentId,
+          name: stuName,
+          nationalId: stuNatId,
+          age: stuAge,
+          parentName: stuParentName,
+          parentPhone: stuParentPhone,
+          parentRelation: stuParentRelation || "أب",
+          residence: stuResidence,
+          phone: stuParentPhone,
+          circleId: "",
+          status: "active",
+          createdAt: Date.now(),
+        };
+
+        window.appStore.students.push(newStudent);
+
+        // إنشاء وتثبيت حساب دخول الطالب تلقائياً بالهوية
+        const defaultPassword = stuNatId
+          ? stuNatId.length >= 4
+            ? stuNatId.slice(-4)
+            : stuNatId
+          : "1234";
+        const studentUserRec = {
+          id: studentId,
+          name: stuName,
+          role: "student",
+          username: stuNatId || stuParentPhone || studentId,
+          pass: defaultPassword,
+          status: "active",
+          createdAt: Date.now(),
+        };
+        window.appStore.users.push(studentUserRec);
+
+        if (typeof saveToCloud === "function") {
+          saveToCloud("students", newStudent.id, newStudent);
+          saveToCloud("users", studentUserRec.id, studentUserRec);
+        }
+
+        importedCount++;
+      }
+
+      if (typeof saveLocalStore === "function") saveLocalStore();
+      if (typeof closeModal === "function") closeModal("modal-excel-import");
+
+      alert(
+        `✅ تم بنجاح استيراد (${importedCount}) طالب ببياناتهم الكاملة (7 أعمدة)!`,
+      );
+      renderStudentsTable();
+      if (typeof renderAccountsTable === "function") renderAccountsTable();
+      fileInput.value = "";
+    } catch (err) {
+      console.error(err);
+      alert("⚠️ حدث خطأ أثناء معالجة ملف Excel، يرجى التأكد من صيغة الملف.");
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
+};
+
+// 1. التنقل بين الأقسام داخل شاشة إدارة المَجْمَع
 function switchComplexSection(section) {
   const btnCircles = document.getElementById("hub-btn-circles");
   const btnTeachers = document.getElementById("hub-btn-teachers");
@@ -323,10 +587,11 @@ function executeBulkExportStudentsExcel() {
       م: idx + 1,
       "اسم الطالب": s.name || "—",
       "رقم الهوية": s.nationalId || "—",
-      "جوال الطالب": s.phone || "—",
+      "عمر الطالب": s.age || "—",
       "اسم ولي الأمر": s.parentName || "—",
       "صلة القرابة": s.parentRelation || "—",
       "جوال ولي الأمر": s.parentPhone || "—",
+      "مكان السكن": s.residence || "—",
       الحلقة: circle ? circle.name : "غير مسجل",
       الحالة: s.status === "active" ? "نشط" : "مؤرشف",
     };
@@ -360,11 +625,11 @@ function renderStudentsTable() {
   );
 
   if (isTeacher) {
-    const teacherObj =
-      (window.appStore.teachers || []).find(
-        (t) => t.userId === user.id || t.id === user.teacherId,
-      ) || (window.appStore.teachers || [])[0];
-    const teacherId = teacherObj ? teacherObj.id : "t1";
+    const teacherObj = (window.appStore.teachers || []).find(
+      (t) =>
+        t.userId === user.id || t.id === user.teacherId || t.id === user.id,
+    );
+    const teacherId = teacherObj ? teacherObj.id : user.id;
     const teacherCircleIds = (window.appStore.circles || [])
       .filter(
         (c) =>
@@ -437,6 +702,16 @@ function renderStudentsTable() {
   updateBulkToolbarCount();
 }
 
+function updatePendingBadgeCount() {
+  const badge = document.getElementById("pending-count-badge");
+  if (badge) {
+    const pendingCount = (window.appStore.students || []).filter(
+      (s) => s.status === "pending",
+    ).length;
+    badge.textContent = pendingCount;
+  }
+}
+
 function deleteStudent(studentId) {
   const student = (window.appStore.students || []).find(
     (s) => s.id === studentId,
@@ -456,7 +731,6 @@ function deleteStudent(studentId) {
   if (typeof renderAccountsTable === "function") renderAccountsTable();
 }
 
-// فتح نافذة تعديل بيانات الطالب وتحميل رقمه السري للمدير
 function openModalEditStudentComprehensive(studentId) {
   const student = (window.appStore.students || []).find(
     (s) => s.id === studentId,
@@ -505,7 +779,6 @@ function openModalEditStudentComprehensive(studentId) {
     openModal("modal-edit-student-comprehensive");
 }
 
-// حفظ بيانات الطالب وتحديث كلمة المرور في جدول المستخدمين والقاعدة السحابية
 function handleSaveStudentComprehensive(e) {
   e.preventDefault();
   const studentId = document.getElementById("edit-comp-stu-id")?.value;
@@ -638,7 +911,7 @@ function handleTeacherSaveStudentRecord(e) {
   if (typeof renderAttendanceTable === "function") renderAttendanceTable();
 }
 
-// 3. إدارة المعلمين ومتابعة التحضير
+// 3. إدارة المعلمين ومتابعة التحضير والتقرير المالي
 function switchTeacherSubTab(tab) {
   const btnList = document.getElementById("tab-btn-teachers-list");
   const btnAtt = document.getElementById("tab-btn-teachers-attendance");
@@ -678,6 +951,8 @@ function renderTeachersTable() {
     return;
   }
 
+  const financialTeacherId = window.appStore.settings?.financialTeacherId;
+
   let html = "";
   filtered.forEach((t) => {
     const teacherCircles = (window.appStore.circles || []).filter(
@@ -691,10 +966,14 @@ function renderTeachersTable() {
         : "غير مكلف";
     const lastLogin = t.lastLogin || "اليوم 04:30 م";
     const isSuspended = t.status !== "active";
+    const isFinance = financialTeacherId === t.id;
 
     html += `
       <tr>
-        <td style="font-weight: 700;">${t.name}</td>
+        <td style="font-weight: 700;">
+          ${t.name}
+          ${isFinance ? '<span class="badge" style="background:#0b6b7d; color:#fff; margin-right:4px;">💼 مسؤول مالي</span>' : ""}
+        </td>
         <td>${t.phone || "—"}</td>
         <td><span style="font-weight: 600; color: var(--text-dark);">${circleNamesStr} (${teacherCircles.length} حلقة)</span></td>
         <td dir="ltr" class="text-muted" style="text-align: right;">${lastLogin}</td>
@@ -714,7 +993,7 @@ function renderTeachersTable() {
   tbody.innerHTML = html;
 }
 
-// عرض وإدارة تحضير المعلمين للمدير
+// عرض وإدارة تحضير المعلمين والمدير
 function renderTeachersAttendanceTable() {
   const tbody = document.getElementById("teachers-attendance-table-body");
   if (!tbody) return;
@@ -784,7 +1063,7 @@ function renderTeachersAttendanceTable() {
           </select>
         </td>
         <td>
-          <input type="text" class="form-control" placeholder="ملاحظة المدير..." value="${attRecord.notes || ""}" onchange="updateTeacherAttendanceNotes('${t.id}', this.value)">
+          <input type="text" class="form-control" placeholder="ملاحظة الإدارة..." value="${attRecord.notes || ""}" onchange="updateTeacherAttendanceNotes('${t.id}', this.value)">
         </td>
       </tr>
     `;
@@ -911,7 +1190,7 @@ function exportTeachersAttendanceExcel() {
       التاريخ: dateVal,
       "وقت الحضور": att.time || "—",
       "حالة الحضور": statusLabel,
-      "ملاحظات المدير": att.notes || "—",
+      "ملاحظات الإدارة": att.notes || "—",
     };
   });
 
@@ -1049,6 +1328,12 @@ function openModalEditTeacher(teacherId) {
   );
   setVal("edit-teach-password", userRec ? userRec.pass : "1234");
 
+  const financeCheckbox = document.getElementById("edit-teach-is-finance");
+  if (financeCheckbox) {
+    financeCheckbox.checked =
+      window.appStore.settings?.financialTeacherId === teacher.id;
+  }
+
   const container = document.getElementById(
     "edit-teacher-circles-checkbox-container",
   );
@@ -1097,6 +1382,24 @@ function handleSaveTeacherEdit(e) {
   if (typeof saveToCloud === "function")
     saveToCloud("teachers", teacher.id, teacher);
 
+  // تحديث الصلاحية المالية وحصرها في معلم واحد دون المساس بالسجلات
+  const isFinanceChecked = document.getElementById(
+    "edit-teach-is-finance",
+  )?.checked;
+  if (!window.appStore.settings) window.appStore.settings = {};
+
+  if (isFinanceChecked) {
+    window.appStore.settings.financialTeacherId = teacher.id;
+  } else if (window.appStore.settings.financialTeacherId === teacher.id) {
+    window.appStore.settings.financialTeacherId = null;
+  }
+
+  if (typeof saveToCloud === "function") {
+    saveToCloud("settings", "finance_access", {
+      financialTeacherId: window.appStore.settings.financialTeacherId,
+    });
+  }
+
   const newPass = document.getElementById("edit-teach-password")?.value.trim();
   if (newPass) {
     if (!window.appStore.users) window.appStore.users = [];
@@ -1140,7 +1443,7 @@ function handleSaveTeacherEdit(e) {
 
   if (typeof saveLocalStore === "function") saveLocalStore();
   if (typeof closeModal === "function") closeModal("modal-edit-teacher");
-  alert("✅ تم تعديل بيانات المعلم والرقم السري بنجاح!");
+  alert("✅ تم تعديل بيانات المعلم والرقم السري والصلاحيات بنجاح!");
   renderTeachersTable();
   if (typeof renderCirclesCards === "function") renderCirclesCards();
   if (typeof updateCircleDropdowns === "function") updateCircleDropdowns();
@@ -1664,7 +1967,7 @@ function openCustomTestsPrintModal() {
   if (typeof openModal === "function") openModal("modal-print-tests-columns");
 }
 
-function executeCustomTestsPrint() {
+function executeCustomTestsPDF() {
   const colStudent = document.getElementById("chk-col-student")?.checked;
   const colCircle = document.getElementById("chk-col-circle")?.checked;
   const colType = document.getElementById("chk-col-type")?.checked;
@@ -1690,7 +1993,7 @@ function executeCustomTestsPrint() {
   toggleCol(6, colDate);
 
   if (typeof closeModal === "function") closeModal("modal-print-tests-columns");
-  window.print();
+  exportTestsPDF();
 }
 
 function renderTestsTable() {
@@ -1749,7 +2052,7 @@ function renderTestsTable() {
   tbody.innerHTML = html;
 }
 
-// 7. لوحة التميز الأسبوعي (الاسم، الحلقة، عدد بطاقات التميز فقط)
+// 7. لوحة التميز الأسبوعي
 function setTrophyWinner(studentId) {
   const user = window.currentUser;
   if (!user || user.role !== "admin") {
