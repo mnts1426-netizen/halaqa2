@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <title>حلقات تحفيظ القرآن الكريم - بجامع الهدى</title>
+    <title>حلقات تحفيظ القرآن الكريم - مَجْمَع عبدالله بن مهدي القرآني</title>
     <!-- الخط الرسمي: Cairo & Tajawal -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,6 +16,8 @@
     />
     <!-- مكتبة التصدير والاستيراد لـ Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- مكتبة تصدير الـ PDF المباشر -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- مكتبات Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -26,7 +28,7 @@
   </head>
   <body>
     <!-- ========================================== -->
-    <!-- 1. شاشة تسجيل الدخول الموحدة للجميع -->
+    <!-- 1. شاشات تسجيل الدخول -->
     <!-- ========================================== -->
     <div id="view-login" class="page-view active">
       <div class="login-wrapper">
@@ -96,16 +98,7 @@
               >
                 <img
                   id="login-hero-logo"
-                  src="logo2.png"
-                  onerror="
-                    if (this.src.indexOf('logo2.png') !== -1) {
-                      this.src = 'logo_transparent_2.jpg';
-                    } else if (
-                      this.src.indexOf('logo_transparent_2.jpg') !== -1
-                    ) {
-                      this.src = 'logo111.png';
-                    }
-                  "
+                  src="logo_transparent_2.png"
                   alt="شعار الحلقات"
                   style="
                     width: 100%;
@@ -124,8 +117,39 @@
             <div class="quran-quote">
               «خيرُكُم مَن تعلَّمَ القرآنَ وعلَّمَهُ»
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-            <p class="brand-desc"></p>
+    <div id="view-student-login" class="page-view style-hidden">
+      <div class="login-wrapper">
+        <div class="login-left-panel">
+          <div class="login-box">
+            <h2 class="login-title">بوابة دخول الطلاب</h2>
+            <form
+              id="student-login-form"
+              onsubmit="
+                event.preventDefault();
+                return handleStudentLoginFormSubmit(event);
+              "
+            >
+              <div class="form-group">
+                <label for="stu-login-identifier"
+                  >رقم الهوية الوطنية أو جوال ولي الأمر</label
+                >
+                <input
+                  type="text"
+                  id="stu-login-identifier"
+                  class="form-control"
+                  placeholder="أدخل رقم الهوية أو الجوال..."
+                  required
+                />
+              </div>
+              <button type="submit" class="btn btn-primary btn-block btn-lg">
+                دخول بوابة الطالب
+              </button>
+            </form>
           </div>
         </div>
       </div>
@@ -147,8 +171,8 @@
               />
             </div>
             <div class="logo-text">
-              <h2 id="sidebar-org-name">حلقات جامع الهدى</h2>
-              <p id="sidebar-mosque-name">لتحفيظ القرآن الكريم</p>
+              <h2 id="sidebar-org-name">مَجْمَع عبدالله بن مهدي القرآني</h2>
+              <p id="sidebar-mosque-name">جامع الهدى</p>
             </div>
           </div>
         </div>
@@ -187,7 +211,7 @@
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                 <polyline points="9 22 9 12 15 12 15 22" />
               </svg>
-              <span>إدارة المجمع</span>
+              <span>إدارة المَجْمَع</span>
             </a>
             <a
               href="#"
@@ -325,6 +349,28 @@
               </svg>
               <span>التقارير</span>
             </a>
+            <a
+              href="#"
+              class="nav-link"
+              id="nav-finance-link"
+              data-target="view-finance"
+              style="display: none"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <line x1="12" y1="1" x2="12" y2="23"></line>
+                <path
+                  d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
+                ></path>
+              </svg>
+              <span>التقارير المالية</span>
+            </a>
             <a href="#" class="nav-link" data-target="view-notifications">
               <svg
                 width="20"
@@ -363,9 +409,9 @@
         </nav>
 
         <div class="sidebar-user-card">
-          <div class="user-avatar" id="current-user-avatar">أ</div>
+          <div class="user-avatar" id="current-user-avatar">ص</div>
           <div class="user-info">
-            <h4 id="current-user-name">أحمد بن عبدالله بن مهدي</h4>
+            <h4 id="current-user-name">صالح ال ناشع</h4>
             <span id="current-user-role">المدير</span>
           </div>
           <button class="logout-btn" id="btn-logout" title="تسجيل الخروج">
@@ -387,7 +433,6 @@
 
         <!-- 1. لوحة التحكم -->
         <section id="view-dashboard" class="content-view active">
-          <!-- شبكة المربعات الإحصائية الموحدة بالكامل في الشكل والحجم واللون -->
           <div class="stats-grid" id="dashboard-stats-grid">
             <div class="stat-card">
               <div class="stat-icon icon-brown">
@@ -469,7 +514,7 @@
               </div>
             </div>
 
-            <!-- المربع 5: سمّعوا اليوم بنفس التنسيق القياسي التام -->
+            <!-- المربع 5: سمّعوا اليوم -->
             <div
               class="stat-card nav-admin-only"
               style="cursor: pointer"
@@ -497,7 +542,7 @@
               </div>
             </div>
 
-            <!-- المربع 6: لم يسمّعوا اليوم بنفس التنسيق القياسي التام -->
+            <!-- المربع 6: لم يسمّعوا اليوم -->
             <div
               class="stat-card nav-admin-only"
               style="cursor: pointer"
@@ -527,11 +572,8 @@
             </div>
           </div>
 
-          <!-- بطاقة التحضير الذاتي للمعلم فقط فور تواجده بالمسجد -->
-          <div
-            class="card mb-3 nav-teacher-only"
-            id="teacher-self-attendance-card"
-          >
+          <!-- بطاقة التحضير الذاتي للمدير والمعلم -->
+          <div class="card mb-3" id="teacher-self-attendance-card">
             <div class="card-header flex-between">
               <div>
                 <h3
@@ -544,7 +586,7 @@
                   📍 تسجيل الحضور الذاتي بالمسجد
                 </h3>
                 <small class="text-muted"
-                  >تسجيل حضورك المباشر في المجمع لهذا اليوم</small
+                  >تسجيل حضورك المباشر في المَجْمَع لهذا اليوم</small
                 >
               </div>
               <div id="teacher-self-checkin-status-badge">
@@ -571,7 +613,7 @@
             </div>
           </div>
 
-          <!-- لوحة التميز خاصة بالمدير فقط ومحذوفة تماماً من واجهة المعلم -->
+          <!-- لوحة التميز خاصة بالمدير فقط -->
           <div class="card mb-3 nav-admin-only" id="tamayuz-board-card">
             <div class="card-header flex-between">
               <div>
@@ -642,7 +684,7 @@
           </div>
         </section>
 
-        <!-- 2. شاشة إدارة المجمع -->
+        <!-- 2. شاشة إدارة المَجْمَع -->
         <section id="view-circles" class="content-view">
           <div
             class="complex-hub-cards mb-3"
@@ -767,8 +809,11 @@
                 >
                   📤 تصدير Excel
                 </button>
-                <button class="btn btn-outline-brown" onclick="window.print()">
-                  طباعة
+                <button
+                  class="btn btn-outline-brown"
+                  onclick="exportTeachersPDF()"
+                >
+                  📄 تنزيل PDF
                 </button>
                 <button class="btn btn-primary" onclick="openModalAddTeacher()">
                   ➕ إضافة معلم
@@ -776,7 +821,6 @@
               </div>
             </div>
 
-            <!-- جدول المعلمين الرئيسي -->
             <div class="card" id="box-teachers-list-table">
               <div class="card-filter-bar">
                 <input
@@ -802,7 +846,6 @@
               </div>
             </div>
 
-            <!-- جدول متابعة وتعديل تحضير المعلمين للمدير -->
             <div class="card style-hidden" id="box-teachers-attendance-table">
               <div class="card-filter-bar flex-between">
                 <div style="display: flex; gap: 0.8rem; flex: 1">
@@ -825,12 +868,21 @@
                     class="btn btn-outline-brown btn-sm"
                     onclick="exportTeachersAttendanceExcel()"
                   >
-                    📤 تصدير التحضير Excel
+                    📤 تصدير Excel
+                  </button>
+                  <button
+                    class="btn btn-outline-brown btn-sm"
+                    onclick="exportTeachersAttendancePDF()"
+                  >
+                    📄 تنزيل PDF
                   </button>
                 </div>
               </div>
               <div class="table-responsive">
-                <table class="data-table">
+                <table
+                  class="data-table"
+                  id="teachers-attendance-table-element"
+                >
                   <thead>
                     <tr>
                       <th style="width: 45px; text-align: center">م</th>
@@ -890,8 +942,11 @@
                 >
                   📤 تصدير Excel
                 </button>
-                <button class="btn btn-outline-brown" onclick="window.print()">
-                  طباعة
+                <button
+                  class="btn btn-outline-brown"
+                  onclick="exportStudentsPDF()"
+                >
+                  📄 تنزيل PDF
                 </button>
                 <button
                   class="btn btn-primary nav-admin-only"
@@ -1067,9 +1122,9 @@
                 </button>
                 <button
                   class="btn btn-outline-brown btn-sm"
-                  onclick="window.print()"
+                  onclick="exportAttendancePDF()"
                 >
-                  طباعة
+                  📄 تنزيل PDF
                 </button>
                 <button
                   class="btn btn-outline-brown btn-sm"
@@ -1125,7 +1180,7 @@
           </div>
         </section>
 
-        <!-- 5. شاشة ملاحظات المعلمين للمدير -->
+        <!-- 5. شاشة ملاحظات المعلمين -->
         <section id="view-teacher-notes" class="content-view">
           <div class="card">
             <div class="card-header flex-between">
@@ -1145,9 +1200,9 @@
                 </button>
                 <button
                   class="btn btn-outline-brown btn-sm"
-                  onclick="window.print()"
+                  onclick="exportTeacherNotesPDF()"
                 >
-                  طباعة
+                  📄 تنزيل PDF
                 </button>
               </div>
             </div>
@@ -1183,7 +1238,7 @@
           </div>
         </section>
 
-        <!-- 6. شاشة إدارة الحسابات للمدير -->
+        <!-- 6. شاشة إدارة الحسابات -->
         <section id="view-accounts" class="content-view">
           <div class="card">
             <div class="card-header flex-between">
@@ -1203,9 +1258,9 @@
                 </button>
                 <button
                   class="btn btn-outline-brown btn-sm"
-                  onclick="window.print()"
+                  onclick="exportAccountsPDF()"
                 >
-                  طباعة
+                  📄 تنزيل PDF
                 </button>
               </div>
             </div>
@@ -1324,11 +1379,8 @@
               >
                 📤 تصدير Excel
               </button>
-              <button
-                class="btn btn-outline-brown"
-                onclick="openCustomTestsPrintModal()"
-              >
-                طباعة
+              <button class="btn btn-outline-brown" onclick="exportTestsPDF()">
+                📄 تنزيل PDF
               </button>
             </div>
             <button class="btn btn-primary" onclick="openModalAddTest()">
@@ -1443,15 +1495,9 @@
               </button>
               <button
                 class="btn btn-outline-brown"
-                onclick="printOfficialReport()"
-              >
-                طباعة
-              </button>
-              <button
-                class="btn btn-outline-brown"
                 onclick="downloadReportPDF()"
               >
-                تنزيل PDF
+                📄 تنزيل PDF
               </button>
             </div>
           </div>
@@ -1459,8 +1505,16 @@
           <div class="card mt-3" id="report-results-wrapper">
             <div class="print-official-header">
               <div class="print-header-center-logos">
-                <img id="print-logo-new" src="logo12.jpeg" alt="شعار الحلقات" />
-                <img id="print-logo-old" src="logo1.png" alt="شعار الحلقات" />
+                <img
+                  id="print-logo-new"
+                  src="logo12.jpeg"
+                  alt="شعار المَجْمَع"
+                />
+                <img
+                  id="print-logo-old"
+                  src="logo_transparent_1.png"
+                  alt="شعار المَجْمَع"
+                />
               </div>
               <div class="print-header-title-box">
                 <h3
@@ -1503,7 +1557,25 @@
           </div>
         </section>
 
-        <!-- 10. شاشة الإشعارات والرسائل -->
+        <!-- 10. شاشة التقارير المالية -->
+        <section id="view-finance" class="content-view">
+          <div class="card">
+            <div class="card-header flex-between">
+              <h3
+                style="color: var(--primary-brown); font-weight: 800; margin: 0"
+              >
+                💼 التقارير المالية والمصروفات
+              </h3>
+            </div>
+            <div class="empty-state-card p-4 text-center">
+              <p class="text-muted">
+                قسم التقارير المالية قيد الإعداد والتجهيز...
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 11. شاشة الإشعارات والرسائل -->
         <section id="view-notifications" class="content-view">
           <div class="flex-between mb-3">
             <div></div>
@@ -1530,12 +1602,12 @@
           </div>
         </section>
 
-        <!-- 11. شاشة الإعدادات -->
+        <!-- 12. شاشة الإعدادات -->
         <section id="view-settings" class="content-view">
           <div class="dashboard-columns">
             <div class="card nav-admin-only" id="admin-org-settings-card">
               <h3 style="color: var(--primary-brown); font-weight: 800">
-                🏛️ إعدادات وهوية المجمع والطباعة
+                🏛️ إعدادات وهوية المَجْمَع والموقع والطباعة
               </h3>
               <form
                 id="form-org-settings"
@@ -1543,7 +1615,7 @@
                 class="mt-3"
               >
                 <div class="form-group">
-                  <label>اسم المجمع الرسمي</label
+                  <label>اسم المَجْمَع الرسمي</label
                   ><input
                     type="text"
                     id="set-org-name"
@@ -1561,13 +1633,35 @@
                   />
                 </div>
                 <div class="form-group">
-                  <label>اسم مدير المجمع</label
+                  <label>اسم مدير المَجْمَع</label
                   ><input
                     type="text"
                     id="set-org-director"
                     class="form-control"
                     required
                   />
+                </div>
+                <div class="form-group">
+                  <label
+                    >📍 الموقع الجغرافي للمَجْمَع (إحداثيات GPS / رابط خرائط
+                    Google)</label
+                  >
+                  <div style="display: flex; gap: 0.5rem">
+                    <input
+                      type="text"
+                      id="set-org-location"
+                      class="form-control"
+                      placeholder="مثال: 18.2165, 42.5053 أو رابط الخريطة..."
+                    />
+                    <button
+                      type="button"
+                      class="btn btn-outline-brown"
+                      onclick="getCurrentLocationCoords()"
+                      title="تحديد موقعي الحالي بدقة"
+                    >
+                      📡 تحديد تلقائي
+                    </button>
+                  </div>
                 </div>
                 <div class="form-group">
                   <label>حجم خط العناوين ورأس الصفحة</label>
@@ -1598,7 +1692,7 @@
                   </div>
                 </div>
                 <button type="submit" class="btn btn-primary">
-                  💾 حفظ إعدادات وهوية المجمع
+                  💾 حفظ إعدادات وهوية وموقع المَجْمَع
                 </button>
               </form>
             </div>
@@ -1649,7 +1743,7 @@
           </div>
         </section>
 
-        <!-- 12. شاشات الطالب (تتضمن صندوق الإشعارات الواردة من المدير) -->
+        <!-- 13. شاشات الطالب -->
         <section id="view-student-home" class="content-view"></section>
         <section id="view-student-lessons" class="content-view">
           <div id="stu-lessons-container">
@@ -1663,7 +1757,6 @@
 
     <!-- MODALS: النوافذ المنبثقة -->
 
-    <!-- نافذة عرض تفاصيل من سمّع ومن لم يسمّع اليوم -->
     <div id="modal-tasmeea-status-details" class="modal-overlay">
       <div class="modal-card modal-lg">
         <div class="modal-header">
@@ -1693,9 +1786,9 @@
               </button>
               <button
                 class="btn btn-outline-brown btn-sm"
-                onclick="printTasmeeaDetails()"
+                onclick="exportTasmeeaDetailsPDF()"
               >
-                📄 طباعة
+                📄 تنزيل PDF
               </button>
             </div>
           </div>
@@ -1739,7 +1832,7 @@
     <div id="modal-add-circle" class="modal-overlay">
       <div class="modal-card modal-lg">
         <div class="modal-header">
-          <h3 id="modal-circle-title">إضافة حلقة جديدة بالمجمع</h3>
+          <h3 id="modal-circle-title">إضافة حلقة جديدة بالمَجْمَع</h3>
           <button class="modal-close" onclick="closeModal('modal-add-circle')">
             &times;
           </button>
@@ -1891,7 +1984,6 @@
       </div>
     </div>
 
-    <!-- نافذة تعديل بيانات الطالب وحسابه مع الرقم السري -->
     <div id="modal-edit-student-comprehensive" class="modal-overlay">
       <div class="modal-card modal-lg">
         <div class="modal-header">
@@ -2107,7 +2199,6 @@
       </div>
     </div>
 
-    <!-- نافذة تعديل بيانات المعلم وحسابه مع الرقم السري -->
     <div id="modal-edit-teacher" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
@@ -2150,6 +2241,32 @@
                 class="form-control"
                 placeholder="كلمة المرور..."
               />
+            </div>
+            <div class="form-group">
+              <label
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 0.5rem;
+                  cursor: pointer;
+                  font-weight: 700;
+                  color: var(--primary-brown);
+                "
+              >
+                <input
+                  type="checkbox"
+                  id="edit-teach-is-finance"
+                  style="
+                    width: 18px;
+                    height: 18px;
+                    accent-color: var(--primary-brown);
+                  "
+                />
+                <span
+                  >💼 تعيين كمسؤول مالي للمَجْمَع (صلاحية التقارير
+                  المالية)</span
+                >
+              </label>
             </div>
             <div class="form-group">
               <label>الحلقات المكلف بها:</label>
@@ -2234,7 +2351,6 @@
       </div>
     </div>
 
-    <!-- نافذة طلب الالتحاق بالمجمع -->
     <div id="modal-self-register" class="modal-overlay">
       <div class="modal-card word-doc-style">
         <div class="modal-header">
@@ -2397,7 +2513,7 @@
               </div>
               <div class="form-group">
                 <label style="font-weight: 800"
-                  >الالتحاق سابقاً بحلقات أو مجامع قرانية
+                  >الالتحاق سابقاً بحلقات أو مَجَامِع قرآنية
                   <span style="color: red">*</span></label
                 >
                 <div
@@ -2849,66 +2965,6 @@
             </button>
           </div>
         </form>
-      </div>
-    </div>
-
-    <div id="modal-print-tests-columns" class="modal-overlay">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3>تحديد أعمدة طباعة الاختبارات</h3>
-          <button
-            class="modal-close"
-            onclick="closeModal('modal-print-tests-columns')"
-          >
-            &times;
-          </button>
-        </div>
-        <div class="modal-body">
-          <p class="text-muted mb-3" style="font-size: 0.88rem">
-            حدد الأعمدة التي ترغب في طباعتها في تقرير الاختبارات:
-          </p>
-          <div class="form-group">
-            <label class="checkbox-item-row p-2"
-              ><input type="checkbox" id="chk-col-student" checked />
-              <span>اسم الطالب</span></label
-            >
-            <label class="checkbox-item-row p-2"
-              ><input type="checkbox" id="chk-col-circle" checked />
-              <span>الحلقة</span></label
-            >
-            <label class="checkbox-item-row p-2"
-              ><input type="checkbox" id="chk-col-type" checked />
-              <span>نوع الاختبار / المقرر</span></label
-            >
-            <label class="checkbox-item-row p-2"
-              ><input type="checkbox" id="chk-col-score" checked />
-              <span>الدرجة</span></label
-            >
-            <label class="checkbox-item-row p-2"
-              ><input type="checkbox" id="chk-col-rating" checked />
-              <span>التقدير</span></label
-            >
-            <label class="checkbox-item-row p-2"
-              ><input type="checkbox" id="chk-col-date" checked />
-              <span>التاريخ</span></label
-            >
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button
-            type="button"
-            class="btn btn-primary"
-            onclick="executeCustomTestsPrint()"
-          >
-            طباعة</button
-          ><button
-            type="button"
-            class="btn btn-outline-brown"
-            onclick="closeModal('modal-print-tests-columns')"
-          >
-            إلغاء
-          </button>
-        </div>
       </div>
     </div>
 
