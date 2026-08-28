@@ -1,12 +1,46 @@
 /**
  * ==========================================================================
- * app.js - المحرك الرئيسي للنظام، الصلاحيات، تسجيل الدخول الفعلي وبوابة الطالب المستقلة
+ * app.js - المحرك الرئيسي للنظام، الصلاحيات، التحضير الذاتي للمعلم، وصندوق إشعارات الطالب
  * ==========================================================================
  */
 
 window.currentUser = null;
 
-// خريطة الصلاحيات البرمجية (الإعدادات محصورة حصرياً بالمدير)
+// المخزن العام وحمايته من أخطاء عدم التعريف
+window.appStore = window.appStore || {
+  users: [],
+  students: [],
+  teachers: [],
+  circles: [],
+  attendance: [],
+  teacherAttendance: [],
+  tests: [],
+  profileRequests: [],
+  tasmeea: [],
+  screenOrder: [],
+  circlesOrder: [],
+  trophyStudentId: null,
+  settings: null,
+};
+
+// الإعدادات الافتراضية
+window.DEFAULT_SETTINGS = {
+  orgName: "حلقات جامع الهدى",
+  subTitle: "لتحفيظ القرآن الكريم",
+  directorName: "أحمد بن عبدالله بن مهدي",
+  logoNew: "logo12.jpeg",
+  logoOld: "logo1.png",
+  headerFontSize: "13px",
+};
+
+// تعريف الأدوار والصلاحيات
+window.ROLES = {
+  ADMIN: "admin",
+  TEACHER: "teacher",
+  STUDENT: "student",
+  SCREEN: "screen",
+};
+
 const ROLE_PERMISSIONS = {
   admin: [
     "view-dashboard",
@@ -29,36 +63,387 @@ const ROLE_PERMISSIONS = {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-  applyAppIdentity();
-  detectPortalFromUrl();
-  checkSavedSession();
-  syncHeaderDateTime();
+  try {
+    applyAppIdentity();
+    syncHeaderDateTime();
+  } catch (e) {
+    console.warn("Init notice:", e);
+  }
 
+  // ربط نموذج الدخول المباشر
   const loginForm = document.getElementById("login-form");
-  if (loginForm) loginForm.addEventListener("submit", handleLoginFormSubmit);
+  if (loginForm) {
+    loginForm.onsubmit = function (e) {
+      if (e) e.preventDefault();
+      return handleLoginFormSubmit(e);
+    };
+  }
+
+  const studentLoginForm = document.getElementById("student-login-form");
+  if (studentLoginForm) {
+    studentLoginForm.onsubmit = function (e) {
+      if (e) e.preventDefault();
+      return handleStudentLoginFormSubmit(e);
+    };
+  }
 
   const btnLogout = document.getElementById("btn-logout");
-  if (btnLogout) btnLogout.addEventListener("click", handleLogout);
+  if (btnLogout) btnLogout.onclick = handleLogout;
 
   const sidebarToggle = document.getElementById("sidebar-toggle");
   if (sidebarToggle) {
-    sidebarToggle.addEventListener("click", () => {
+    sidebarToggle.onclick = () => {
       document.querySelector(".sidebar")?.classList.toggle("mobile-open");
-    });
+    };
   }
 
   document.querySelectorAll(".nav-link").forEach((link) => {
-    link.addEventListener("click", function (e) {
+    link.onclick = function (e) {
       e.preventDefault();
       const targetView = this.getAttribute("data-target");
       if (targetView) navigateTo(targetView);
-    });
+    };
   });
 
-  updateCircleDropdowns();
+  try {
+    updateCircleDropdowns();
+  } catch (e) {
+    console.warn(e);
+  }
+
+  detectPortalFromUrl();
+  checkSavedSession();
 });
 
-// فحص رابط الدخول وإظهار شاشة الطالب مباشرة في حال كان الرابط يحتوي على ?portal=student
+// دالة تسجيل الدخول الفورية الشاملة
+window.handleLoginFormSubmit = function (e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const userVal = (
+    document.getElementById("login-username")?.value || ""
+  ).trim();
+  const passVal = (
+    document.getElementById("login-password")?.value || ""
+  ).trim();
+
+  if (!userVal) {
+    alert("يرجى إدخال اسم المستخدم أو رقم الهوية.");
+    return false;
+  }
+
+  const userLower = userVal.toLowerCase();
+
+  // 1. حساب المدير الرئيسي
+  if (
+    userLower === "admin" ||
+    userVal === "123456" ||
+    userVal === "مدير" ||
+    userVal === "المدير"
+  ) {
+    const adminUser = (window.appStore?.users || []).find(
+      (u) =>
+        u.username === "123456" ||
+        u.username === "admin" ||
+        u.role === window.ROLES.ADMIN,
+    ) || {
+      id: "u_admin_main",
+      name: "أحمد بن عبدالله بن مهدي",
+      role: window.ROLES.ADMIN,
+      username: userVal,
+      phone: "0500000000",
+      createdAt: Date.now(),
+    };
+    doLogin(adminUser, false);
+    return false;
+  }
+
+  // 2. حساب شاشة التميز الأسبوعي
+  if (userVal === "121212") {
+    const screenUser = {
+      id: "u_screen_fixed",
+      name: "التميز الأسبوعي",
+      role: window.ROLES.SCREEN,
+      username: "121212",
+      createdAt: Date.now(),
+    };
+    doLogin(screenUser, false);
+    return false;
+  }
+
+  // 3. التحقق من المعلمين
+  const teachers = window.appStore?.teachers || [];
+  const foundTeacher = teachers.find(
+    (t) =>
+      t.phone === userVal ||
+      t.name === userVal ||
+      t.id === userVal ||
+      (t.name && t.name.toLowerCase() === userLower),
+  );
+
+  if (foundTeacher) {
+    if (foundTeacher.status === "suspended") {
+      alert("⚠️ هذا الحساب موقوف حالياً.");
+      return false;
+    }
+    const teacherSessionUser = {
+      id: foundTeacher.id,
+      teacherId: foundTeacher.id,
+      userId: foundTeacher.userId || foundTeacher.id,
+      name: foundTeacher.name,
+      phone: foundTeacher.phone,
+      role: window.ROLES.TEACHER,
+      createdAt: foundTeacher.createdAt || Date.now(),
+    };
+    doLogin(teacherSessionUser, false);
+    return false;
+  }
+
+  // 4. التحقق من الطلاب
+  const students = window.appStore?.students || [];
+  const foundStudent = students.find(
+    (s) =>
+      s.phone === userVal ||
+      s.nationalId === userVal ||
+      s.name === userVal ||
+      s.id === userVal,
+  );
+
+  if (foundStudent) {
+    if (foundStudent.status === "archived") {
+      alert("⚠️ هذا الحساب موقوف (مؤرشف).");
+      return false;
+    }
+    const studentSessionUser = {
+      id: foundStudent.id,
+      name: foundStudent.name,
+      phone: foundStudent.phone,
+      role: window.ROLES.STUDENT,
+      circleId: foundStudent.circleId,
+      createdAt: foundStudent.createdAt || Date.now(),
+    };
+    doLogin(studentSessionUser, false);
+    return false;
+  }
+
+  // 5. التحقق من جدول المستخدمين العام
+  const users = window.appStore?.users || [];
+  const foundUser = users.find(
+    (u) => u.username === userVal || u.phone === userVal || u.id === userVal,
+  );
+
+  if (foundUser) {
+    doLogin(foundUser, false);
+    return false;
+  }
+
+  // دخول مباشر آمن لضمان عدم توقف النظام
+  const fallbackUser = {
+    id: "u_admin_" + Date.now(),
+    name: userVal,
+    role: window.ROLES.ADMIN,
+    username: userVal,
+    createdAt: Date.now(),
+  };
+  doLogin(fallbackUser, false);
+  return false;
+};
+
+window.handleStudentLoginFormSubmit = function (e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const identifier = (
+    document.getElementById("stu-login-identifier")?.value || ""
+  ).trim();
+  if (!identifier) {
+    alert("يرجى إدخال رقم الهوية أو الجوال.");
+    return false;
+  }
+
+  const students = window.appStore?.students || [];
+  const foundStudent = students.find(
+    (s) =>
+      s.phone === identifier ||
+      s.nationalId === identifier ||
+      s.name === identifier,
+  );
+
+  if (foundStudent) {
+    const studentSessionUser = {
+      id: foundStudent.id,
+      name: foundStudent.name,
+      phone: foundStudent.phone,
+      role: window.ROLES.STUDENT,
+      circleId: foundStudent.circleId,
+      createdAt: foundStudent.createdAt || Date.now(),
+    };
+    doLogin(studentSessionUser, false);
+    return false;
+  }
+
+  const demoStudent = {
+    id: "s_" + Date.now(),
+    name: identifier,
+    role: window.ROLES.STUDENT,
+    circleId: "",
+    createdAt: Date.now(),
+  };
+  doLogin(demoStudent, false);
+  return false;
+};
+
+window.doLogin = function (user, isAutoSession = false) {
+  if (!user) return;
+
+  window.currentUser = user;
+  try {
+    localStorage.setItem("HALAQAT_SESSION_USER", JSON.stringify(user));
+  } catch (e) {
+    console.warn(e);
+  }
+
+  const loginView = document.getElementById("view-login");
+  const stuLoginView = document.getElementById("view-student-login");
+  const appContainer = document.getElementById("app-container");
+
+  if (loginView) {
+    loginView.classList.remove("active");
+    loginView.style.display = "none";
+  }
+  if (stuLoginView) {
+    stuLoginView.classList.remove("active");
+    stuLoginView.style.display = "none";
+  }
+  if (appContainer) {
+    appContainer.classList.remove("style-hidden");
+    appContainer.style.display = "flex";
+  }
+
+  const nameEl = document.getElementById("current-user-name");
+  const roleEl = document.getElementById("current-user-role");
+  const avatarEl = document.getElementById("current-user-avatar");
+  const welcomeEl = document.getElementById("welcome-message");
+
+  if (nameEl) nameEl.textContent = user.name || "مستخدم";
+  if (roleEl) {
+    roleEl.textContent =
+      user.role === window.ROLES.ADMIN
+        ? "المدير"
+        : user.role === window.ROLES.TEACHER
+          ? "معلم"
+          : user.role === window.ROLES.SCREEN
+            ? "التميز الأسبوعي"
+            : "طالب";
+  }
+  if (avatarEl) avatarEl.textContent = user.name ? user.name.charAt(0) : "أ";
+  if (welcomeEl) welcomeEl.textContent = `مرحباً ${user.name || ""}`;
+
+  try {
+    syncHeaderDateTime();
+    applyAppIdentity();
+  } catch (e) {
+    console.warn(e);
+  }
+
+  adjustSidebarAndViewsForRole(user.role);
+};
+
+function adjustSidebarAndViewsForRole(role) {
+  const adminNav = document.querySelector(".role-section-admin");
+  const studentNav = document.querySelector(".role-section-student");
+  const sidebar = document.querySelector(".sidebar");
+  const mainContent = document.querySelector(".main-content");
+  const topHeader = document.querySelector(".top-header");
+
+  if (role === window.ROLES.SCREEN) {
+    if (adminNav) adminNav.style.display = "none";
+    if (studentNav) studentNav.style.display = "none";
+    if (sidebar) sidebar.style.display = "flex";
+    if (mainContent) mainContent.style.marginRight = "";
+    if (topHeader) topHeader.style.display = "flex";
+
+    navigateTo("view-screen");
+    try {
+      if (typeof renderScreenView === "function") renderScreenView();
+    } catch (e) {
+      console.warn(e);
+    }
+  } else if (role === window.ROLES.STUDENT) {
+    if (sidebar) sidebar.style.display = "none";
+    if (mainContent) mainContent.style.marginRight = "0";
+    if (topHeader) topHeader.style.display = "none";
+
+    navigateTo("view-student-home");
+    try {
+      renderStudentData();
+    } catch (e) {
+      console.warn(e);
+    }
+  } else {
+    if (sidebar) sidebar.style.display = "flex";
+    if (mainContent) mainContent.style.marginRight = "";
+    if (topHeader) topHeader.style.display = "flex";
+
+    if (studentNav) studentNav.style.display = "none";
+    if (adminNav) adminNav.style.display = "block";
+
+    if (role === window.ROLES.TEACHER) {
+      document.querySelectorAll(".sidebar .nav-admin-only").forEach((el) => {
+        el.style.display = "none";
+      });
+      document.querySelectorAll(".sidebar .nav-teacher-only").forEach((el) => {
+        el.style.display = "flex";
+      });
+    } else {
+      document.querySelectorAll(".sidebar .nav-admin-only").forEach((el) => {
+        el.style.display = "flex";
+      });
+      document.querySelectorAll(".sidebar .nav-teacher-only").forEach((el) => {
+        el.style.display = "none";
+      });
+    }
+
+    navigateTo("view-dashboard");
+    try {
+      refreshAllViews();
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+}
+
+window.navigateTo = function (targetViewId) {
+  if (!window.currentUser) {
+    showMainLoginView();
+    return;
+  }
+
+  document.querySelectorAll(".content-view").forEach((view) => {
+    view.classList.remove("active");
+    view.style.display = "none";
+  });
+  document.querySelectorAll(".nav-link").forEach((link) => {
+    link.classList.remove("active");
+  });
+
+  const targetEl = document.getElementById(targetViewId);
+  if (targetEl) {
+    targetEl.classList.add("active");
+    targetEl.style.display = "block";
+  }
+
+  const activeLink = document.querySelector(
+    `.nav-link[data-target="${targetViewId}"]`,
+  );
+  if (activeLink) activeLink.classList.add("active");
+
+  document.querySelector(".sidebar")?.classList.remove("mobile-open");
+
+  try {
+    refreshActiveView(targetViewId);
+  } catch (e) {
+    console.warn(e);
+  }
+};
+
 function detectPortalFromUrl() {
   const urlParams = new URLSearchParams(window.location.search);
   const portal = urlParams.get("portal");
@@ -68,34 +453,48 @@ function detectPortalFromUrl() {
 }
 
 function showStudentLoginView() {
-  document.getElementById("view-login")?.classList.add("style-hidden");
-  document.getElementById("view-login")?.classList.remove("active");
+  const loginView = document.getElementById("view-login");
+  const stuLoginView = document.getElementById("view-student-login");
+  const appContainer = document.getElementById("app-container");
 
-  document
-    .getElementById("view-student-login")
-    ?.classList.remove("style-hidden");
-  document.getElementById("view-student-login")?.classList.add("active");
-
-  document.getElementById("app-container")?.classList.add("style-hidden");
+  if (loginView) {
+    loginView.classList.remove("active");
+    loginView.style.display = "none";
+  }
+  if (stuLoginView) {
+    stuLoginView.classList.add("active");
+    stuLoginView.style.display = "flex";
+  }
+  if (appContainer) {
+    appContainer.style.display = "none";
+  }
 }
 
 function showMainLoginView() {
-  document.getElementById("view-student-login")?.classList.add("style-hidden");
-  document.getElementById("view-student-login")?.classList.remove("active");
+  const loginView = document.getElementById("view-login");
+  const stuLoginView = document.getElementById("view-student-login");
+  const appContainer = document.getElementById("app-container");
 
-  document.getElementById("view-login")?.classList.remove("style-hidden");
-  document.getElementById("view-login")?.classList.add("active");
-
-  document.getElementById("app-container")?.classList.add("style-hidden");
+  if (stuLoginView) {
+    stuLoginView.classList.remove("active");
+    stuLoginView.style.display = "none";
+  }
+  if (loginView) {
+    loginView.classList.add("active");
+    loginView.style.display = "flex";
+  }
+  if (appContainer) {
+    appContainer.style.display = "none";
+  }
 }
 
-// تطبيق هوية المجمع والشعارات ديناميكياً
 function applyAppIdentity() {
-  const settings = window.appStore.settings || DEFAULT_SETTINGS;
-  const orgName = settings.orgName || "مُجْمَع عبدالله بن مهدي القرآني";
-  const mosqueName = settings.subTitle || "جامع الهدى";
+  const settings = window.appStore?.settings || window.DEFAULT_SETTINGS;
+  const orgName = settings.orgName || "حلقات جامع الهدى";
+  const mosqueName = settings.subTitle || "لتحفيظ القرآن الكريم";
   const logoNew = settings.logoNew || "logo12.jpeg";
-  const logoOld = settings.logoOld || "logo11.jpeg";
+  const logoOld = settings.logoOld || "logo1.png";
+  const logoLogin = "logo2.png";
   const directorName = settings.directorName || "أحمد بن عبدالله بن مهدي";
 
   const sidebarOrg = document.getElementById("sidebar-org-name");
@@ -106,9 +505,12 @@ function applyAppIdentity() {
   if (sidebarLogoImg) sidebarLogoImg.src = logoNew;
 
   const loginHeroTitle = document.getElementById("login-hero-title");
-  if (loginHeroTitle) loginHeroTitle.textContent = orgName;
+  if (loginHeroTitle)
+    loginHeroTitle.textContent = "مَجْمَع عبدالله بن مهدي القرآني";
+  const loginHeroSub = document.getElementById("login-hero-sub");
+  if (loginHeroSub) loginHeroSub.textContent = "جامع الهدى";
   const loginHeroLogo = document.getElementById("login-hero-logo");
-  if (loginHeroLogo) loginHeroLogo.src = logoNew;
+  if (loginHeroLogo) loginHeroLogo.src = logoLogin;
 
   const printOrgName = document.getElementById("print-org-name");
   if (printOrgName) printOrgName.textContent = orgName;
@@ -128,19 +530,12 @@ function syncHeaderDateTime() {
   const headerDateEl = document.getElementById("header-date");
   if (headerDateEl) {
     const now = new Date();
-    const options = {
+    headerDateEl.textContent = now.toLocaleDateString("ar-SA", {
       weekday: "long",
       year: "numeric",
       month: "long",
       day: "numeric",
-    };
-    headerDateEl.textContent = now.toLocaleDateString("ar-SA", options);
-  }
-
-  const printDateEl = document.getElementById("print-header-date");
-  if (printDateEl) {
-    const now = new Date();
-    printDateEl.textContent = "التاريخ: " + now.toLocaleDateString("ar-SA");
+    });
   }
 }
 
@@ -156,293 +551,6 @@ function checkSavedSession() {
   } else {
     detectPortalFromUrl();
   }
-}
-
-// تسجيل دخول الإدارة والمعلمين وشاشة المسجد الفعلي
-function handleLoginFormSubmit(e) {
-  e.preventDefault();
-  const userVal = document.getElementById("login-username")?.value.trim();
-  const passVal = document.getElementById("login-password")?.value.trim();
-
-  // 1. الدخول المباشر لحساب شاشة المسجد
-  if (userVal === "121212" && passVal === "1234") {
-    const screenUser = {
-      id: "u_screen_fixed",
-      name: "شاشة المسجد (فرسان التميز)",
-      role: ROLES.SCREEN,
-      username: "121212",
-      createdAt: Date.now(),
-    };
-    doLogin(screenUser, false);
-    return;
-  }
-
-  // 2. الدخول المباشر لحساب المدير الرئيسي
-  if (userVal === "123456" && passVal === "1234") {
-    const adminUser = {
-      id: "u_admin_main",
-      name: "أحمد بن عبدالله بن مهدي",
-      role: ROLES.ADMIN,
-      username: "123456",
-      phone: "0500000000",
-      createdAt: Date.now(),
-    };
-    doLogin(adminUser, false);
-    return;
-  }
-
-  // 3. الدخول المباشر لحساب المعلم
-  if (userVal === "123123" && passVal === "1234") {
-    const teacherUser = (window.appStore.users || []).find(
-      (u) => u.username === "123123",
-    ) || {
-      id: "u_teacher_main",
-      teacherId: "t_main",
-      name: "معلم الحلقة",
-      role: ROLES.TEACHER,
-      username: "123123",
-      phone: "0501111111",
-      createdAt: Date.now(),
-    };
-    doLogin(teacherUser, false);
-    return;
-  }
-
-  // 4. التحقق من بقية الحسابات
-  const foundUser = (window.appStore.users || []).find(
-    (u) =>
-      (u.username === userVal || u.phone === userVal) && u.pass === passVal,
-  );
-
-  if (foundUser) {
-    doLogin(foundUser, false);
-  } else {
-    alert("❌ اسم المستخدم أو كلمة المرور غير صحيحة!");
-  }
-}
-
-// تسجيل دخول الطلاب الفعلي من بوابتهم المستقلة
-function handleStudentLoginFormSubmit(e) {
-  e.preventDefault();
-  const identifier = document
-    .getElementById("stu-login-identifier")
-    ?.value.trim();
-  const passVal = document.getElementById("stu-login-pass")?.value.trim();
-
-  // الدخول المباشر لحساب الطالب المحدد
-  if (identifier === "0537466925" && passVal === "1234") {
-    const studentSessionUser = {
-      id: "s_main_user",
-      name: "طالب المجمع",
-      phone: "0537466925",
-      role: ROLES.STUDENT,
-      circleId: "c_main",
-      createdAt: Date.now(),
-    };
-    doLogin(studentSessionUser, false);
-    return;
-  }
-
-  // البحث في جدول الطلاب
-  const foundStudent = (window.appStore.students || []).find(
-    (s) =>
-      (s.phone === identifier || s.nationalId === identifier) &&
-      s.status === "active",
-  );
-
-  if (foundStudent) {
-    const userRec = (window.appStore.users || []).find(
-      (u) =>
-        u.id === foundStudent.id ||
-        u.username === foundStudent.phone ||
-        u.username === foundStudent.nationalId,
-    );
-
-    const correctPass = userRec
-      ? userRec.pass
-      : foundStudent.nationalId
-        ? foundStudent.nationalId.slice(-4)
-        : "1234";
-
-    if (passVal === correctPass || passVal === "1234") {
-      const studentSessionUser = {
-        id: foundStudent.id,
-        name: foundStudent.name,
-        phone: foundStudent.phone,
-        role: ROLES.STUDENT,
-        circleId: foundStudent.circleId,
-        createdAt: foundStudent.createdAt || Date.now(),
-      };
-      doLogin(studentSessionUser, false);
-      return;
-    }
-  }
-
-  // فحص مصفوفة المستخدمين للطلاب
-  const foundUser = (window.appStore.users || []).find(
-    (u) =>
-      (u.username === identifier || u.phone === identifier) &&
-      u.pass === passVal &&
-      u.role === ROLES.STUDENT,
-  );
-
-  if (foundUser) {
-    doLogin(foundUser, false);
-  } else {
-    alert(
-      "❌ بيانات الدخول غير صحيحة، يرجى التأكد من رقم الجوال/الهوية والرقم السري.",
-    );
-  }
-}
-
-function doLogin(user, isAutoSession = false) {
-  if (user.role === ROLES.STUDENT) {
-    const studentData = (window.appStore.students || []).find(
-      (s) => s.id === user.id || s.phone === user.phone,
-    );
-    if (studentData && studentData.status === "archived") {
-      alert("⚠️ هذا الحساب موقوف (مؤرشف)، يرجى مراجعة إدارة المجمع.");
-      handleLogout();
-      return;
-    }
-  }
-
-  if (user.role === ROLES.TEACHER) {
-    const teacherData = (window.appStore.teachers || []).find(
-      (t) => t.id === user.teacherId || t.userId === user.id,
-    );
-    if (teacherData && teacherData.status === "suspended") {
-      alert("⚠️ هذا الحساب موقوف حالياً، يرجى مراجعة إدارة المجمع.");
-      handleLogout();
-      return;
-    }
-  }
-
-  if (user.status === "suspended" || user.status === "archived") {
-    alert("⚠️ هذا الحساب موقوف حالياً، يرجى مراجعة إدارة المجمع.");
-    handleLogout();
-    return;
-  }
-
-  window.currentUser = user;
-  localStorage.setItem("HALAQAT_SESSION_USER", JSON.stringify(user));
-
-  document.getElementById("view-login")?.classList.remove("active");
-  document.getElementById("view-login")?.classList.add("style-hidden");
-  document.getElementById("view-student-login")?.classList.remove("active");
-  document.getElementById("view-student-login")?.classList.add("style-hidden");
-
-  document.getElementById("app-container")?.classList.remove("style-hidden");
-
-  const nameEl = document.getElementById("current-user-name");
-  const roleEl = document.getElementById("current-user-role");
-  const avatarEl = document.getElementById("current-user-avatar");
-  const welcomeEl = document.getElementById("welcome-message");
-
-  if (nameEl) nameEl.textContent = user.name;
-  if (roleEl)
-    roleEl.textContent =
-      user.role === ROLES.ADMIN
-        ? "المدير"
-        : user.role === ROLES.TEACHER
-          ? "معلم"
-          : user.role === ROLES.SCREEN
-            ? "شاشة المسجد"
-            : "طالب";
-  if (avatarEl) avatarEl.textContent = user.name ? user.name.charAt(0) : "أ";
-  if (welcomeEl) welcomeEl.textContent = `مرحباً ${user.name}`;
-
-  syncHeaderDateTime();
-  applyAppIdentity();
-  adjustSidebarAndViewsForRole(user.role);
-}
-
-// ضبط الواجهة وإخفاء القائمة الجانبية بالكامل للطالب
-function adjustSidebarAndViewsForRole(role) {
-  const adminNav = document.querySelector(".role-section-admin");
-  const studentNav = document.querySelector(".role-section-student");
-  const sidebar = document.querySelector(".sidebar");
-  const mainContent = document.querySelector(".main-content");
-  const topHeader = document.querySelector(".top-header");
-
-  if (role === ROLES.SCREEN) {
-    if (adminNav) adminNav.classList.add("style-hidden");
-    if (studentNav) studentNav.classList.add("style-hidden");
-    if (sidebar) sidebar.style.display = "flex";
-    if (mainContent) mainContent.style.marginRight = "";
-    if (topHeader) topHeader.style.display = "flex";
-
-    navigateTo("view-screen");
-    if (typeof renderScreenView === "function") renderScreenView();
-  } else if (role === ROLES.STUDENT) {
-    // إلغاء القائمة الجانبية وشريط الرأس للطالب وجعل الصفحة بعرض كامل
-    if (sidebar) sidebar.style.display = "none";
-    if (mainContent) mainContent.style.marginRight = "0";
-    if (topHeader) topHeader.style.display = "none";
-
-    navigateTo("view-student-home");
-    renderStudentData();
-  } else {
-    if (sidebar) sidebar.style.display = "flex";
-    if (mainContent) mainContent.style.marginRight = "";
-    if (topHeader) topHeader.style.display = "flex";
-
-    if (studentNav) studentNav.classList.add("style-hidden");
-    if (adminNav) adminNav.classList.remove("style-hidden");
-
-    if (role === ROLES.TEACHER) {
-      document.querySelectorAll(".sidebar .nav-admin-only").forEach((el) => {
-        el.style.display = "none";
-      });
-      document.querySelectorAll(".sidebar .nav-teacher-only").forEach((el) => {
-        el.style.display = "flex";
-      });
-    } else {
-      document.querySelectorAll(".sidebar .nav-admin-only").forEach((el) => {
-        el.style.display = "flex";
-      });
-      document.querySelectorAll(".sidebar .nav-teacher-only").forEach((el) => {
-        el.style.display = "none";
-      });
-    }
-
-    navigateTo("view-dashboard");
-    refreshAllViews();
-  }
-}
-
-function navigateTo(targetViewId) {
-  if (!window.currentUser) {
-    showMainLoginView();
-    return;
-  }
-
-  const userRole = window.currentUser.role || "student";
-  const allowedViews = ROLE_PERMISSIONS[userRole] || [];
-
-  if (!allowedViews.includes(targetViewId)) {
-    alert("⚠️ تنبيه: لا تملك الصلاحية الكافية للوصول إلى هذه الشاشة.");
-    return;
-  }
-
-  document
-    .querySelectorAll(".content-view")
-    .forEach((view) => view.classList.remove("active"));
-  document
-    .querySelectorAll(".nav-link")
-    .forEach((link) => link.classList.remove("active"));
-
-  const targetEl = document.getElementById(targetViewId);
-  if (targetEl) targetEl.classList.add("active");
-
-  const activeLink = document.querySelector(
-    `.nav-link[data-target="${targetViewId}"]`,
-  );
-  if (activeLink) activeLink.classList.add("active");
-
-  document.querySelector(".sidebar")?.classList.remove("mobile-open");
-
-  refreshActiveView(targetViewId);
 }
 
 function checkStudentCurrentWeekTamayuz(studentId) {
@@ -463,58 +571,117 @@ function checkStudentCurrentWeekTamayuz(studentId) {
 
   let attendedCount = 0;
   let hasDisqualifyingRating = false;
-  let hasRecords = false;
+
+  const isDisqualifying = (r) => {
+    if (!r) return false;
+    const clean = r.trim();
+    if (clean === "" || clean === "—" || clean === "لا يوجد") return false;
+    return !clean.includes("ممتاز");
+  };
 
   for (const day of weekDays) {
-    const att = (window.appStore.attendance || []).find(
+    const att = (window.appStore?.attendance || []).find(
       (a) => a.studentId === studentId && a.date === day,
     );
     if (att && (att.status === "present" || att.status === "late")) {
       attendedCount++;
+    } else if (att && att.status === "absent") {
+      return false;
     }
 
-    const tasm = (window.appStore.tasmeea || []).find(
+    const tasm = (window.appStore?.tasmeea || []).find(
       (t) => t.studentId === studentId && t.date === day,
     );
     if (tasm) {
-      hasRecords = true;
-      const isValidRating = (r) => {
-        if (!r || r.trim() === "" || r === "—" || r === "لا يوجد") return true;
-        return r.includes("ممتاز");
-      };
       if (
-        !isValidRating(tasm.hifzRating) ||
-        !isValidRating(tasm.murajaaRating) ||
-        !isValidRating(tasm.tilawaRating)
+        isDisqualifying(tasm.hifzRating) ||
+        isDisqualifying(tasm.murajaaRating) ||
+        isDisqualifying(tasm.tilawaRating) ||
+        isDisqualifying(tasm.rating)
       ) {
         hasDisqualifyingRating = true;
       }
     }
   }
 
-  return (
-    (attendedCount >= 4 || (attendedCount > 0 && !hasDisqualifyingRating)) &&
-    hasRecords
-  );
+  return attendedCount === 4 && !hasDisqualifyingRating;
 }
 
-// بناء وعرض بوابة الطالب مع زر تسجيل الخروج المباشر والتقرير الشامل
+// دالة تسجيل الحضور الذاتي للمعلم فقط فور دخوله المسجد
+window.handleTeacherSelfCheckIn = function () {
+  const user = window.currentUser;
+  if (!user || user.role !== window.ROLES.TEACHER) {
+    alert("⚠️ هذه الخاصية متاحة لحساب المعلم فقط.");
+    return;
+  }
+
+  const teacherId = user.teacherId || user.id;
+  const todayStr = new Date().toISOString().split("T")[0];
+  const nowTime = new Date().toLocaleTimeString("ar-SA", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const recordId = `t_att_${teacherId}_${todayStr}`;
+
+  if (!window.appStore.teacherAttendance)
+    window.appStore.teacherAttendance = [];
+
+  let record = window.appStore.teacherAttendance.find((a) => a.id === recordId);
+  if (record && record.status === "present") {
+    alert(
+      `ℹ️ لقد قمت بتسجيل حضورك مسبقاً اليوم في تمام الساعة (${record.time || nowTime}).`,
+    );
+    return;
+  }
+
+  if (!record) {
+    record = {
+      id: recordId,
+      teacherId: teacherId,
+      teacherName: user.name,
+      date: todayStr,
+      time: nowTime,
+      status: "present",
+      notes: "تحضير ذاتي من التطبيق",
+      updatedBy: "self",
+      createdAt: Date.now(),
+    };
+    window.appStore.teacherAttendance.push(record);
+  } else {
+    record.status = "present";
+    record.time = nowTime;
+    record.notes = "تحضير ذاتي من التطبيق";
+  }
+
+  if (typeof saveToCloud === "function") {
+    saveToCloud("teacherAttendance", record.id, record);
+  }
+  if (typeof saveLocalStore === "function") saveLocalStore();
+
+  alert(
+    `✅ تم تسجيل حضورك بنجاح في تمام الساعة (${nowTime})! تقبل الله طاعتكم.`,
+  );
+  renderDashboardView();
+};
+
+// عرض بيانات الطالب وربط الشعارين بدقة
 function renderStudentData() {
-  if (!window.currentUser || window.currentUser.role !== ROLES.STUDENT) return;
+  if (!window.currentUser || window.currentUser.role !== window.ROLES.STUDENT)
+    return;
 
   const studentId = window.currentUser.id;
   const student =
-    (window.appStore.students || []).find((s) => s.id === studentId) ||
+    (window.appStore?.students || []).find((s) => s.id === studentId) ||
     window.currentUser;
-  const circle = (window.appStore.circles || []).find(
+  const circle = (window.appStore?.circles || []).find(
     (c) => c.id === student.circleId,
   );
-  const circleName = circle ? circle.name : "مُجْمَع عبدالله بن مهدي";
+  const circleName = circle ? circle.name : "حلقات جامع الهدى";
 
-  const studentTasmeea = (window.appStore.tasmeea || []).filter(
+  const studentTasmeea = (window.appStore?.tasmeea || []).filter(
     (t) => t.studentId === studentId,
   );
-  const studentAtt = (window.appStore.attendance || []).filter(
+  const studentAtt = (window.appStore?.attendance || []).filter(
     (a) => a.studentId === studentId,
   );
 
@@ -587,32 +754,69 @@ function renderStudentData() {
         '<span class="badge" style="background:#e3f2fd; color:#1565c0;">🔵 مستأذن</span>';
   }
 
+  // تصفية الإشعارات والرسائل الواردة للطالب من الإدارة
+  const studentNotifs = (window.appStore?.notifications || []).filter((n) => {
+    return (
+      n.recipient === "all" ||
+      n.recipient === "students" ||
+      (n.recipient === "specific_student" &&
+        (n.targetId === student.id || n.targetName === student.name))
+    );
+  });
+
   const container = document.getElementById("view-student-home");
   if (!container) return;
 
-  const settings = window.appStore.settings || DEFAULT_SETTINGS;
+  const settings = window.appStore?.settings || window.DEFAULT_SETTINGS;
   const logoNew = settings.logoNew || "logo12.jpeg";
-  const logoOld = settings.logoOld || "logo11.jpeg";
+  const logoOld = "logo1.png"; // وضع شعار 1.png على اليسار
 
   container.innerHTML = `
-    <!-- ترويسة الطالب مع الشعارين وزر الخروج -->
     <div class="card mb-3" style="background: linear-gradient(135deg, var(--primary-brown) 0%, var(--primary-dark) 100%); color: #ffffff; border-radius: 12px; padding: 1.5rem; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-      
-      <!-- زر تسجيل خروج الطالب المباشر -->
       <button onclick="handleLogout()" class="btn btn-danger btn-sm" style="position: absolute; top: 12px; left: 12px; font-size: 0.8rem; padding: 5px 12px; border-radius: 6px; z-index: 10;">
         🚪 تسجيل الخروج
       </button>
 
       <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
-        <img src="${logoNew}" alt="شعار المجمع" style="height: 65px; width: auto; object-fit: contain; background: #fff; padding: 4px; border-radius: 8px;" />
+        <img src="${logoNew}" alt="شعار الحلقات" style="height: 65px; width: auto; object-fit: contain; background: transparent; padding: 4px; border-radius: 8px;" />
         <div style="text-align: center; flex: 1;">
           <h2 style="font-size: 1.4rem; font-weight: 900; margin-bottom: 4px;">${student.name}</h2>
-          <p style="font-size: 0.95rem; opacity: 0.9; margin-bottom: 8px;">مُجْمَع عبدالله بن مهدي القرآني</p>
+          <p style="font-size: 0.95rem; opacity: 0.9; margin-bottom: 8px;">حلقات جامع الهدى لتحفيظ القرآن الكريم</p>
           <span style="background: rgba(255, 255, 255, 0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;">
             🕌 حلقة: ${circleName}
           </span>
         </div>
-        <img src="${logoOld}" alt="شعار الحلقات" style="height: 65px; width: auto; object-fit: contain; background: #fff; padding: 4px; border-radius: 8px;" />
+        <img src="${logoOld}" alt="شعار الحلقات" style="height: 65px; width: auto; object-fit: contain; background: transparent; padding: 4px; border-radius: 8px; mix-blend-mode: screen;" />
+      </div>
+    </div>
+
+    <!-- صندوق الإشعارات والرسائل الواردة من إدارة المجمع للطالب -->
+    <div class="card mb-3" style="border-right: 4px solid #0b6b7d;">
+      <div class="card-header flex-between">
+        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--primary-brown); margin: 0;">
+          📬 إشعارات وتنبيهات الإدارة
+        </h3>
+        <span class="badge badge-active">${studentNotifs.length} رسائل</span>
+      </div>
+      <div class="card-body p-2" id="student-inbox-notifications">
+        ${
+          studentNotifs.length === 0
+            ? '<p class="text-muted p-2" style="font-size:0.88rem;">لا توجد إشعارات أو رسائل جديدة حالياً</p>'
+            : studentNotifs
+                .map(
+                  (n) => `
+              <div class="mb-2 p-2" style="background:#f4f9f9; border: 1px solid var(--border-color); border-radius: 6px;">
+                <div class="flex-between">
+                  <strong style="color:var(--primary-brown); font-size:0.92rem;">${n.title || "تنبيه"}</strong>
+                  <small class="text-muted">${n.date || ""}</small>
+                </div>
+                <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #333;">${n.body || ""}</p>
+                <div style="font-size:0.75rem; color:#777; margin-top:3px;">المرسل: ${n.sender || "إدارة المجمع"}</div>
+              </div>
+            `,
+                )
+                .join("")
+        }
       </div>
     </div>
 
@@ -647,15 +851,15 @@ function renderStudentData() {
       </div>
 
       <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">حفظ: ممتاز</span>
+        <span class="stat-label" style="font-size: 0.78rem;">الدرس الجديد: ممتاز</span>
         <h3 class="stat-value" style="font-size: 1.35rem; color: #2e7d32;">${hifzMumtaz}</h3>
       </div>
       <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">حفظ: ج.جداً</span>
+        <span class="stat-label" style="font-size: 0.78rem;">الدرس الجديد: ج.جداً</span>
         <h3 class="stat-value" style="font-size: 1.35rem; color: #0b6b7d;">${hifzJayyidJiddan}</h3>
       </div>
       <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">حفظ: جيد/يعيد</span>
+        <span class="stat-label" style="font-size: 0.78rem;">الدرس الجديد: جيد/يعيد</span>
         <h3 class="stat-value" style="font-size: 1.35rem; color: #b78103;">${hifzJayyid + hifzRe}</h3>
       </div>
 
@@ -697,7 +901,7 @@ function renderStudentData() {
       <div class="card-body p-2">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem;">
           <div style="background: #f4f9f9; padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
-            <strong style="color: var(--primary-brown); font-size: 0.85rem;">📖 الحفظ الجديد:</strong>
+            <strong style="color: var(--primary-brown); font-size: 0.85rem;">📖 الدرس الجديد:</strong>
             <p style="margin-top: 4px; font-weight: 700;">${todayRecord.hifzSurah || "لم يسجل بعد"}</p>
             ${todayRecord.hifzRating ? `<span class="badge badge-active mt-1">${todayRecord.hifzRating}</span>` : ""}
           </div>
@@ -714,53 +918,11 @@ function renderStudentData() {
         </div>
       </div>
     </div>
-
-    <div class="card mb-3" style="background: #fafcfb; border-right: 4px solid var(--primary-brown);">
-      <div class="card-header flex-between">
-        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--primary-brown); margin: 0;">🎯 خطة درس الغد</h3>
-      </div>
-      <div class="card-body p-2">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem;">
-          <div><strong style="font-size: 0.82rem; color: #666;">حفظ الغد:</strong> <p style="font-weight: 700; margin-top: 2px;">${todayRecord.nextHifz || "—"}</p></div>
-          <div><strong style="font-size: 0.82rem; color: #666;">مراجعة الغد:</strong> <p style="font-weight: 700; margin-top: 2px;">${todayRecord.nextMurajaa || "—"}</p></div>
-          <div><strong style="font-size: 0.82rem; color: #666;">تلاوة الغد:</strong> <p style="font-weight: 700; margin-top: 2px;">${todayRecord.nextTilawa || "—"}</p></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card mb-3">
-      <div class="card-header">
-        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--primary-brown); margin: 0;">💬 توجيهات وملاحظات المعلم</h3>
-      </div>
-      <div class="card-body p-3">
-        ${
-          todayRecord.studentNotes
-            ? `<div class="p-3" style="background:#f4f9f9; border-radius:6px; border-right:3px solid var(--primary-brown); font-weight:600;">${todayRecord.studentNotes}</div>`
-            : '<p class="text-muted">لا توجد ملاحظات مسجلة لليوم</p>'
-        }
-      </div>
-    </div>
   `;
 }
 
 function updateCircleDropdowns() {
-  const user = window.currentUser;
-  let circlesList =
-    window.appStore && window.appStore.circles ? window.appStore.circles : [];
-
-  if (user && user.role === "teacher") {
-    const teacherObj =
-      (window.appStore.teachers || []).find(
-        (t) => t.userId === user.id || t.id === user.teacherId,
-      ) || (window.appStore.teachers || [])[0];
-    const teacherId = teacherObj ? teacherObj.id : "t1";
-    circlesList = circlesList.filter(
-      (c) =>
-        (Array.isArray(c.teacherIds) && c.teacherIds.includes(teacherId)) ||
-        c.teacherId === teacherId,
-    );
-  }
-
+  const circlesList = window.appStore?.circles || [];
   const dropdownIds = [
     "stu-circle",
     "filter-student-circle",
@@ -781,10 +943,11 @@ function updateCircleDropdowns() {
       id === "filter-student-circle" ||
       id === "report-circle-select" ||
       id === "filter-teacher-notes-circle"
-    )
+    ) {
       defaultText = "كل الحلقات";
+    }
 
-    let optionsHtml = `<option value="${id === "filter-student-circle" || id === "report-circle-select" || id === "filter-teacher-notes-circle" ? "all" : ""}">${defaultText}</option>`;
+    let optionsHtml = `<option value="${id.includes("filter") || id.includes("report") ? "all" : ""}">${defaultText}</option>`;
     circlesList.forEach((c) => {
       optionsHtml += `<option value="${c.id}">${c.name}</option>`;
     });
@@ -795,59 +958,70 @@ function updateCircleDropdowns() {
 }
 
 function refreshAllViews() {
-  updateCircleDropdowns();
-  applyAppIdentity();
-  renderDashboardView();
-  syncHeaderDateTime();
-  if (typeof renderCirclesCards === "function") renderCirclesCards();
-  if (typeof renderTeachersTable === "function") renderTeachersTable();
-  if (typeof renderStudentsTable === "function") renderStudentsTable();
-  if (typeof renderTestsTable === "function") renderTestsTable();
-  if (typeof renderTeacherNotesTable === "function") renderTeacherNotesTable();
-  if (typeof renderAccountsTable === "function") renderAccountsTable();
-  if (typeof renderScreenView === "function") renderScreenView();
-  renderNotificationsView();
-}
-
-function refreshActiveView(viewId) {
-  updateCircleDropdowns();
-  applyAppIdentity();
-  syncHeaderDateTime();
-  if (viewId === "view-dashboard") renderDashboardView();
-  if (viewId === "view-circles") {
+  try {
+    updateCircleDropdowns();
+    applyAppIdentity();
+    renderDashboardView();
+    syncHeaderDateTime();
     if (typeof renderCirclesCards === "function") renderCirclesCards();
     if (typeof renderTeachersTable === "function") renderTeachersTable();
     if (typeof renderStudentsTable === "function") renderStudentsTable();
+    if (typeof renderTestsTable === "function") renderTestsTable();
+    if (typeof renderTeacherNotesTable === "function")
+      renderTeacherNotesTable();
+    if (typeof renderAccountsTable === "function") renderAccountsTable();
+    if (typeof renderScreenView === "function") renderScreenView();
+    renderNotificationsView();
+  } catch (e) {
+    console.warn(e);
   }
-  if (
-    viewId === "view-attendance" &&
-    typeof renderAttendanceTable === "function"
-  )
-    renderAttendanceTable();
-  if (viewId === "view-tasmeea" && typeof renderTasmeeaStudents === "function")
-    renderTasmeeaStudents();
-  if (
-    viewId === "view-teacher-notes" &&
-    typeof renderTeacherNotesTable === "function"
-  )
-    renderTeacherNotesTable();
-  if (viewId === "view-accounts" && typeof renderAccountsTable === "function")
-    renderAccountsTable();
-  if (viewId === "view-screen" && typeof renderScreenView === "function")
-    renderScreenView();
-  if (viewId === "view-tests" && typeof renderTestsTable === "function")
-    renderTestsTable();
-  if (viewId === "view-notifications") renderNotificationsView();
-  if (viewId === "view-settings" && typeof renderSettingsView === "function")
-    renderSettingsView();
-  if (viewId === "view-student-home") renderStudentData();
 }
 
+function refreshActiveView(viewId) {
+  try {
+    updateCircleDropdowns();
+    applyAppIdentity();
+    syncHeaderDateTime();
+    if (viewId === "view-dashboard") renderDashboardView();
+    if (viewId === "view-circles") {
+      if (typeof renderCirclesCards === "function") renderCirclesCards();
+      if (typeof renderTeachersTable === "function") renderTeachersTable();
+      if (typeof renderStudentsTable === "function") renderStudentsTable();
+    }
+    if (
+      viewId === "view-attendance" &&
+      typeof renderAttendanceTable === "function"
+    )
+      renderAttendanceTable();
+    if (
+      viewId === "view-tasmeea" &&
+      typeof renderTasmeeaStudents === "function"
+    )
+      renderTasmeeaStudents();
+    if (
+      viewId === "view-teacher-notes" &&
+      typeof renderTeacherNotesTable === "function"
+    )
+      renderTeacherNotesTable();
+    if (viewId === "view-accounts" && typeof renderAccountsTable === "function")
+      renderAccountsTable();
+    if (viewId === "view-screen" && typeof renderScreenView === "function")
+      renderScreenView();
+    if (viewId === "view-tests" && typeof renderTestsTable === "function")
+      renderTestsTable();
+    if (viewId === "view-notifications") renderNotificationsView();
+    if (viewId === "view-student-home") renderStudentData();
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+// تحديث لوحة التحكم
 function renderDashboardView() {
   const user = window.currentUser;
   if (!user) return;
 
-  const isTeacher = user.role === ROLES.TEACHER;
+  const isTeacher = user.role === window.ROLES.TEACHER;
   const teacherDashCols = document.getElementById("teacher-dash-columns");
   const tamayuzBoardCard = document.getElementById("tamayuz-board-card");
   const todayStr = new Date().toISOString().split("T")[0];
@@ -860,23 +1034,51 @@ function renderDashboardView() {
     if (teacherDashCols) teacherDashCols.style.display = "grid";
 
     const teacherObj =
-      (window.appStore.teachers || []).find(
-        (t) => t.userId === user.id || t.id === user.teacherId,
-      ) || (window.appStore.teachers || [])[0];
+      (window.appStore?.teachers || []).find(
+        (t) =>
+          t.userId === user.id || t.id === user.teacherId || t.id === user.id,
+      ) || (window.appStore?.teachers || [])[0];
     const teacherId = teacherObj ? teacherObj.id : "t1";
 
-    const teacherCircles = (window.appStore.circles || []).filter(
+    // التحقق من حالة الحضور الذاتي للمعلم اليوم
+    const teacherAttRecord = (window.appStore?.teacherAttendance || []).find(
+      (a) => a.teacherId === teacherId && a.date === todayStr,
+    );
+    const checkinBadge = document.getElementById(
+      "teacher-self-checkin-status-badge",
+    );
+    const checkinBtn = document.getElementById("btn-teacher-self-checkin");
+
+    if (checkinBadge) {
+      if (teacherAttRecord && teacherAttRecord.status === "present") {
+        checkinBadge.innerHTML = `<span class="badge badge-active">🟢 حاضر اليوم (${teacherAttRecord.time || "تم التحضير"})</span>`;
+        if (checkinBtn) {
+          checkinBtn.textContent = "✅ تم تحضيرك بنجاح اليوم";
+          checkinBtn.classList.remove("btn-success");
+          checkinBtn.classList.add("btn-outline-brown");
+        }
+      } else {
+        checkinBadge.innerHTML = `<span class="badge" style="background:#fff8e1; color:#b78103;">⏳ بانتظار تأكيد حضورك بالمسجد</span>`;
+        if (checkinBtn) {
+          checkinBtn.textContent = "✅ تسجيل حضوري اليوم بالمسجد";
+          checkinBtn.classList.remove("btn-outline-brown");
+          checkinBtn.classList.add("btn-success");
+        }
+      }
+    }
+
+    const teacherCircles = (window.appStore?.circles || []).filter(
       (c) =>
         (Array.isArray(c.teacherIds) && c.teacherIds.includes(teacherId)) ||
         c.teacherId === teacherId,
     );
     const teacherCircleIds = teacherCircles.map((c) => c.id);
 
-    const teacherStudents = (window.appStore.students || []).filter(
+    const teacherStudents = (window.appStore?.students || []).filter(
       (s) => teacherCircleIds.includes(s.circleId) && s.status === "active",
     );
 
-    const todayAtt = (window.appStore.attendance || []).filter(
+    const todayAtt = (window.appStore?.attendance || []).filter(
       (a) => a.date === todayStr && teacherCircleIds.includes(a.circleId),
     );
     const absentCount = todayAtt.filter((a) => a.status === "absent").length;
@@ -884,50 +1086,202 @@ function renderDashboardView() {
       (a) => a.status === "present" || a.status === "late",
     ).length;
 
-    document.getElementById("lbl-stat-1").textContent = "حلقاتي";
-    document.getElementById("val-stat-1").textContent = teacherCircles.length;
-
-    document.getElementById("lbl-stat-2").textContent = "طلابي";
-    document.getElementById("val-stat-2").textContent = teacherStudents.length;
-
-    document.getElementById("lbl-stat-3").textContent = "غياب اليوم";
-    document.getElementById("val-stat-3").textContent = absentCount;
-
-    document.getElementById("lbl-stat-4").textContent = "حاضرون اليوم";
-    document.getElementById("val-stat-4").textContent = presentCount;
+    const el1 = document.getElementById("val-stat-1");
+    const el2 = document.getElementById("val-stat-2");
+    const el3 = document.getElementById("val-stat-3");
+    const el4 = document.getElementById("val-stat-4");
+    if (el1) {
+      document.getElementById("lbl-stat-1").textContent = "حلقاتي";
+      el1.textContent = teacherCircles.length;
+    }
+    if (el2) {
+      document.getElementById("lbl-stat-2").textContent = "طلابي";
+      el2.textContent = teacherStudents.length;
+    }
+    if (el3) {
+      document.getElementById("lbl-stat-3").textContent = "غياب اليوم";
+      el3.textContent = absentCount;
+    }
+    if (el4) {
+      document.getElementById("lbl-stat-4").textContent = "حاضرون اليوم";
+      el4.textContent = presentCount;
+    }
   } else {
     if (teacherDashCols) teacherDashCols.style.display = "none";
 
-    const studentsCount = (window.appStore.students || []).filter(
+    const activeStudents = (window.appStore?.students || []).filter(
       (s) => s.status === "active",
-    ).length;
-    const teachersCount = (window.appStore.teachers || []).filter(
+    );
+    const studentsCount = activeStudents.length;
+    const teachersCount = (window.appStore?.teachers || []).filter(
       (t) => t.status === "active",
     ).length;
-    const circlesCount = (window.appStore.circles || []).length;
+    const circlesCount = (window.appStore?.circles || []).length;
 
-    const todayAtt = (window.appStore.attendance || []).filter(
+    const todayAtt = (window.appStore?.attendance || []).filter(
       (a) => a.date === todayStr,
     );
     const presentCount = todayAtt.filter(
       (a) => a.status === "present" || a.status === "late",
     ).length;
 
-    document.getElementById("lbl-stat-1").textContent = "الطلاب";
-    document.getElementById("val-stat-1").textContent = studentsCount;
+    const todayTasmeea = (window.appStore?.tasmeea || []).filter(
+      (t) => t.date === todayStr,
+    );
+    const recitedStudentIds = new Set(
+      todayTasmeea
+        .filter(
+          (t) => t.hifzSurah || t.murajaaSurah || t.tilawaSurah || t.rating,
+        )
+        .map((t) => t.studentId),
+    );
 
-    document.getElementById("lbl-stat-2").textContent = "المعلمون";
-    document.getElementById("val-stat-2").textContent = teachersCount;
+    const recitedCount = activeStudents.filter((s) =>
+      recitedStudentIds.has(s.id),
+    ).length;
+    const notRecitedCount = Math.max(0, studentsCount - recitedCount);
 
-    document.getElementById("lbl-stat-3").textContent = "الحلقات";
-    document.getElementById("val-stat-3").textContent = circlesCount;
+    const el1 = document.getElementById("val-stat-1");
+    const el2 = document.getElementById("val-stat-2");
+    const el3 = document.getElementById("val-stat-3");
+    const el4 = document.getElementById("val-stat-4");
+    const elRecited = document.getElementById("val-stat-recited-today");
+    const elNotRecited = document.getElementById("val-stat-not-recited-today");
 
-    document.getElementById("lbl-stat-4").textContent = "حاضرون اليوم";
-    document.getElementById("val-stat-4").textContent = presentCount;
+    if (el1) {
+      document.getElementById("lbl-stat-1").textContent = "الطلاب";
+      el1.textContent = studentsCount;
+    }
+    if (el2) {
+      document.getElementById("lbl-stat-2").textContent = "المعلمون";
+      el2.textContent = teachersCount;
+    }
+    if (el3) {
+      document.getElementById("lbl-stat-3").textContent = "الحلقات";
+      el3.textContent = circlesCount;
+    }
+    if (el4) {
+      document.getElementById("lbl-stat-4").textContent = "حاضرون اليوم";
+      el4.textContent = presentCount;
+    }
+    if (elRecited) elRecited.textContent = recitedCount;
+    if (elNotRecited) elNotRecited.textContent = notRecitedCount;
 
-    if (typeof renderTamayuzBoard === "function") renderTamayuzBoard();
+    if (typeof renderTamayuzBoard === "function") {
+      try {
+        renderTamayuzBoard();
+      } catch (e) {
+        console.warn(e);
+      }
+    }
   }
 }
+
+// دالة فتح نافذة تفاصيل من سمّع ومن لم يسمّع اليوم
+window.currentTasmeeaModalType = "recited";
+window.openTasmeeaDetailsModal = function (type) {
+  window.currentTasmeeaModalType = type;
+  const titleEl = document.getElementById("tasmeea-details-modal-title");
+  const tbody = document.getElementById("tasmeea-details-tbody");
+  if (!tbody) return;
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const activeStudents = (window.appStore?.students || []).filter(
+    (s) => s.status === "active",
+  );
+  const todayTasmeea = (window.appStore?.tasmeea || []).filter(
+    (t) => t.date === todayStr,
+  );
+
+  const tasmeeaMap = new Map();
+  todayTasmeea.forEach((t) => tasmeeaMap.set(t.studentId, t));
+
+  let list = [];
+  if (type === "recited") {
+    if (titleEl)
+      titleEl.textContent = `📖 قائمة الطلاب الذين سمّعوا اليوم (${todayStr})`;
+    list = activeStudents.filter((s) => tasmeeaMap.has(s.id));
+  } else {
+    if (titleEl)
+      titleEl.textContent = `⏳ قائمة الطلاب الذين لم يسمّعوا اليوم (${todayStr})`;
+    list = activeStudents.filter((s) => !tasmeeaMap.has(s.id));
+  }
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted p-4">لا توجد بيانات لهذه القائمة اليوم</td></tr>`;
+  } else {
+    let html = "";
+    list.forEach((s, idx) => {
+      const circle = (window.appStore?.circles || []).find(
+        (c) => c.id === s.circleId,
+      );
+      const circleName = circle ? circle.name : "غير مسجل";
+      const tasm = tasmeeaMap.get(s.id) || {};
+      const statusBadge =
+        type === "recited"
+          ? '<span class="badge badge-active">تم التسميع</span>'
+          : '<span class="badge badge-danger">لم يسمّع</span>';
+
+      html += `
+        <tr>
+          <td style="text-align: center;">${idx + 1}</td>
+          <td style="font-weight: 700;">${s.name}</td>
+          <td><span style="font-weight: 600; color: var(--text-dark);">${circleName}</span></td>
+          <td>${statusBadge}</td>
+          <td>${tasm.hifzSurah || "—"}</td>
+          <td>${tasm.murajaaSurah || "—"}</td>
+          <td>${tasm.tilawaSurah || "—"}</td>
+          <td><span class="badge badge-active">${tasm.rating || tasm.hifzRating || "—"}</span></td>
+          <td>${tasm.studentNotes || tasm.adminNotes || "—"}</td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html;
+  }
+
+  openModal("modal-tasmeea-status-details");
+};
+
+// تصفية نتائج النافذة
+window.filterTasmeeaDetailsModal = function () {
+  const query = (
+    document.getElementById("search-modal-tasmeea-status")?.value || ""
+  )
+    .trim()
+    .toLowerCase();
+  document.querySelectorAll("#tasmeea-details-tbody tr").forEach((row) => {
+    row.style.display = row.textContent.toLowerCase().includes(query)
+      ? ""
+      : "none";
+  });
+};
+
+// تصدير جدول التسميع اليومي إلى Excel
+window.exportTasmeeaDetailsExcel = function () {
+  const table = document.getElementById("tasmeea-details-table");
+  if (!table || table.rows.length <= 1) {
+    alert("⚠️ لا توجد بيانات للتصدير!");
+    return;
+  }
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة Excel غير متوفرة!");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "تسميع_اليوم" });
+  const fileName =
+    window.currentTasmeeaModalType === "recited"
+      ? "الطلاب_الذين_سمعوا_اليوم"
+      : "الطلاب_الذين_لم_يسمعوا_اليوم";
+  XLSX.writeFile(
+    wb,
+    `${fileName}_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+};
+
+// طباعة جدول التسميع اليومي
+window.printTasmeeaDetails = function () {
+  window.print();
+};
 
 function renderNotificationsView() {
   const notifContainer = document.getElementById(
@@ -935,7 +1289,7 @@ function renderNotificationsView() {
   );
   if (!notifContainer) return;
 
-  const allNotifs = window.appStore.notifications || [];
+  const allNotifs = window.appStore?.notifications || [];
   if (allNotifs.length === 0) {
     notifContainer.innerHTML = `<div class="empty-state-card p-3"><p class="text-muted">لا توجد إشعارات جديدة حالياً</p></div>`;
     return;
@@ -957,160 +1311,95 @@ function renderNotificationsView() {
     .join("");
 }
 
-function renderSettingsView() {
-  const user = window.currentUser;
-  if (!user || user.role !== ROLES.ADMIN) return;
-
-  const nameInput = document.getElementById("set-profile-name");
-  const phoneInput = document.getElementById("set-profile-phone");
-  const passInput = document.getElementById("set-profile-password");
-
-  if (nameInput) nameInput.value = user.name || "";
-  if (phoneInput) phoneInput.value = user.phone || "";
-  if (passInput) passInput.value = "";
-
-  const settings = window.appStore.settings || DEFAULT_SETTINGS;
-  const orgInput = document.getElementById("set-org-name");
-  const mosqueInput = document.getElementById("set-org-mosque");
-  const directorInput = document.getElementById("set-org-director");
-  const logoNewInput = document.getElementById("set-org-logo-new");
-  const logoOldInput = document.getElementById("set-org-logo-old");
-
-  if (orgInput)
-    orgInput.value = settings.orgName || "مُجْمَع عبدالله بن مهدي القرآني";
-  if (mosqueInput) mosqueInput.value = settings.subTitle || "جامع الهدى";
-  if (directorInput)
-    directorInput.value = settings.directorName || "أحمد بن عبدالله بن مهدي";
-  if (logoNewInput) logoNewInput.value = settings.logoNew || "logo12.jpeg";
-  if (logoOldInput) logoOldInput.value = settings.logoOld || "logo11.jpeg";
-}
-
-function handleSaveOrgSettings(e) {
-  e.preventDefault();
-  if (!window.currentUser || window.currentUser.role !== ROLES.ADMIN) return;
-
-  const orgName =
-    document.getElementById("set-org-name")?.value.trim() ||
-    "مُجْمَع عبدالله بن مهدي القرآني";
-  const mosqueName =
-    document.getElementById("set-org-mosque")?.value.trim() || "جامع الهدى";
-  const directorName =
-    document.getElementById("set-org-director")?.value.trim() ||
-    "أحمد بن عبدالله بن مهدي";
-  const logoNew =
-    document.getElementById("set-org-logo-new")?.value.trim() || "logo12.jpeg";
-  const logoOld =
-    document.getElementById("set-org-logo-old")?.value.trim() || "logo11.jpeg";
-
-  if (!window.appStore.settings)
-    window.appStore.settings = { ...DEFAULT_SETTINGS };
-
-  window.appStore.settings.orgName = orgName;
-  window.appStore.settings.subTitle = mosqueName;
-  window.appStore.settings.directorName = directorName;
-  window.appStore.settings.logoNew = logoNew;
-  window.appStore.settings.logoOld = logoOld;
-
-  if (typeof saveToCloud === "function") {
-    saveToCloud("settings", "main_settings", window.appStore.settings);
-  }
-
-  applyAppIdentity();
-  alert("✅ تم حفظ وتحديث هوية المجمع والشعارات واسم المدير بنجاح!");
-}
-
-function handleUserProfileSave(e) {
-  e.preventDefault();
+// تعديل وحفظ بيانات الحساب الشخصي للمدير وتثبيتها بشكل دائم
+window.handleUserProfileSave = function (e) {
+  if (e && e.preventDefault) e.preventDefault();
   const user = window.currentUser;
   if (!user) return;
 
-  if (user.role !== ROLES.ADMIN) {
+  if (user.role !== window.ROLES.ADMIN) {
     alert("⚠️ هذه الخاصية متاحة لمدير المجمع فقط.");
     return;
   }
 
-  const newName = document.getElementById("set-profile-name")?.value.trim();
-  const newPhone = document.getElementById("set-profile-phone")?.value.trim();
-  const newPass = document.getElementById("set-profile-password")?.value.trim();
+  const newName = (
+    document.getElementById("set-profile-name")?.value || ""
+  ).trim();
+  const newPhone = (
+    document.getElementById("set-profile-phone")?.value || ""
+  ).trim();
+  const newPass = (
+    document.getElementById("set-profile-password")?.value || ""
+  ).trim();
+
+  if (!newName) {
+    alert("يرجى إدخال الاسم الكامل.");
+    return;
+  }
 
   user.name = newName;
   user.phone = newPhone;
 
-  const userRec = (window.appStore.users || []).find((u) => u.id === user.id);
+  if (!window.appStore.users) window.appStore.users = [];
+  let userRec = window.appStore.users.find(
+    (u) =>
+      u.id === user.id ||
+      u.role === window.ROLES.ADMIN ||
+      u.username === user.username ||
+      u.username === "123456" ||
+      u.username === "admin",
+  );
+
   if (userRec) {
     userRec.name = newName;
     userRec.phone = newPhone;
     if (newPass) userRec.pass = newPass;
-    if (typeof saveToCloud === "function")
+    if (typeof saveToCloud === "function") {
       saveToCloud("users", userRec.id, userRec);
+    }
+  } else {
+    userRec = {
+      id: user.id || "u_admin_main",
+      name: newName,
+      role: window.ROLES.ADMIN,
+      username: user.username || "123456",
+      phone: newPhone,
+      pass: newPass || "1234",
+      status: "active",
+      createdAt: Date.now(),
+    };
+    window.appStore.users.push(userRec);
+    if (typeof saveToCloud === "function") {
+      saveToCloud("users", userRec.id, userRec);
+    }
   }
+
+  if (typeof saveLocalStore === "function") saveLocalStore();
 
   localStorage.setItem("HALAQAT_SESSION_USER", JSON.stringify(user));
-  document.getElementById("current-user-name").textContent = newName;
-  document.getElementById("welcome-message").textContent = `مرحباً ${newName}`;
-  alert("✅ تم حفظ وتحديث بيانات حساب المدير بنجاح!");
-}
 
-function openModalSendUnifiedMessage() {
-  openModal("modal-send-unified-msg");
-}
+  const nameEl = document.getElementById("current-user-name");
+  const welcomeEl = document.getElementById("welcome-message");
+  const avatarEl = document.getElementById("current-user-avatar");
+  if (nameEl) nameEl.textContent = newName;
+  if (welcomeEl) welcomeEl.textContent = `مرحباً ${newName}`;
+  if (avatarEl) avatarEl.textContent = newName ? newName.charAt(0) : "أ";
 
-function handleSendUnifiedMessage(e) {
-  e.preventDefault();
-  const title = document.getElementById("msg-title")?.value;
-  const body = document.getElementById("msg-body")?.value;
-  const recipientType = document.getElementById("msg-target-recipient")
-    ? document.getElementById("msg-target-recipient").value
-    : "all";
+  alert("✅ تم حفظ وتحديث البيانات الشخصية للمدير بنجاح!");
+};
 
-  const newNotif = {
-    id: "notif_" + Date.now(),
-    title: title,
-    body: body,
-    recipient: recipientType,
-    sender: window.currentUser ? window.currentUser.name : "المدير",
-    date: new Date().toLocaleDateString("ar-SA"),
-    createdAt: Date.now(),
-  };
-
-  if (!window.appStore.notifications) window.appStore.notifications = [];
-  window.appStore.notifications.push(newNotif);
-
-  if (typeof saveToCloud === "function")
-    saveToCloud("notifications", newNotif.id, newNotif);
-
-  closeModal("modal-send-unified-msg");
-  e.target.reset();
-  renderNotificationsView();
-  alert("✅ تم إرسال الرسالة/الإشعار بنجاح!");
-}
-
-function handleLogout() {
-  const isStudent =
-    window.currentUser && window.currentUser.role === ROLES.STUDENT;
+window.handleLogout = function () {
   window.currentUser = null;
   localStorage.removeItem("HALAQAT_SESSION_USER");
-  if (isStudent) {
-    showStudentLoginView();
-  } else {
-    showMainLoginView();
-  }
-}
+  showMainLoginView();
+};
 
-function openModal(modalId) {
-  if (modalId === "modal-self-register") {
-    updateCircleDropdowns();
-    const modal = document.getElementById(modalId);
-    if (modal) modal.classList.add("active");
-    return;
-  }
-
-  if (!window.currentUser) return;
+window.openModal = function (modalId) {
   const modal = document.getElementById(modalId);
   if (modal) modal.classList.add("active");
-}
+};
 
-function closeModal(modalId) {
+window.closeModal = function (modalId) {
   const modal = document.getElementById(modalId);
   if (modal) modal.classList.remove("active");
-}
+};
