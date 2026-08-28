@@ -4,7 +4,7 @@
  * ==========================================================================
  */
 
-// 1. إعدادات Firebase الحقيقية للمشروع الجديد (halaqa2-hoda)
+// 1. إعدادات Firebase
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyC-rJVz16sg1o71y47VMDyTBBPGK9azHWw",
   authDomain: "halaqa2-hoda.firebaseapp.com",
@@ -26,16 +26,18 @@ const ROLES = {
 // 3. التقديرات الافتراضية
 const DEFAULT_RATINGS = ["ممتاز", "جيد جداً", "جيد", "يعيد"];
 
-// 4. الإعدادات الافتراضية للمجمع
+// 4. الإعدادات الافتراضية للمَجْمَع
 const DEFAULT_SETTINGS = {
   orgName: "مَجْمَع عبدالله بن مهدي القرآني",
   subTitle: "جامع الهدى",
-  directorName: "أحمد بن عبدالله بن مهدي",
+  directorName: "صالح ال ناشع",
   logoNew: "logo12.jpeg",
-  logoOld: "logo11.jpeg",
+  logoOld: "logo_transparent_1.png",
+  logoLogin: "logo_transparent_2.png",
   headerFontSize: "13px",
   pageSize: 20,
   sessionTimeoutMinutes: 60,
+  location: "",
   ratings: [...DEFAULT_RATINGS],
 };
 
@@ -157,5 +159,5 @@ const QURAN_SURAHS = [
   { id: 114, name: "الناس", verses: 6 },
 ];
 
-// 6. مفتاح التخزين المحلي الاحتياطي
+// 6. مفتاح التخزين المحلي
 const LOCAL_STORAGE_KEY = "HALAQAT_ALHUDA_DB_V1";
