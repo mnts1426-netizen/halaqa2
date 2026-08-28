@@ -59,7 +59,12 @@ window.ROLE_PERMISSIONS = {
     "view-notifications",
     "view-settings",
   ],
-  teacher: ["view-dashboard", "view-tasmeea", "view-notifications"],
+  teacher: [
+    "view-dashboard",
+    "view-tasmeea",
+    "view-finance",
+    "view-notifications",
+  ],
   student: ["view-student-home", "view-student-lessons", "view-notifications"],
   screen: ["view-screen"],
 };
@@ -195,6 +200,7 @@ window.handleLoginFormSubmit = function (e) {
       name: foundTeacher.name,
       phone: foundTeacher.phone,
       role: window.ROLES.TEACHER,
+      isFinance: Boolean(foundTeacher.isFinance),
       createdAt: foundTeacher.createdAt || Date.now(),
     };
     doLogin(teacherSessionUser, false);
@@ -381,8 +387,14 @@ function adjustSidebarAndViewsForRole(role) {
     const isFinancialTeacher =
       user &&
       user.role === window.ROLES.TEACHER &&
-      window.appStore?.settings?.financialTeacherId ===
-        (user.teacherId || user.id);
+      (user.isFinance === true ||
+        window.appStore?.settings?.financialTeacherId ===
+          (user.teacherId || user.id) ||
+        (window.appStore?.teachers || []).some(
+          (t) =>
+            (t.id === user.teacherId || t.userId === user.id) &&
+            t.isFinance === true,
+        ));
 
     if (role === window.ROLES.TEACHER) {
       document.querySelectorAll(".sidebar .nav-admin-only").forEach((el) => {
@@ -392,6 +404,7 @@ function adjustSidebarAndViewsForRole(role) {
         el.style.display = "flex";
       });
 
+      // إظهار رابط التقارير المالية للمعلم المصرح له فقط
       const financeNav = document.getElementById("nav-finance-link");
       if (financeNav) {
         financeNav.style.display = isFinancialTeacher ? "flex" : "none";
@@ -426,10 +439,17 @@ window.navigateTo = function (targetViewId) {
   if (targetViewId === "view-finance") {
     const user = window.currentUser;
     const isAllowed =
-      user.role === window.ROLES.ADMIN ||
-      (user.role === window.ROLES.TEACHER &&
-        window.appStore?.settings?.financialTeacherId ===
-          (user.teacherId || user.id));
+      user &&
+      (user.role === window.ROLES.ADMIN ||
+        (user.role === window.ROLES.TEACHER &&
+          (user.isFinance === true ||
+            window.appStore?.settings?.financialTeacherId ===
+              (user.teacherId || user.id) ||
+            (window.appStore?.teachers || []).some(
+              (t) =>
+                (t.id === user.teacherId || t.userId === user.id) &&
+                t.isFinance === true,
+            ))));
 
     if (!isAllowed) {
       alert("⚠️ غير مصرح لك بالدخول إلى قسم التقارير المالية.");
@@ -517,6 +537,7 @@ function applyAppIdentity() {
   const logoOld = settings.logoOld || "logo_transparent_1.png";
   const logoLogin = settings.logoLogin || "logo_transparent_2.png";
   const directorName = settings.directorName || "صالح ال ناشع";
+  const location = settings.location || "";
 
   const sidebarOrg = document.getElementById("sidebar-org-name");
   if (sidebarOrg) sidebarOrg.textContent = orgName;
@@ -544,6 +565,9 @@ function applyAppIdentity() {
 
   const printDirector = document.getElementById("print-director-name");
   if (printDirector) printDirector.textContent = directorName;
+
+  const setLocInput = document.getElementById("set-org-location");
+  if (setLocInput && location) setLocInput.value = location;
 }
 
 function syncHeaderDateTime() {
@@ -627,7 +651,33 @@ function checkStudentCurrentWeekTamayuz(studentId) {
   return attendedCount === 4 && !hasDisqualifyingRating;
 }
 
-// دالة تسجيل الحضور الذاتي للمدير والمعلم
+// دالة تحديد الإحداثيات الجغرافية الحالية وحفظها
+window.getCurrentLocationCoords = function () {
+  const setLocInput = document.getElementById("set-org-location");
+  if (!navigator.geolocation) {
+    alert("⚠️ متصفحك أو جهازك لا يدعم خاصية تحديد الموقع الجغرافي GPS.");
+    return;
+  }
+
+  alert("📡 جاري التقاط إحداثيات الموقع الحالي...");
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lat = pos.coords.latitude.toFixed(6);
+      const lng = pos.coords.longitude.toFixed(6);
+      const coordsStr = `${lat}, ${lng}`;
+      if (setLocInput) setLocInput.value = coordsStr;
+      alert(`✅ تم تحديد موقع المَجْمَع بنجاح:\nالإحداثيات: ${coordsStr}`);
+    },
+    (err) => {
+      alert(
+        "❌ تعذر التقاط الموقع. يرجى التأكد من تشغيل الـ GPS ومنح الإذن للمتصفح.",
+      );
+    },
+    { enableHighAccuracy: true, timeout: 10000 },
+  );
+};
+
+// دالة تسجيل الحضور الذاتي للمدير والمعلم مع توثيق الموقع
 window.handleTeacherSelfCheckIn = function () {
   const user = window.currentUser;
   if (
@@ -658,40 +708,56 @@ window.handleTeacherSelfCheckIn = function () {
     return;
   }
 
-  if (!record) {
-    record = {
-      id: recordId,
-      teacherId: attId,
-      teacherName: user.name,
-      date: todayStr,
-      time: nowTime,
-      status: "present",
-      notes:
-        user.role === window.ROLES.ADMIN
-          ? "تحضير ذاتي (المدير)"
-          : "تحضير ذاتي (معلم)",
-      updatedBy: "self",
-      createdAt: Date.now(),
-    };
-    window.appStore.teacherAttendance.push(record);
-  } else {
-    record.status = "present";
-    record.time = nowTime;
-    record.notes =
+  const performCheckIn = (locationNote = "") => {
+    const noteText =
       user.role === window.ROLES.ADMIN
-        ? "تحضير ذاتي (المدير)"
-        : "تحضير ذاتي (معلم)";
-  }
+        ? `تحضير ذاتي (المدير)${locationNote ? " - " + locationNote : ""}`
+        : `تحضير ذاتي (معلم)${locationNote ? " - " + locationNote : ""}`;
 
-  if (typeof saveToCloud === "function") {
-    saveToCloud("teacherAttendance", record.id, record);
-  }
-  if (typeof saveLocalStore === "function") saveLocalStore();
+    if (!record) {
+      record = {
+        id: recordId,
+        teacherId: attId,
+        teacherName: user.name,
+        date: todayStr,
+        time: nowTime,
+        status: "present",
+        notes: noteText,
+        updatedBy: "self",
+        createdAt: Date.now(),
+      };
+      window.appStore.teacherAttendance.push(record);
+    } else {
+      record.status = "present";
+      record.time = nowTime;
+      record.notes = noteText;
+    }
 
-  alert(
-    `✅ تم تسجيل حضورك بنجاح في تمام الساعة (${nowTime})! تقبل الله طاعتكم.`,
-  );
-  renderDashboardView();
+    if (typeof saveToCloud === "function") {
+      saveToCloud("teacherAttendance", record.id, record);
+    }
+    if (typeof saveLocalStore === "function") saveLocalStore();
+
+    alert(
+      `✅ تم تسجيل حضورك بنجاح في تمام الساعة (${nowTime})! تقبل الله طاعتكم.`,
+    );
+    renderDashboardView();
+  };
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = `إحداثيات: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+        performCheckIn(coords);
+      },
+      () => {
+        performCheckIn();
+      },
+      { timeout: 5000 },
+    );
+  } else {
+    performCheckIn();
+  }
 };
 
 function renderStudentData() {
