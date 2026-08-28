@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * firebase.js - محرك الاتصال بـ Firebase وقاعدة البيانات المحمية للمجمع
+ * firebase.js - محرك الاتصال بـ Firebase وقاعدة البيانات المحمية للمَجْمَع
  * ==========================================================================
  */
 
@@ -10,12 +10,14 @@ let isFirebaseOnline = false;
 
 // الإعدادات والمفاتيح الافتراضية الآمنة لمنع أي خطأ توقف برمجي[cite: 15]
 const SAFE_DEFAULT_SETTINGS = window.DEFAULT_SETTINGS || {
-  orgName: "حلقات جامع الهدى",
-  subTitle: "لتحفيظ القرآن الكريم",
-  directorName: "أحمد بن عبدالله بن مهدي",
+  orgName: "مَجْمَع عبدالله بن مهدي القرآني",
+  subTitle: "جامع الهدى",
+  directorName: "صالح ال ناشع",
   logoNew: "logo12.jpeg",
-  logoOld: "logo11.jpeg",
+  logoOld: "logo_transparent_1.png",
+  logoLogin: "logo_transparent_2.png",
   headerFontSize: "13px",
+  location: "",
 };
 
 const SAFE_ROLES = window.ROLES || {
@@ -30,7 +32,7 @@ const STORAGE_KEY =
     ? LOCAL_STORAGE_KEY
     : window.LOCAL_STORAGE_KEY || "HALAQAT_DATA_STORAGE_V1";
 
-// كائن تخزين البيانات العام المحمي[cite: 15]
+// كائن تخزين البيانات العام المحمي (يبدأ نظيفاً تماماً بدون أي طلاب أو معلمين)[cite: 15]
 window.appStore = window.appStore || {
   users: [],
   students: [],
@@ -79,7 +81,7 @@ function initFirebaseApp() {
   loadInitialData();
 }
 
-// تحميل البيانات وحمايتها من التلف أو الحذف غير المقصود[cite: 15]
+// تحميل البيانات والتحقق من حساب المدير المعتمد فقط[cite: 15]
 function loadInitialData() {
   const localData = localStorage.getItem(STORAGE_KEY);
   if (localData) {
@@ -87,7 +89,6 @@ function loadInitialData() {
       const parsedData = JSON.parse(localData);
       window.appStore = Object.assign(window.appStore, parsedData);
 
-      // التأكد من تهيئة المصفوفات الأساسية[cite: 15]
       if (!Array.isArray(window.appStore.users)) window.appStore.users = [];
       if (!Array.isArray(window.appStore.students))
         window.appStore.students = [];
@@ -104,21 +105,17 @@ function loadInitialData() {
       if (!Array.isArray(window.appStore.screenOrder))
         window.appStore.screenOrder = [];
 
-      // ضمان وجود حساب المدير وحساب التميز الأسبوعي دون مساس ببيانات الطلاب[cite: 15]
-      const hasAdmin = window.appStore.users.some(
+      // ضمان وجود حساب المدير (صالح ال ناشع) وحساب الشاشة فقط[cite: 15]
+      let adminUser = window.appStore.users.find(
         (u) =>
           (u.username === "123456" || u.username === "admin") &&
           u.role === SAFE_ROLES.ADMIN,
       );
 
-      const hasScreen = window.appStore.users.some(
-        (u) => u.username === "121212" && u.role === SAFE_ROLES.SCREEN,
-      );
-
-      if (!hasAdmin) {
+      if (!adminUser) {
         window.appStore.users.push({
           id: "u_admin_main",
-          name: "أحمد بن عبدالله بن مهدي",
+          name: "صالح ال ناشع",
           role: SAFE_ROLES.ADMIN,
           username: "123456",
           pass: "1234",
@@ -126,7 +123,13 @@ function loadInitialData() {
           status: "active",
           createdAt: Date.now(),
         });
+      } else {
+        adminUser.name = "صالح ال ناشع";
       }
+
+      const hasScreen = window.appStore.users.some(
+        (u) => u.username === "121212" && u.role === SAFE_ROLES.SCREEN,
+      );
 
       if (!hasScreen) {
         window.appStore.users.push({
@@ -150,7 +153,7 @@ function loadInitialData() {
     seedProductionAdminOnly();
   }
 
-  // مزامنة البيانات مع Firestore إذا كان متصلاً[cite: 15]
+  // مزامنة البيانات السحابية من Firestore[cite: 15]
   if (isFirebaseOnline && dbFirestore) {
     syncDataFromCloud();
   }
@@ -165,14 +168,14 @@ function saveLocalStore() {
   }
 }
 
-// إنشاء الحسابات الافتراضية مع المحافظة على الهيكل العام[cite: 15]
+// إنشاء الحسابات النظيفة الافتراضية دون أي طلاب أو معلمين مسبقين[cite: 15]
 function seedProductionAdminOnly() {
   const baseTime = Date.now();
   window.appStore = {
     users: [
       {
         id: "u_admin_main",
-        name: "أحمد بن عبدالله بن مهدي",
+        name: "صالح ال ناشع",
         role: SAFE_ROLES.ADMIN,
         username: "123456",
         pass: "1234",
@@ -206,7 +209,7 @@ function seedProductionAdminOnly() {
     logs: [
       {
         id: "log_" + baseTime,
-        userName: "أحمد بن عبدالله بن مهدي",
+        userName: "صالح ال ناشع",
         action: "تهيئة النظام وتدشين الحسابات",
         timestamp: new Date().toLocaleDateString("ar-SA"),
       },
