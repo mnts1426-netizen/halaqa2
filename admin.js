@@ -44,6 +44,14 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
+  const formAddTest = document.getElementById("form-add-test");
+  if (formAddTest) {
+    formAddTest.onsubmit = function (e) {
+      if (e) e.preventDefault();
+      handleSaveTest(e);
+    };
+  }
+
   // أحداث البحث والتصفية
   const searchStudents = document.getElementById("search-students");
   if (searchStudents) searchStudents.oninput = renderStudentsTable;
@@ -1839,6 +1847,9 @@ window.renderTeacherNotesTable = function () {
   tbody.innerHTML = html;
 };
 
+// ==========================================================================
+// 8. شاشة الاختبارات (إضافة وعرض وحذف)
+// ==========================================================================
 window.renderTestsTable = function () {
   const tbody = document.getElementById("tests-table-body");
   if (!tbody) return;
@@ -1902,8 +1913,24 @@ window.openModalAddTest = function () {
       opts += `<option value="${c.id}">${c.name}</option>`;
     });
     circleSelect.innerHTML = opts;
+    circleSelect.value = "";
   }
-  populateTestStudentsDropdown();
+
+  const stuSelect = document.getElementById("test-student-select");
+  if (stuSelect) {
+    stuSelect.innerHTML = '<option value="">— اختر الطالب —</option>';
+    stuSelect.value = "";
+  }
+
+  const typeInput = document.getElementById("test-type");
+  if (typeInput) typeInput.value = "";
+
+  const scoreInput = document.getElementById("test-score");
+  if (scoreInput) scoreInput.value = "100";
+
+  const ratingSelect = document.getElementById("test-rating");
+  if (ratingSelect) ratingSelect.value = "ممتاز";
+
   openModal("modal-add-test");
 };
 
@@ -1934,8 +1961,8 @@ window.handleSaveTest = function (e) {
   const score = document.getElementById("test-score")?.value || "100";
   const rating = document.getElementById("test-rating")?.value || "ممتاز";
 
-  if (!studentId || !type) {
-    alert("يرجى اختيار الطالب ونوع الاختبار.");
+  if (!circleId || !studentId || !type) {
+    alert("يرجى اختيار الحلقة، الطالب، ونوع الاختبار.");
     return;
   }
 
@@ -1958,7 +1985,6 @@ window.handleSaveTest = function (e) {
   if (typeof saveLocalStore === "function") saveLocalStore();
 
   closeModal("modal-add-test");
-  e.target?.reset();
   alert("✅ تم حفظ الاختبار بنجاح!");
   renderTestsTable();
 };
@@ -1977,20 +2003,154 @@ window.deleteTest = function (testId) {
 };
 
 // ==========================================================================
-// 8. شاشة التميز الأسبوعي وطلبات التسجيل
+// 9. لوحة فرسان التميز والتميز الأسبوعي (شروط صارمة: حضور 4 أيام + ممتاز فقط)
 // ==========================================================================
+function getSundayToWednesdayDatesForWeek(weekOption = "current") {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+
+  let offsetWeeks = 0;
+  if (weekOption === "w_1") offsetWeeks = 1;
+  else if (weekOption === "w_2") offsetWeeks = 2;
+  else if (weekOption === "w_3") offsetWeeks = 3;
+  else if (weekOption === "w_4") offsetWeeks = 4;
+
+  const sunday = new Date(now);
+  sunday.setDate(now.getDate() - dayOfWeek - offsetWeeks * 7);
+
+  const days = [];
+  for (let i = 0; i < 4; i++) {
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    days.push(`${y}-${m}-${day}`);
+  }
+  return days;
+}
+
+function isStudentTamayuzForWeek(studentId, weekOption = "current") {
+  const weekDays = getSundayToWednesdayDatesForWeek(weekOption);
+  let attendedDaysCount = 0;
+
+  const isDisqualifyingRating = (r) => {
+    if (!r) return false;
+    const clean = r.trim();
+    if (clean === "" || clean === "—" || clean === "لا يوجد" || clean === "-")
+      return false;
+    return !clean.includes("ممتاز");
+  };
+
+  for (const day of weekDays) {
+    // 1. فحص الحضور
+    const att = (window.appStore?.attendance || []).find(
+      (a) => a.studentId === studentId && a.date === day,
+    );
+    if (att && (att.status === "present" || att.status === "late")) {
+      attendedDaysCount++;
+    } else {
+      return false;
+    }
+
+    // 2. فحص التسميع
+    const tasm = (window.appStore?.tasmeea || []).find(
+      (t) => t.studentId === studentId && t.date === day,
+    );
+    if (tasm) {
+      if (
+        isDisqualifyingRating(tasm.hifzRating) ||
+        isDisqualifyingRating(tasm.murajaaRating) ||
+        isDisqualifyingRating(tasm.tilawaRating) ||
+        isDisqualifyingRating(tasm.rating)
+      ) {
+        return false;
+      }
+    }
+  }
+
+  return attendedDaysCount === 4;
+}
+
+window.getQualifyingTamayuzStudents = function (weekOption = "current") {
+  const activeStudents = (window.appStore?.students || []).filter(
+    (s) => s.status === "active",
+  );
+
+  const qualifying = activeStudents.filter((s) =>
+    isStudentTamayuzForWeek(s.id, weekOption),
+  );
+
+  const savedOrder = window.appStore?.screenOrder || [];
+  if (savedOrder.length > 0) {
+    qualifying.sort((a, b) => {
+      const idxA = savedOrder.indexOf(a.id);
+      const idxB = savedOrder.indexOf(b.id);
+      if (idxA > -1 && idxB > -1) return idxA - idxB;
+      if (idxA > -1) return -1;
+      if (idxB > -1) return 1;
+      return 0;
+    });
+  }
+
+  return qualifying;
+};
+
+window.renderTamayuzBoard = function () {
+  const tbody = document.getElementById("tamayuz-students-body");
+  if (!tbody) return;
+
+  const weekFilter =
+    document.getElementById("tamayuz-week-filter")?.value || "current";
+  const qualifyingStudents = getQualifyingTamayuzStudents(weekFilter);
+
+  if (qualifyingStudents.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="text-center text-muted p-4">
+          لا يوجد طلاب متميزون لهذا الأسبوع (يشترط حضور 4 أيام كاملة من الأحد إلى الأربعاء والحصول على ممتاز في جميع المقررات)
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  let html = "";
+  qualifyingStudents.forEach((stu, idx) => {
+    const circle = (window.appStore?.circles || []).find(
+      (c) => c.id === stu.circleId,
+    );
+    const circleName = circle ? circle.name : "جامع الهدى";
+    const isFirst = idx === 0;
+
+    html += `
+      <tr>
+        <td style="font-weight: 800;">${isFirst ? "🏆 " : "⭐ "}${stu.name}</td>
+        <td><span style="font-weight: 600; color: var(--text-dark);">${circleName}</span></td>
+        <td><span class="badge badge-active">100% (حضور 4 / 4 أيام)</span></td>
+        <td><span class="badge badge-active">متقن (ممتاز)</span></td>
+        <td><span class="badge" style="background:#805333; color:#fff;">${isFirst ? "المركز الأول 🏆" : `متميز #${idx + 1}`}</span></td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+};
+
 window.renderScreenView = function () {
   const grid = document.getElementById("mosque-screen-grid");
   const tbody = document.getElementById("screen-manage-table-body");
 
-  const students = (window.appStore?.students || []).filter(
-    (s) => s.status === "active",
-  );
+  const students = getQualifyingTamayuzStudents("current");
 
   if (grid) {
     if (students.length === 0) {
-      grid.innerHTML =
-        '<div class="empty-state-card" style="grid-column:1/-1; padding:2rem;"><p class="text-muted">لا يوجد طلاب نشطون حالياً</p></div>';
+      grid.innerHTML = `
+        <div class="empty-state-card" style="grid-column:1/-1; padding:2.5rem; text-align:center; background:#fff; border-radius:10px;">
+          <h3>لوحة فرسان التميز الأسبوعي</h3>
+          <p class="text-muted">لا يوجد طلاب حققوا شروط التميز لهذا الأسبوع حتى الآن (حضور 4 أيام من الأحد للأربعاء وتقييم ممتاز)</p>
+        </div>
+      `;
     } else {
       let gridHtml = "";
       students.forEach((stu, idx) => {
@@ -2007,7 +2167,10 @@ window.renderScreenView = function () {
             </div>
             <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text-dark); margin-bottom: 4px;">${stu.name}</h3>
             <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 8px;">حلقة: ${circleName}</p>
-            <span class="badge badge-active">متميز</span>
+            <div style="display: flex; justify-content: center; gap: 0.4rem;">
+              <span class="badge badge-active">حضور 4 أيام</span>
+              <span class="badge badge-active">ممتاز</span>
+            </div>
           </div>
         `;
       });
@@ -2018,7 +2181,7 @@ window.renderScreenView = function () {
   if (tbody) {
     if (students.length === 0) {
       tbody.innerHTML =
-        '<tr><td colspan="5" class="text-center text-muted p-3">لا يوجد طلاب</td></tr>';
+        '<tr><td colspan="5" class="text-center text-muted p-3">لا يوجد طلاب متميزون حالياً للترتيب</td></tr>';
     } else {
       let tbodyHtml = "";
       students.forEach((stu, idx) => {
@@ -2032,7 +2195,7 @@ window.renderScreenView = function () {
             <td style="text-align: center; font-weight: 800;">${idx + 1} ${idx === 0 ? "🏆" : ""}</td>
             <td style="font-weight: 700;">${stu.name}</td>
             <td>${circleName}</td>
-            <td><span class="badge badge-active">متميز</span></td>
+            <td><span class="badge badge-active">متميز (حضور 100% وممتاز)</span></td>
             <td style="text-align: center;">
               <button class="btn btn-outline-brown btn-sm" onclick="moveScreenStudentUp(${idx})" ${idx === 0 ? "disabled" : ""}>⬆️ للأعلى</button>
               <button class="btn btn-outline-brown btn-sm" onclick="moveScreenStudentDown(${idx})" ${idx === students.length - 1 ? "disabled" : ""}>⬇️ للأسفل</button>
@@ -2046,9 +2209,7 @@ window.renderScreenView = function () {
 };
 
 window.moveScreenStudentUp = function (index) {
-  const students = (window.appStore?.students || []).filter(
-    (s) => s.status === "active",
-  );
+  const students = getQualifyingTamayuzStudents("current");
   if (index <= 0 || index >= students.length) return;
 
   const currentIds = students.map((s) => s.id);
@@ -2064,9 +2225,7 @@ window.moveScreenStudentUp = function (index) {
 };
 
 window.moveScreenStudentDown = function (index) {
-  const students = (window.appStore?.students || []).filter(
-    (s) => s.status === "active",
-  );
+  const students = getQualifyingTamayuzStudents("current");
   if (index < 0 || index >= students.length - 1) return;
 
   const currentIds = students.map((s) => s.id);
@@ -2090,6 +2249,9 @@ window.resetScreenStudentOrder = function () {
   alert("✅ تمت إعادة الترتيب التلقائي بنجاح!");
 };
 
+// ==========================================================================
+// 10. طلبات التسجيل وإعدادات المَجْمَع
+// ==========================================================================
 window.renderPendingRequestsTable = function () {
   const tbody = document.getElementById("pending-requests-table-body");
   if (!tbody) return;
