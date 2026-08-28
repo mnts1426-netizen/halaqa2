@@ -118,7 +118,7 @@ function buildStudentAccordionCard(
   const isSaved = Boolean(record.id);
   const currentAtt = attRecord.status || "";
 
-  // ترحيل خطة الأمس كمقرر لليوم مع إمكانية التعديل
+  // ترحيل خطة الأمس كمقرر لليوم مع إمكانية التعديل المباشر
   const initialHifz = record.hifzSurah || previousRecord.nextHifz || "";
   const initialMurajaa =
     record.murajaaSurah || previousRecord.nextMurajaa || "";
