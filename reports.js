@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * reports.js - محرك التقارير الشاملة الرقمية، إنجاز طالب، ولوحة المتميزين الأسبوعية
+ * reports.js - محرك التقارير الشاملة الرقمية، إنجاز طالب، والتميز الأسبوعي
  * ==========================================================================
  */
 
@@ -10,31 +10,34 @@ document.addEventListener("DOMContentLoaded", () => {
     handleReportTypeChange();
   }
   populateReportStudentsDropdown();
-  populateReportWeekDropdown();
+  populateReportWeekRangeDropdowns();
 });
 
-// تعبئة قائمة أسابيع التميز تلقائياً بتاريخ يوم الأحد الفعلي لكل أسبوع
-function populateReportWeekDropdown() {
-  const weekSelect = document.getElementById("report-week-select");
-  if (!weekSelect) return;
+// تعبئة قوائم نطاق أسابيع التميز (من - إلى)
+function populateReportWeekRangeDropdowns() {
+  const weekFromSelect = document.getElementById("report-week-from");
+  const weekToSelect = document.getElementById("report-week-to");
+  if (!weekFromSelect || !weekToSelect) return;
 
-  const weekOptions = ["current", "w_1", "w_2", "w_3", "w_4"];
+  const weekOptions = [
+    { id: "current", label: "الأسبوع الحالي" },
+    { id: "w_1", label: "الأسبوع السابق (1)" },
+    { id: "w_2", label: "الأسبوع السابق (2)" },
+    { id: "w_3", label: "الأسبوع السابق (3)" },
+    { id: "w_4", label: "الأسبوع السابق (4)" },
+  ];
+
   let optionsHtml = "";
-
-  weekOptions.forEach((opt, idx) => {
-    const days = getSundayToWednesdayDatesByWeekOption(opt);
-    const sundayDate = days[0];
-    if (idx === 0) {
-      optionsHtml += `<option value="${opt}">أسبوع الأحد (${sundayDate}) - الحالي</option>`;
-    } else {
-      optionsHtml += `<option value="${opt}">أسبوع الأحد (${sundayDate})</option>`;
-    }
+  weekOptions.forEach((w) => {
+    optionsHtml += `<option value="${w.id}">${w.label}</option>`;
   });
 
-  weekSelect.innerHTML = optionsHtml;
+  weekFromSelect.innerHTML = optionsHtml;
+  weekToSelect.innerHTML = optionsHtml;
+  weekToSelect.value = "current";
+  weekFromSelect.value = "w_4";
 }
 
-// تعبئة وتغذية قائمة الطلاب في خانة واحدة موحدة
 function populateReportStudentsDropdown() {
   const studentSelect = document.getElementById("report-student-select");
   const circleId =
@@ -67,23 +70,22 @@ function handleReportTypeChange() {
   const reportType = document.getElementById("report-type-select")?.value;
   const circleGroup = document.getElementById("report-circle-group");
   const studentGroup = document.getElementById("report-student-group");
-  const weekGroup = document.getElementById("report-week-group");
+  const weekRangeGroup = document.getElementById("report-week-range-group");
   const dateFromGroup = document.getElementById("report-date-from-group");
   const dateToGroup = document.getElementById("report-date-to-group");
   const thead = document.getElementById("report-thead");
   const tbody = document.getElementById("report-tbody");
-  const footer = document.getElementById("report-print-footer");
 
   if (circleGroup) circleGroup.style.display = "block";
   if (studentGroup) studentGroup.style.display = "block";
 
   if (reportType === "tamayuz") {
-    if (weekGroup) weekGroup.classList.remove("style-hidden");
+    if (weekRangeGroup) weekRangeGroup.classList.remove("style-hidden");
     if (dateFromGroup) dateFromGroup.style.display = "none";
     if (dateToGroup) dateToGroup.style.display = "none";
-    populateReportWeekDropdown();
+    populateReportWeekRangeDropdowns();
   } else {
-    if (weekGroup) weekGroup.classList.add("style-hidden");
+    if (weekRangeGroup) weekRangeGroup.classList.add("style-hidden");
     if (dateFromGroup) dateFromGroup.style.display = "block";
     if (dateToGroup) dateToGroup.style.display = "block";
   }
@@ -93,13 +95,11 @@ function handleReportTypeChange() {
       '<tr><td class="text-center text-muted p-4">حدد خيارات التقرير ثم اضغط على "استخراج التقرير"</td></tr>';
   }
   if (thead) thead.innerHTML = "";
-  if (footer) footer.style.display = "none";
 }
 
-// دالة حساب أيام التسميع الأربعة للأسبوع (الأحد، الإثنين، الثلاثاء، الأربعاء)
 function getSundayToWednesdayDatesByWeekOption(weekOption) {
   const now = new Date();
-  const dayOfWeek = now.getDay(); // 0 = الأحد
+  const dayOfWeek = now.getDay();
 
   let offsetWeeks = 0;
   if (weekOption === "w_1") offsetWeeks = 1;
@@ -122,7 +122,6 @@ function getSundayToWednesdayDatesByWeekOption(weekOption) {
   return days;
 }
 
-// توليد التقرير الشامل التفاعلي
 function generateReport() {
   const reportType = document.getElementById("report-type-select")?.value;
   const selectedStudentId =
@@ -131,31 +130,20 @@ function generateReport() {
     document.getElementById("report-circle-select")?.value || "all";
   const dateFrom = document.getElementById("report-date-from")?.value;
   const dateTo = document.getElementById("report-date-to")?.value;
-  const weekOption =
-    document.getElementById("report-week-select")?.value || "current";
+  const weekFrom = document.getElementById("report-week-from")?.value || "w_4";
+  const weekTo = document.getElementById("report-week-to")?.value || "current";
 
   const thead = document.getElementById("report-thead");
   const tbody = document.getElementById("report-tbody");
   const printTitle = document.getElementById("print-report-title");
   const printPeriod = document.getElementById("print-report-period");
-  const footer = document.getElementById("report-print-footer");
-  const footerDate = document.getElementById("print-footer-date");
-  const printDirectorName = document.getElementById("print-director-name");
 
   if (!thead || !tbody) return;
-
-  // تحديث بيانات الترويسة والتوقيع
-  const settings = window.appStore.settings || DEFAULT_SETTINGS;
-  const directorName = settings.directorName || "أحمد بن عبدالله بن مهدي";
-  if (printDirectorName) printDirectorName.textContent = directorName;
-
-  const now = new Date();
-  if (footerDate) footerDate.textContent = now.toLocaleDateString("ar-SA");
 
   let headHtml = "";
   let bodyHtml = "";
 
-  // 1. تقرير إنجاز طالب
+  // 1. تقرير إنجاز طالب (تم استبدال مسمى الحفظ بـ الدرس الجديد)
   if (reportType === "student_achievement") {
     if (printTitle) printTitle.textContent = "تقرير إنجاز طالب";
 
@@ -174,10 +162,10 @@ function generateReport() {
 
     headHtml = `
       <tr>
-        <th style="width: 50px;">م</th>
+        <th style="width: 50px; text-align: center;">م</th>
         <th>اسم الطالب</th>
         <th>الحلقة</th>
-        <th>الحفظ</th>
+        <th>الدرس الجديد</th>
         <th>المراجعة</th>
         <th>التلاوة</th>
       </tr>
@@ -235,7 +223,7 @@ function generateReport() {
 
         bodyHtml += `
           <tr>
-            <td>${idx + 1}</td>
+            <td style="text-align: center;">${idx + 1}</td>
             <td style="font-weight: 800;">${s.name}</td>
             <td><span style="font-weight: 600; color: var(--text-dark);">${circleName}</span></td>
             <td style="line-height: 1.5;">${hifzSpan}</td>
@@ -247,7 +235,7 @@ function generateReport() {
     }
   }
 
-  // 2. التقرير الإحصائي الشامل للطلاب
+  // 2. التقرير الإحصائي الشامل للطلاب (تم استبدال مسمى الحفظ بـ الدرس الجديد)
   else if (reportType === "students") {
     if (printTitle)
       printTitle.textContent =
@@ -268,12 +256,12 @@ function generateReport() {
 
     headHtml = `
       <tr>
-        <th rowspan="2" style="vertical-align: middle;">م</th>
+        <th rowspan="2" style="vertical-align: middle; text-align: center;">م</th>
         <th rowspan="2" style="vertical-align: middle;">اسم الطالب</th>
-        <th rowspan="2" style="vertical-align: middle;">أيام الحضور</th>
-        <th rowspan="2" style="vertical-align: middle;">أيام الغياب</th>
-        <th rowspan="2" style="vertical-align: middle;">مرات التميز</th>
-        <th colspan="4" class="text-center">الدرس (الحفظ)</th>
+        <th rowspan="2" style="vertical-align: middle; text-align: center; line-height: 1.2;">أيام<br>الحضور</th>
+        <th rowspan="2" style="vertical-align: middle; text-align: center; line-height: 1.2;">أيام<br>الغياب</th>
+        <th rowspan="2" style="vertical-align: middle; text-align: center; line-height: 1.2;">مرات<br>التميز</th>
+        <th colspan="4" class="text-center">الدرس الجديد</th>
         <th colspan="4" class="text-center">المراجعة</th>
         <th colspan="4" class="text-center">التلاوة</th>
       </tr>
@@ -373,11 +361,11 @@ function generateReport() {
 
         bodyHtml += `
           <tr>
-            <td>${idx + 1}</td>
+            <td style="text-align: center;">${idx + 1}</td>
             <td style="font-weight:700;">${s.name}</td>
-            <td style="font-weight:700; color: #2e7d32;">${presentCount}</td>
-            <td style="font-weight:700; color: #c62828;">${absentCount}</td>
-            <td style="font-weight:700; color: var(--primary-brown);">${tamayuzCount}</td>
+            <td style="font-weight:700; color: #2e7d32; text-align: center;">${presentCount}</td>
+            <td style="font-weight:700; color: #c62828; text-align: center;">${absentCount}</td>
+            <td style="font-weight:700; color: var(--primary-brown); text-align: center;">${tamayuzCount}</td>
             
             <td>${hifzMumtaz}</td>
             <td>${hifzJayyidJiddan}</td>
@@ -399,9 +387,10 @@ function generateReport() {
     }
   }
 
-  // 3. تقرير سجل التسميع اليومي
+  // 3. تقرير سجل التسميع اليومي (تم استبدال مسمى الحفظ بـ الدرس الجديد)
   else if (reportType === "tasmeea") {
-    if (printTitle) printTitle.textContent = "تقرير إنجاز وسجل التسميع والحفظ";
+    if (printTitle)
+      printTitle.textContent = "تقرير إنجاز وسجل التسميع والدرس الجديد";
 
     if (printPeriod) {
       if (dateFrom && dateTo) {
@@ -418,9 +407,9 @@ function generateReport() {
 
     headHtml = `
       <tr>
-        <th>التاريخ</th>
+        <th style="width: 50px; text-align: center;">م</th>
         <th>اسم الطالب</th>
-        <th>الحفظ</th>
+        <th>الدرس الجديد</th>
         <th>المراجعة</th>
         <th>التلاوة</th>
         <th>التقدير</th>
@@ -440,13 +429,13 @@ function generateReport() {
       bodyHtml =
         '<tr><td colspan="7" class="text-center text-muted p-4">لا توجد سجلات تسميع في هذه الفترة</td></tr>';
     } else {
-      records.forEach((t) => {
+      records.forEach((t, idx) => {
         const student = (window.appStore.students || []).find(
           (s) => s.id === t.studentId,
         );
         bodyHtml += `
           <tr>
-            <td>${t.date}</td>
+            <td style="text-align: center;">${idx + 1}</td>
             <td style="font-weight:700;">${student ? student.name : "طالب"}</td>
             <td>${t.hifzSurah || "—"}</td>
             <td>${t.murajaaSurah || "—"}</td>
@@ -459,26 +448,22 @@ function generateReport() {
     }
   }
 
-  // 4. تقرير لوحة الطلاب المتميزين
+  // 4. تقرير التميز الأسبوعي
   else if (reportType === "tamayuz") {
     if (printTitle)
-      printTitle.textContent = "تقرير لوحة الطلاب المتميزين (التميز الأسبوعي)";
-
-    const weekDays = getSundayToWednesdayDatesByWeekOption(weekOption);
+      printTitle.textContent = "تقرير التميز الأسبوعي (عدد بطاقات التميز)";
 
     if (printPeriod) {
-      printPeriod.textContent = `أسبوع التميز (من الأحد ${weekDays[0]} إلى الأربعاء ${weekDays[3]})`;
+      printPeriod.textContent = `نطاق الأسابيع (من الأسبوع ${weekFrom} إلى الأسبوع ${weekTo})`;
       printPeriod.style.display = "block";
     }
 
     headHtml = `
       <tr>
-        <th style="width: 50px;">م</th>
-        <th>اسم الطالب المتميز</th>
+        <th style="width: 60px; text-align: center;">م</th>
+        <th>اسم الطالب</th>
         <th>الحلقة</th>
-        <th>أيام الحضور (الأحد - الأربعاء)</th>
-        <th>حالة التسميع الأسبوعي</th>
-        <th>التقدير الأسبوعي</th>
+        <th style="text-align: center;">عدد بطاقات التميز</th>
       </tr>
     `;
 
@@ -493,66 +478,84 @@ function generateReport() {
       students = students.filter((s) => s.id === selectedStudentId);
     }
 
-    const qualifyingStudents = [];
+    const allWeekKeys = ["w_4", "w_3", "w_2", "w_1", "current"];
+    const startIdx = allWeekKeys.indexOf(weekFrom);
+    const endIdx = allWeekKeys.indexOf(weekTo);
+    const selectedWeeks =
+      startIdx > -1 && endIdx >= startIdx
+        ? allWeekKeys.slice(startIdx, endIdx + 1)
+        : ["current"];
+
+    const isDisqualifying = (r) => {
+      if (!r) return false;
+      const clean = r.trim();
+      if (clean === "" || clean === "—" || clean === "لا يوجد") return false;
+      return !clean.includes("ممتاز");
+    };
+
+    const studentBadgesCount = [];
 
     students.forEach((s) => {
-      let attendedCount = 0;
-      let hasDisqualifyingRating = false;
+      let badgesSum = 0;
 
-      for (const day of weekDays) {
-        const att = (window.appStore.attendance || []).find(
-          (a) => a.studentId === s.id && a.date === day,
-        );
-        if (att && (att.status === "present" || att.status === "late")) {
-          attendedCount++;
-        }
+      selectedWeeks.forEach((wk) => {
+        const weekDays = getSundayToWednesdayDatesByWeekOption(wk);
+        let attendedCount = 0;
+        let hasDisqualifyingRating = false;
 
-        const tasm = (window.appStore.tasmeea || []).find(
-          (t) => t.studentId === s.id && t.date === day,
-        );
-        if (tasm) {
-          const isValidRating = (r) => {
-            if (!r || r.trim() === "" || r === "—" || r === "لا يوجد")
-              return true;
-            return r.includes("ممتاز");
-          };
-
-          if (
-            !isValidRating(tasm.hifzRating) ||
-            !isValidRating(tasm.murajaaRating) ||
-            !isValidRating(tasm.tilawaRating)
-          ) {
+        for (const day of weekDays) {
+          const att = (window.appStore?.attendance || []).find(
+            (a) => a.studentId === s.id && a.date === day,
+          );
+          if (att && (att.status === "present" || att.status === "late")) {
+            attendedCount++;
+          } else if (att && att.status === "absent") {
             hasDisqualifyingRating = true;
           }
-        }
-      }
 
-      if (attendedCount === 4 && !hasDisqualifyingRating) {
-        qualifyingStudents.push(s);
+          const tasm = (window.appStore?.tasmeea || []).find(
+            (t) => t.studentId === s.id && t.date === day,
+          );
+          if (tasm) {
+            if (
+              isDisqualifying(tasm.hifzRating) ||
+              isDisqualifying(tasm.murajaaRating) ||
+              isDisqualifying(tasm.tilawaRating) ||
+              isDisqualifying(tasm.rating)
+            ) {
+              hasDisqualifyingRating = true;
+            }
+          }
+        }
+
+        if (attendedCount === 4 && !hasDisqualifyingRating) {
+          badgesSum++;
+        }
+      });
+
+      if (badgesSum > 0) {
+        studentBadgesCount.push({ student: s, count: badgesSum });
       }
     });
 
-    if (qualifyingStudents.length === 0) {
+    if (studentBadgesCount.length === 0) {
       bodyHtml =
-        '<tr><td colspan="6" class="text-center text-muted p-4">لا يوجد طلاب مطابقون لمعايير التميز لهذا الأسبوع</td></tr>';
+        '<tr><td colspan="4" class="text-center text-muted p-4">لا توجد بطاقات تميز مسجلة للطلاب في نطاق الأسابيع المحدد</td></tr>';
     } else {
-      qualifyingStudents.forEach((s, idx) => {
-        const circle = (window.appStore.circles || []).find(
-          (c) => c.id === s.circleId,
+      studentBadgesCount.forEach((item, idx) => {
+        const circle = (window.appStore?.circles || []).find(
+          (c) => c.id === item.student.circleId,
         );
-        const circleName = circle
-          ? circle.name
-          : window.appStore.settings?.orgName ||
-            "مُجْمَع عبدالله بن مهدي القرآني";
+        const circleName = circle ? circle.name : "حلقات جامع الهدى";
 
         bodyHtml += `
           <tr>
-            <td>${idx + 1}</td>
-            <td style="font-weight: 800;">⭐ ${s.name}</td>
+            <td style="text-align: center;">${idx + 1}</td>
+            <td style="font-weight: 800;">⭐ ${item.student.name}</td>
             <td><span style="font-weight: 600; color: var(--text-dark);">${circleName}</span></td>
-            <td><span class="badge badge-active">حضور كامل (4 / 4 أيام)</span></td>
-            <td><span class="badge badge-active">متقن ومكتمل</span></td>
-            <td><span class="badge badge-active">🌟 ممتاز</span></td>
+            <td style="text-align: center; font-weight: 900; color: var(--primary-brown); font-size: 1.05rem;">
+              🎖️ ${item.count} بطاقات
+            </td>
           </tr>
         `;
       });
@@ -561,27 +564,29 @@ function generateReport() {
 
   thead.innerHTML = headHtml;
   tbody.innerHTML = bodyHtml;
-
-  // إظهار توقيع المدير في نهاية التقرير
-  if (footer) footer.style.display = "flex";
 }
 
-// دالة الطباعة المباشرة
+function exportReportExcel() {
+  const table = document.getElementById("report-results-table");
+  if (!table || table.rows.length <= 1) {
+    alert("⚠️ لا توجد بيانات في التقرير لتصديرها!");
+    return;
+  }
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة Excel غير متوفرة!");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "التقرير الرسمي" });
+  XLSX.writeFile(
+    wb,
+    `تقرير_التميز_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+}
+
 function printOfficialReport() {
-  const dateEl = document.getElementById("print-header-date");
-  const timeEl = document.getElementById("print-header-time");
-  const footerDate = document.getElementById("print-footer-date");
-
-  const now = new Date();
-  if (dateEl)
-    dateEl.textContent = "التاريخ: " + now.toISOString().split("T")[0];
-  if (timeEl) timeEl.textContent = "الوقت: " + now.toLocaleTimeString("ar-SA");
-  if (footerDate) footerDate.textContent = now.toLocaleDateString("ar-SA");
-
   window.print();
 }
 
-// دالة تنزيل التقرير بصيغة PDF
 function downloadReportPDF() {
   printOfficialReport();
 }
