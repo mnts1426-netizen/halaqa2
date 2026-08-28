@@ -45,13 +45,13 @@
             >
               <div class="form-group">
                 <label for="login-username"
-                  >اسم المستخدم / رقم الهوية الوطنية</label
+                  >اسم المستخدم / رقم الهوية الوطنية / رقم الجوال</label
                 >
                 <input
                   type="text"
                   id="login-username"
                   class="form-control"
-                  placeholder=" أو رقم الهوية للطالب أو الجوال..."
+                  placeholder="admin أو رقم الهوية للطالب أو الجوال..."
                   required
                 />
               </div>
@@ -349,6 +349,7 @@
               </svg>
               <span>التقارير</span>
             </a>
+            <!-- رابط التقارير المالية للمصرح لهم فقط -->
             <a
               href="#"
               class="nav-link"
@@ -400,7 +401,7 @@
               >
                 <circle cx="12" cy="12" r="3" />
                 <path
-                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
                 />
               </svg>
               <span>الإعدادات</span>
@@ -1829,6 +1830,7 @@
       </div>
     </div>
 
+    <!-- نافذة إضافة وتعديل حلقة -->
     <div id="modal-add-circle" class="modal-overlay">
       <div class="modal-card modal-lg">
         <div class="modal-header">
@@ -1837,7 +1839,7 @@
             &times;
           </button>
         </div>
-        <form id="form-add-circle">
+        <form id="form-add-circle" onsubmit="handleSaveCircle(event)">
           <input type="hidden" id="edit-circle-id" value="" />
           <div class="modal-body">
             <div class="form-group">
@@ -1902,7 +1904,7 @@
             &times;
           </button>
         </div>
-        <form id="form-add-student">
+        <form id="form-add-student" onsubmit="handleAddStudent(event)">
           <div class="modal-body">
             <div class="form-group">
               <label>الاسم الرباعي للطالب</label
@@ -2026,8 +2028,8 @@
                 ><input type="tel" id="edit-comp-phone" class="form-control" />
               </div>
               <div class="form-group flex-1">
-                <label>رقم جوال ولي الأمر</label
-                ><input
+                <label>رقم جوال ولي الأمر</label>
+                <input
                   type="tel"
                   id="edit-comp-parent-phone"
                   class="form-control"
@@ -2157,7 +2159,7 @@
             &times;
           </button>
         </div>
-        <form id="form-add-teacher">
+        <form id="form-add-teacher" onsubmit="handleAddTeacher(event)">
           <div class="modal-body">
             <div class="form-group">
               <label>اسم المعلم</label
@@ -2176,6 +2178,32 @@
                 class="form-control"
                 required
               />
+            </div>
+            <div class="form-group">
+              <label
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 0.5rem;
+                  cursor: pointer;
+                  font-weight: 700;
+                  color: var(--primary-brown);
+                "
+              >
+                <input
+                  type="checkbox"
+                  id="add-teach-is-finance"
+                  style="
+                    width: 18px;
+                    height: 18px;
+                    accent-color: var(--primary-brown);
+                  "
+                />
+                <span
+                  >💼 تعيين كمسؤول مالي للمَجْمَع (صلاحية التقارير
+                  المالية)</span
+                >
+              </label>
             </div>
             <div class="form-group">
               <label>الحلقات المكلف بها:</label>
@@ -2343,6 +2371,177 @@
               type="button"
               class="btn btn-outline-brown"
               onclick="closeModal('modal-edit-user-account')"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- نافذة استيراد Excel المحدثة بـ 7 أعمدة -->
+    <div id="modal-excel-import" class="modal-overlay">
+      <div class="modal-card modal-lg">
+        <div class="modal-header">
+          <h3>📥 استيراد بيانات الطلاب من ملف Excel (7 أعمدة)</h3>
+          <button
+            class="modal-close"
+            onclick="closeModal('modal-excel-import')"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted mb-2" style="font-size: 0.88rem">
+            يرجى التأكد من ترتيب الأعمدة في ملف Excel الخاص بك وفق الترتيب
+            القياسي التالي (7 أعمدة):
+          </p>
+          <div class="form-group">
+            <div
+              id="excel-columns-mapping-container"
+              style="
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 0.6rem;
+              "
+            ></div>
+          </div>
+          <div class="form-group mt-3">
+            <label>اختر ملف Excel (.xlsx أو .xls):</label
+            ><input
+              type="file"
+              id="excel-dynamic-file"
+              class="form-control"
+              accept=".xlsx, .xls"
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-primary"
+            onclick="executeDynamicExcelImport()"
+          >
+            بدء الاستيراد الفوري</button
+          ><button
+            type="button"
+            class="btn btn-outline-brown"
+            onclick="closeModal('modal-excel-import')"
+          >
+            إلغاء
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-send-unified-msg" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>إرسال إشعار / رسالة جديدة</h3>
+          <button
+            class="modal-close"
+            onclick="closeModal('modal-send-unified-msg')"
+          >
+            &times;
+          </button>
+        </div>
+        <form
+          id="form-send-unified-msg"
+          onsubmit="handleSendUnifiedMessage(event)"
+        >
+          <div class="modal-body">
+            <div class="form-group nav-admin-only" id="msg-recipient-wrapper">
+              <label>المستهدف بالإشعار / الرسالة</label>
+              <select
+                id="msg-target-recipient"
+                class="form-control"
+                onchange="handleRecipientTypeChange(this)"
+              >
+                <option value="all">الجميع (الكل)</option>
+                <option value="teachers">جميع المعلمين</option>
+                <option value="students">جميع الطلاب</option>
+                <option value="specific_teacher">معلم محدد</option>
+                <option value="specific_student">طالب محدد</option>
+              </select>
+            </div>
+            <div
+              id="msg-specific-recipient-group"
+              class="form-group style-hidden"
+            >
+              <label id="msg-specific-label">اختر الشخص المستهدف:</label
+              ><select id="msg-specific-select" class="form-control"></select>
+            </div>
+            <div class="form-group">
+              <label>عنوان الرسالة / الإشعار</label
+              ><input
+                type="text"
+                id="msg-title"
+                class="form-control"
+                placeholder="عنوان التنبيه..."
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label>نص الرسالة / التنبيه</label
+              ><textarea
+                id="msg-body"
+                class="form-control"
+                rows="3"
+                placeholder="اكتب نص الرسالة هنا..."
+                required
+              ></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">إرسال الآن</button
+            ><button
+              type="button"
+              class="btn btn-outline-brown"
+              onclick="closeModal('modal-send-unified-msg')"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="modal-bulk-circle" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>إضافة الطلاب المحددين إلى حلقة</h3>
+          <button class="modal-close" onclick="closeModal('modal-bulk-circle')">
+            &times;
+          </button>
+        </div>
+        <form id="form-bulk-circle" onsubmit="handleBulkCircleSubmit(event)">
+          <input type="hidden" id="bulk-circle-action-type" value="assign" />
+          <div class="modal-body">
+            <p
+              class="text-muted mb-2"
+              id="bulk-circle-desc"
+              style="font-size: 0.88rem"
+            >
+              اختر الحلقة المراد إضافة الطلاب المحددين إليها:
+            </p>
+            <div class="form-group">
+              <label>الحلقة المستهدفة</label
+              ><select id="bulk-target-circle" class="form-control" required>
+                <option value="">— اختر الحلقة —</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="submit"
+              class="btn btn-primary"
+              id="btn-submit-bulk-circle"
+            >
+              تنفيذ</button
+            ><button
+              type="button"
+              class="btn btn-outline-brown"
+              onclick="closeModal('modal-bulk-circle')"
             >
               إلغاء
             </button>
@@ -2797,352 +2996,6 @@
               type="button"
               class="btn btn-outline-brown"
               onclick="closeModal('modal-self-register')"
-            >
-              إلغاء
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <div id="modal-add-test" class="modal-overlay">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3>تسجيل اختبار جديد</h3>
-          <button class="modal-close" onclick="closeModal('modal-add-test')">
-            &times;
-          </button>
-        </div>
-        <form id="form-add-test" onsubmit="handleSaveTest(event)">
-          <div class="modal-body">
-            <div class="form-group">
-              <label>الحلقة</label
-              ><select
-                id="test-circle-select"
-                class="form-control"
-                onchange="populateTestStudentsDropdown()"
-                required
-              >
-                <option value="">— اختر الحلقة —</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>الطالب</label
-              ><select id="test-student-select" class="form-control" required>
-                <option value="">— اختر الطالب —</option>
-              </select>
-            </div>
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>نوع الاختبار / المقرر</label
-                ><input
-                  type="text"
-                  id="test-type"
-                  class="form-control"
-                  placeholder="مثال .."
-                  required
-                />
-              </div>
-              <div class="form-group flex-1">
-                <label>الدرجة من (100)</label
-                ><input
-                  type="number"
-                  id="test-score"
-                  class="form-control"
-                  min="0"
-                  max="100"
-                  required
-                />
-              </div>
-            </div>
-            <div class="form-group">
-              <label>التقدير</label>
-              <select id="test-rating" class="form-control" required>
-                <option value="ممتاز">ممتاز</option>
-                <option value="جيد جداً">جيد جداً</option>
-                <option value="جيد">جيد</option>
-                <option value="يعيد">يعيد</option>
-              </select>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="submit" class="btn btn-primary">حفظ الاختبار</button
-            ><button
-              type="button"
-              class="btn btn-outline-brown"
-              onclick="closeModal('modal-add-test')"
-            >
-              إلغاء
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <div id="modal-edit-test" class="modal-overlay">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3>تعديل بيانات الاختبار</h3>
-          <button class="modal-close" onclick="closeModal('modal-edit-test')">
-            &times;
-          </button>
-        </div>
-        <form id="form-edit-test" onsubmit="handleSaveTestEdit(event)">
-          <input type="hidden" id="edit-test-id" value="" />
-          <div class="modal-body">
-            <div class="form-group">
-              <label>الحلقة</label
-              ><select
-                id="edit-test-circle-select"
-                class="form-control"
-                onchange="populateEditTestStudentsDropdown()"
-                required
-              >
-                <option value="">— اختر الحلقة —</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>الطالب</label
-              ><select
-                id="edit-test-student-select"
-                class="form-control"
-                required
-              >
-                <option value="">— اختر الطالب —</option>
-              </select>
-            </div>
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>نوع الاختبار / المقرر</label
-                ><input
-                  type="text"
-                  id="edit-test-type"
-                  class="form-control"
-                  required
-                />
-              </div>
-              <div class="form-group flex-1">
-                <label>الدرجة من (100)</label
-                ><input
-                  type="number"
-                  id="edit-test-score"
-                  class="form-control"
-                  min="0"
-                  max="100"
-                  required
-                />
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>التقدير</label>
-                <select id="edit-test-rating" class="form-control" required>
-                  <option value="ممتاز">ممتاز</option>
-                  <option value="جيد جداً">جيد جداً</option>
-                  <option value="جيد">جيد</option>
-                  <option value="يعيد">يعيد</option>
-                </select>
-              </div>
-              <div class="form-group flex-1">
-                <label>التاريخ</label
-                ><input
-                  type="date"
-                  id="edit-test-date"
-                  class="form-control"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="submit" class="btn btn-primary">حفظ التعديلات</button
-            ><button
-              type="button"
-              class="btn btn-outline-brown"
-              onclick="closeModal('modal-edit-test')"
-            >
-              إلغاء
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <div id="modal-excel-import" class="modal-overlay">
-      <div class="modal-card modal-lg">
-        <div class="modal-header">
-          <h3>📥 استيراد بيانات الطلاب من ملف Excel</h3>
-          <button
-            class="modal-close"
-            onclick="closeModal('modal-excel-import')"
-          >
-            &times;
-          </button>
-        </div>
-        <div class="modal-body">
-          <div class="form-row mb-3">
-            <div class="form-group flex-1">
-              <label>عدد الأعمدة في ملف Excel الخاص بك (من 2 إلى 5):</label>
-              <select
-                id="excel-col-count"
-                class="form-control"
-                onchange="renderExcelColumnMappingInputs()"
-              >
-                <option value="2">عمودان (2) (الاسم، الهوية)</option>
-                <option value="3">3 أعمدة (الاسم، الهوية، جوال الطالب)</option>
-                <option value="4" selected>
-                  4 أعمدة (الاسم، الهوية، جوال الطالب، جوال ولي الأمر)
-                </option>
-                <option value="5">
-                  5 أعمدة (الاسم، الهوية، جوال الطالب، جوال ولي الأمر، اسم ولي
-                  الأمر)
-                </option>
-              </select>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>تحديد وتسمية محتوى الأعمدة لمطابقتها:</label>
-            <div
-              id="excel-columns-mapping-container"
-              class="dynamic-columns-grid"
-            ></div>
-          </div>
-          <div class="form-group mt-3">
-            <label>اختر ملف Excel (.xlsx أو .xls):</label
-            ><input
-              type="file"
-              id="excel-dynamic-file"
-              class="form-control"
-              accept=".xlsx, .xls"
-            />
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button
-            type="button"
-            class="btn btn-primary"
-            onclick="executeDynamicExcelImport()"
-          >
-            بدء الاستيراد الفوري</button
-          ><button
-            type="button"
-            class="btn btn-outline-brown"
-            onclick="closeModal('modal-excel-import')"
-          >
-            إلغاء
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div id="modal-send-unified-msg" class="modal-overlay">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3>إرسال إشعار / رسالة جديدة</h3>
-          <button
-            class="modal-close"
-            onclick="closeModal('modal-send-unified-msg')"
-          >
-            &times;
-          </button>
-        </div>
-        <form
-          id="form-send-unified-msg"
-          onsubmit="handleSendUnifiedMessage(event)"
-        >
-          <div class="modal-body">
-            <div class="form-group nav-admin-only" id="msg-recipient-wrapper">
-              <label>المستهدف بالإشعار / الرسالة</label>
-              <select
-                id="msg-target-recipient"
-                class="form-control"
-                onchange="handleRecipientTypeChange(this)"
-              >
-                <option value="all">الجميع (الكل)</option>
-                <option value="teachers">جميع المعلمين</option>
-                <option value="students">جميع الطلاب</option>
-                <option value="specific_teacher">معلم محدد</option>
-                <option value="specific_student">طالب محدد</option>
-              </select>
-            </div>
-            <div
-              id="msg-specific-recipient-group"
-              class="form-group style-hidden"
-            >
-              <label id="msg-specific-label">اختر الشخص المستهدف:</label
-              ><select id="msg-specific-select" class="form-control"></select>
-            </div>
-            <div class="form-group">
-              <label>عنوان الرسالة / الإشعار</label
-              ><input
-                type="text"
-                id="msg-title"
-                class="form-control"
-                placeholder="عنوان التنبيه..."
-                required
-              />
-            </div>
-            <div class="form-group">
-              <label>نص الرسالة / التنبيه</label
-              ><textarea
-                id="msg-body"
-                class="form-control"
-                rows="3"
-                placeholder="اكتب نص الرسالة هنا..."
-                required
-              ></textarea>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="submit" class="btn btn-primary">إرسال الآن</button
-            ><button
-              type="button"
-              class="btn btn-outline-brown"
-              onclick="closeModal('modal-send-unified-msg')"
-            >
-              إلغاء
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <div id="modal-bulk-circle" class="modal-overlay">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3>إضافة الطلاب المحددين إلى حلقة</h3>
-          <button class="modal-close" onclick="closeModal('modal-bulk-circle')">
-            &times;
-          </button>
-        </div>
-        <form id="form-bulk-circle" onsubmit="handleBulkCircleSubmit(event)">
-          <input type="hidden" id="bulk-circle-action-type" value="assign" />
-          <div class="modal-body">
-            <p
-              class="text-muted mb-2"
-              id="bulk-circle-desc"
-              style="font-size: 0.88rem"
-            >
-              اختر الحلقة المراد إضافة الطلاب المحددين إليها:
-            </p>
-            <div class="form-group">
-              <label>الحلقة المستهدفة</label
-              ><select id="bulk-target-circle" class="form-control" required>
-                <option value="">— اختر الحلقة —</option>
-              </select>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button
-              type="submit"
-              class="btn btn-primary"
-              id="btn-submit-bulk-circle"
-            >
-              تنفيذ</button
-            ><button
-              type="button"
-              class="btn btn-outline-brown"
-              onclick="closeModal('modal-bulk-circle')"
             >
               إلغاء
             </button>
