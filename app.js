@@ -1,12 +1,12 @@
 /**
  * ==========================================================================
- * app.js - المحرك الرئيسي للنظام، الصلاحيات، صلاحية التقارير المالية، والتحضير الذاتي
+ * app.js - المحرك الرئيسي للنظام، الصلاحيات، عزل بيانات المعلم، وبوابة الطالب المحدثة
  * ==========================================================================
  */
 
 window.currentUser = null;
 
-// المخزن العام - يبدأ نظيفاً تماماً بدون أي طلاب أو معلمين افتراضيين
+// المخزن العام
 window.appStore = window.appStore || {
   users: [],
   students: [],
@@ -24,7 +24,7 @@ window.appStore = window.appStore || {
   settings: null,
 };
 
-// الإعدادات الافتراضية المعتمدة للهوية واسم المدير
+// الإعدادات الافتراضية المعتمدة للهوية واسم المدير ونطاق المسجد
 window.DEFAULT_SETTINGS = {
   orgName: "مَجْمَع عبدالله بن مهدي القرآني",
   subTitle: "جامع الهدى",
@@ -34,6 +34,7 @@ window.DEFAULT_SETTINGS = {
   logoLogin: "logo_transparent_2.png",
   headerFontSize: "13px",
   location: "",
+  radius: 50,
 };
 
 // تعريف الأدوار والصلاحيات
@@ -134,7 +135,7 @@ window.handleLoginFormSubmit = function (e) {
   ).trim();
 
   if (!userVal) {
-    alert("يرجى إدخال اسم المستخدم أو رقم الهوية.");
+    alert("يرجى إدخال اسم المستخدم أو رقم الهوية أو الجوال.");
     return false;
   }
 
@@ -337,6 +338,7 @@ window.doLogin = function (user, isAutoSession = false) {
   try {
     syncHeaderDateTime();
     applyAppIdentity();
+    updateCircleDropdowns();
   } catch (e) {
     console.warn(e);
   }
@@ -404,7 +406,6 @@ function adjustSidebarAndViewsForRole(role) {
         el.style.display = "flex";
       });
 
-      // إظهار رابط التقارير المالية للمعلم المصرح له فقط
       const financeNav = document.getElementById("nav-finance-link");
       if (financeNav) {
         financeNav.style.display = isFinancialTeacher ? "flex" : "none";
@@ -435,7 +436,6 @@ window.navigateTo = function (targetViewId) {
     return;
   }
 
-  // التحقق من صلاحية شاشة التقارير المالية
   if (targetViewId === "view-finance") {
     const user = window.currentUser;
     const isAllowed =
@@ -538,6 +538,7 @@ function applyAppIdentity() {
   const logoLogin = settings.logoLogin || "logo_transparent_2.png";
   const directorName = settings.directorName || "صالح ال ناشع";
   const location = settings.location || "";
+  const radius = settings.radius || 50;
 
   const sidebarOrg = document.getElementById("sidebar-org-name");
   if (sidebarOrg) sidebarOrg.textContent = orgName;
@@ -568,6 +569,9 @@ function applyAppIdentity() {
 
   const setLocInput = document.getElementById("set-org-location");
   if (setLocInput && location) setLocInput.value = location;
+
+  const setRadInput = document.getElementById("set-org-radius");
+  if (setRadInput) setRadInput.value = radius;
 }
 
 function syncHeaderDateTime() {
@@ -597,6 +601,7 @@ function checkSavedSession() {
   }
 }
 
+// دالة فحص التميز الأسبوعي الصارمة (شرطان فقط: حضور 4 أيام كاملة من الأحد للأربعاء + ممتاز فقط أو لا يوجد)
 function checkStudentCurrentWeekTamayuz(studentId) {
   const now = new Date();
   const dayOfWeek = now.getDay();
@@ -613,71 +618,66 @@ function checkStudentCurrentWeekTamayuz(studentId) {
     weekDays.push(`${y}-${m}-${day}`);
   }
 
-  let attendedCount = 0;
-  let hasDisqualifyingRating = false;
-
-  const isDisqualifying = (r) => {
-    if (!r) return false;
-    const clean = r.trim();
-    if (clean === "" || clean === "—" || clean === "لا يوجد") return false;
-    return !clean.includes("ممتاز");
-  };
-
+  // فحص الأيام الأربعة يوماً بيوم
   for (const day of weekDays) {
+    // الشرط 1: التحضير (حاضر حضوراً كاملاً)
     const att = (window.appStore?.attendance || []).find(
       (a) => a.studentId === studentId && a.date === day,
     );
-    if (att && (att.status === "present" || att.status === "late")) {
-      attendedCount++;
-    } else if (att && att.status === "absent") {
-      return false;
+    if (!att || (att.status !== "present" && att.status !== "late")) {
+      return false; // غائب أو لم يحضر في أحد الأيام الأربعة -> استبعاد فوري
     }
 
+    // الشرط 2: التسميع (ممتاز فقط أو فارغ، وأي تقييم آخر كـ جيد جداً، جيد، يعيد، ضعيف يستبعد فوراً)
     const tasm = (window.appStore?.tasmeea || []).find(
       (t) => t.studentId === studentId && t.date === day,
     );
     if (tasm) {
+      const isCleanMumtazOrEmpty = (r) => {
+        if (!r) return true;
+        const clean = String(r).trim();
+        if (
+          clean === "" ||
+          clean === "—" ||
+          clean === "-" ||
+          clean === "لا يوجد"
+        )
+          return true;
+        return clean.includes("ممتاز");
+      };
+
       if (
-        isDisqualifying(tasm.hifzRating) ||
-        isDisqualifying(tasm.murajaaRating) ||
-        isDisqualifying(tasm.tilawaRating) ||
-        isDisqualifying(tasm.rating)
+        !isCleanMumtazOrEmpty(tasm.hifzRating) ||
+        !isCleanMumtazOrEmpty(tasm.murajaaRating) ||
+        !isCleanMumtazOrEmpty(tasm.tilawaRating) ||
+        !isCleanMumtazOrEmpty(tasm.rating)
       ) {
-        hasDisqualifyingRating = true;
+        return false; // حصل على تقييم غير ممتاز في أي مقرر -> استبعاد فوري
       }
     }
   }
 
-  return attendedCount === 4 && !hasDisqualifyingRating;
+  return true;
 }
 
-// دالة تحديد الإحداثيات الجغرافية الحالية وحفظها
-window.getCurrentLocationCoords = function () {
-  const setLocInput = document.getElementById("set-org-location");
-  if (!navigator.geolocation) {
-    alert("⚠️ متصفحك أو جهازك لا يدعم خاصية تحديد الموقع الجغرافي GPS.");
-    return;
-  }
+window.calculateDistanceInMeters = function (lat1, lon1, lat2, lon2) {
+  const R = 6371e3;
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
 
-  alert("📡 جاري التقاط إحداثيات الموقع الحالي...");
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      const lat = pos.coords.latitude.toFixed(6);
-      const lng = pos.coords.longitude.toFixed(6);
-      const coordsStr = `${lat}, ${lng}`;
-      if (setLocInput) setLocInput.value = coordsStr;
-      alert(`✅ تم تحديد موقع المَجْمَع بنجاح:\nالإحداثيات: ${coordsStr}`);
-    },
-    (err) => {
-      alert(
-        "❌ تعذر التقاط الموقع. يرجى التأكد من تشغيل الـ GPS ومنح الإذن للمتصفح.",
-      );
-    },
-    { enableHighAccuracy: true, timeout: 10000 },
-  );
+  const a =
+    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+    Math.cos(phi1) *
+      Math.cos(phi2) *
+      Math.sin(deltaLambda / 2) *
+      Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
 };
 
-// دالة تسجيل الحضور الذاتي للمدير والمعلم مع توثيق الموقع
 window.handleTeacherSelfCheckIn = function () {
   const user = window.currentUser;
   if (
@@ -706,6 +706,23 @@ window.handleTeacherSelfCheckIn = function () {
       `ℹ️ لقد تم تسجيل حضورك مسبقاً اليوم في تمام الساعة (${record.time || nowTime}).`,
     );
     return;
+  }
+
+  const settings = window.appStore?.settings || window.DEFAULT_SETTINGS;
+  const mosqueLoc = settings.location || "";
+  const allowedRadius = parseInt(settings.radius || 50, 10);
+
+  let mosqueLat = null;
+  let mosqueLng = null;
+
+  if (mosqueLoc && mosqueLoc.includes(",")) {
+    const parts = mosqueLoc.split(",");
+    const pLat = parseFloat(parts[0]);
+    const pLng = parseFloat(parts[1]);
+    if (!isNaN(pLat) && !isNaN(pLng)) {
+      mosqueLat = pLat;
+      mosqueLng = pLng;
+    }
   }
 
   const performCheckIn = (locationNote = "") => {
@@ -744,22 +761,60 @@ window.handleTeacherSelfCheckIn = function () {
     renderDashboardView();
   };
 
-  if (navigator.geolocation) {
+  if (mosqueLat !== null && mosqueLng !== null) {
+    if (!navigator.geolocation) {
+      alert(
+        "⚠️ جهازك لا يدعم خاصية تحديد الموقع الجغرافي GPS المطلوبة للتحقق من وجودك بالمسجد.",
+      );
+      return;
+    }
+
+    alert("📡 جاري التحقق من موقعك الفعلي وقربك من المسجد...");
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const coords = `إحداثيات: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
-        performCheckIn(coords);
+        const userLat = pos.coords.latitude;
+        const userLng = pos.coords.longitude;
+        const distance = Math.round(
+          calculateDistanceInMeters(userLat, userLng, mosqueLat, mosqueLng),
+        );
+
+        if (distance > allowedRadius) {
+          alert(
+            `⚠️ تعذر تسجيل الحضور:\nأنت خارج النطاق المسموح به للمسجد!\n\nالمسافة الحالية عن المسجد: (${distance} متر)\nالحد الأقصى المسموح به: (${allowedRadius} متر).`,
+          );
+          return;
+        }
+
+        const note = `إحداثيات: ${userLat.toFixed(4)}, ${userLng.toFixed(4)} (المسافة: ${distance}م)`;
+        performCheckIn(note);
       },
-      () => {
-        performCheckIn();
+      (err) => {
+        alert(
+          "❌ تعذر التقاط موقعك الجغرافي. يرجى تفعيل الـ GPS وإعطاء الإذن للمتصفح لتأكيد حضورك بالمسجد.",
+        );
       },
-      { timeout: 5000 },
+      { enableHighAccuracy: true, timeout: 10000 },
     );
   } else {
-    performCheckIn();
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const coords = `إحداثيات: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+          performCheckIn(coords);
+        },
+        () => {
+          performCheckIn();
+        },
+        { timeout: 5000 },
+      );
+    } else {
+      performCheckIn();
+    }
   }
 };
 
+// بناء وعرض شاشة وبوابة الطالب وفق الترتيب والشروط المحددة بدقة
 function renderStudentData() {
   if (!window.currentUser || window.currentUser.role !== window.ROLES.STUDENT)
     return;
@@ -835,6 +890,19 @@ function renderStudentData() {
   const todayRecord = studentTasmeea.find((t) => t.date === todayStr) || {};
   const todayAttRecord = studentAtt.find((a) => a.date === todayStr);
 
+  // استخراج خطة درس الغد المسجلة للطالب
+  const latestTasmWithNext =
+    studentTasmeea
+      .filter((t) => t.nextHifz || t.nextMurajaa || t.nextTilawa)
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {};
+
+  const tomorrowHifz =
+    todayRecord.nextHifz || latestTasmWithNext.nextHifz || "لم يحدد بعد";
+  const tomorrowMurajaa =
+    todayRecord.nextMurajaa || latestTasmWithNext.nextMurajaa || "لم يحدد بعد";
+  const tomorrowTilawa =
+    todayRecord.nextTilawa || latestTasmWithNext.nextTilawa || "لم يحدد بعد";
+
   let attStatusBadge =
     '<span class="badge" style="background:#e0e0e0; color:#555;">لم يُسجَّل بعد</span>';
   if (todayAttRecord) {
@@ -849,14 +917,30 @@ function renderStudentData() {
         '<span class="badge" style="background:#e3f2fd; color:#1565c0;">🔵 مستأذن</span>';
   }
 
+  // تسليم الإشعارات للطالب
   const studentNotifs = (window.appStore?.notifications || []).filter((n) => {
-    return (
-      n.recipient === "all" ||
-      n.recipient === "students" ||
-      (n.recipient === "specific_student" &&
-        (n.targetId === student.id || n.targetName === student.name))
-    );
+    if (!n) return false;
+    if (n.recipient === "all" || n.recipient === "students") return true;
+    if (n.recipient === "specific_student") {
+      return (
+        n.targetId === student.id ||
+        n.targetId === student.nationalId ||
+        n.targetName === student.name ||
+        (student.phone && n.targetId === student.phone)
+      );
+    }
+    return false;
   });
+
+  // استخراج اختبارات الطالب
+  const studentTests = (window.appStore?.tests || []).filter(
+    (t) => t.studentId === student.id || t.studentId === studentId,
+  );
+  studentTests.sort(
+    (a, b) =>
+      (b.date || "").localeCompare(a.date || "") ||
+      (b.createdAt || 0) - (a.createdAt || 0),
+  );
 
   const container = document.getElementById("view-student-home");
   if (!container) return;
@@ -864,7 +948,76 @@ function renderStudentData() {
   const logoNew = "logo12.jpeg";
   const logoOld = "logo_transparent_1.png";
 
+  // إعداد قسم التميز والاختبارات التفاعلي المشروط
+  const hasTamayuz = Boolean(isDistinguishedThisWeek);
+  const hasTests = studentTests.length > 0;
+
+  const tamayuzBoxHtml = `
+    <div class="card" style="background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%); border: 2px solid #b78103; border-radius: 10px; padding: 1.15rem; text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center; margin-bottom: 0;">
+      <h3 style="color: #b78103; font-weight: 900; font-size: 1.15rem; margin-bottom: 4px;">
+        🎉 مبارك حصولك على التميز لهذا الأسبوع 🌟
+      </h3>
+      <p style="color: #6d4c41; font-size: 0.85rem; margin: 0; font-weight: 700;">
+        نظير التزامك بحضور 4 أيام كاملة من الأحد للأربعاء وتقييم ممتاز في جميع المقررات.
+      </p>
+    </div>
+  `;
+
+  const testsBoxHtml = `
+    <div class="card" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0; padding: 1rem 1.25rem;">
+      <div class="card-header flex-between" style="padding-bottom: 0.4rem; margin-bottom: 0.5rem;">
+        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--primary-brown); margin: 0;">
+          📝 سجل نتائج واختبارات الطالب
+        </h3>
+        <span class="badge badge-active">${studentTests.length} اختبارات</span>
+      </div>
+      <div class="card-body p-0" style="flex: 1; overflow-y: auto; max-height: 200px;">
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>نوع الاختبار / المقرر</th>
+                <th style="text-align: center;">الدرجة</th>
+                <th style="text-align: center;">التقدير</th>
+                <th>التاريخ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${studentTests
+                .map(
+                  (test) => `
+                <tr>
+                  <td style="font-weight: 700;">${test.type || "اختبار مرحلي"}</td>
+                  <td style="text-align: center; font-weight: 800; color: var(--primary-brown);">${test.score || "0"} / 100</td>
+                  <td style="text-align: center;"><span class="badge badge-active">${test.rating || "ممتاز"}</span></td>
+                  <td>${test.date || "—"}</td>
+                </tr>
+              `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  let row1ConditionalHtml = "";
+  if (hasTamayuz && hasTests) {
+    row1ConditionalHtml = `
+      <div class="mb-3" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; align-items: stretch;">
+        <div>${tamayuzBoxHtml}</div>
+        <div>${testsBoxHtml}</div>
+      </div>
+    `;
+  } else if (hasTamayuz) {
+    row1ConditionalHtml = `<div class="mb-3">${tamayuzBoxHtml}</div>`;
+  } else if (hasTests) {
+    row1ConditionalHtml = `<div class="mb-3">${testsBoxHtml}</div>`;
+  }
+
   container.innerHTML = `
+    <!-- ترويسة الحساب والمعلومات الأساسية -->
     <div class="card mb-3" style="background: linear-gradient(135deg, var(--primary-brown) 0%, var(--primary-dark) 100%); color: #ffffff; border-radius: 12px; padding: 1.5rem; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
       <button onclick="handleLogout()" class="btn btn-danger btn-sm" style="position: absolute; top: 12px; left: 12px; font-size: 0.8rem; padding: 5px 12px; border-radius: 6px; z-index: 10;">
         🚪 تسجيل الخروج
@@ -883,51 +1036,10 @@ function renderStudentData() {
       </div>
     </div>
 
-    <!-- صندوق الإشعارات -->
-    <div class="card mb-3" style="border-right: 4px solid #0b6b7d;">
-      <div class="card-header flex-between">
-        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--primary-brown); margin: 0;">
-          📬 إشعارات وتنبيهات الإدارة
-        </h3>
-        <span class="badge badge-active">${studentNotifs.length} رسائل</span>
-      </div>
-      <div class="card-body p-2" id="student-inbox-notifications">
-        ${
-          studentNotifs.length === 0
-            ? '<p class="text-muted p-2" style="font-size:0.88rem;">لا توجد إشعارات أو رسائل جديدة حالياً</p>'
-            : studentNotifs
-                .map(
-                  (n) => `
-              <div class="mb-2 p-2" style="background:#f4f9f9; border: 1px solid var(--border-color); border-radius: 6px;">
-                <div class="flex-between">
-                  <strong style="color:var(--primary-brown); font-size:0.92rem;">${n.title || "تنبيه"}</strong>
-                  <small class="text-muted">${n.date || ""}</small>
-                </div>
-                <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #333;">${n.body || ""}</p>
-                <div style="font-size:0.75rem; color:#777; margin-top:3px;">المرسل: ${n.sender || "إدارة المَجْمَع"}</div>
-              </div>
-            `,
-                )
-                .join("")
-        }
-      </div>
-    </div>
+    <!-- 1. الصف الأول: التميز والاختبارات التفاعلي المشروط -->
+    ${row1ConditionalHtml}
 
-    ${
-      isDistinguishedThisWeek
-        ? `
-      <div class="card mb-3" style="background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%); border: 2px solid #b78103; border-radius: 10px; padding: 1rem 1.25rem; text-align: center;">
-        <h3 style="color: #b78103; font-weight: 900; font-size: 1.2rem; margin-bottom: 4px;">
-          🎉 مبارك حصولك على التميز لهذا الأسبوع 🌟
-        </h3>
-        <p style="color: #6d4c41; font-size: 0.88rem; margin: 0; font-weight: 700;">
-          نظير حرصك والتزامك الكامل بالحضور والتسميع المتقن، سائلين الله لك دوام التوفيق والرفعة.
-        </p>
-      </div>
-    `
-        : ""
-    }
-
+    <!-- 2. الصف الثاني: الإحصائيات الشاملة للإنجاز والحضور -->
     <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">📊 الإحصائيات الشاملة للإنجاز والحضور:</h3>
     <div class="student-stats-report-grid">
       <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
@@ -983,6 +1095,63 @@ function renderStudentData() {
       </div>
     </div>
 
+    <!-- 3. الصف الثالث: صندوق الإشعارات والرسائل -->
+    <div class="card mb-3" style="border-right: 4px solid #0b6b7d;">
+      <div class="card-header flex-between">
+        <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--primary-brown); margin: 0;">
+          📬 إشعارات وتنبيهات الإدارة والمعلم
+        </h3>
+        <span class="badge badge-active">${studentNotifs.length} رسائل</span>
+      </div>
+      <div class="card-body p-2" id="student-inbox-notifications">
+        ${
+          studentNotifs.length === 0
+            ? '<p class="text-muted p-2" style="font-size:0.88rem;">لا توجد إشعارات أو رسائل جديدة حالياً</p>'
+            : studentNotifs
+                .map(
+                  (n) => `
+              <div class="mb-2 p-2" style="background:#f4f9f9; border: 1px solid var(--border-color); border-radius: 6px;">
+                <div class="flex-between">
+                  <strong style="color:var(--primary-brown); font-size:0.92rem;">${n.title || "تنبيه"}</strong>
+                  <small class="text-muted">${n.date || ""}</small>
+                </div>
+                <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #333;">${n.body || ""}</p>
+                <div style="font-size:0.75rem; color:#777; margin-top:3px;">المرسل: ${n.sender || "إدارة المَجْمَع"}</div>
+              </div>
+            `,
+                )
+                .join("")
+        }
+      </div>
+    </div>
+
+    <!-- 4. الصف الرابع: خطة ومقرر درس اليوم التالي -->
+    <div class="card mb-3" style="background: #faf5ee; border: 1.5px solid var(--accent-gold); border-radius: 10px;">
+      <div class="card-header flex-between" style="border-bottom: 1px dashed #d7ccc8;">
+        <h3 style="font-size: 1.1rem; font-weight: 800; color: var(--accent-gold-dark); margin: 0;">
+          📌 خطة ومقرر درس اليوم التالي (المطلوب تحضيره)
+        </h3>
+        <span class="badge" style="background: var(--accent-gold-dark); color: #fff;">واجب الغد</span>
+      </div>
+      <div class="card-body p-2">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem;">
+          <div style="background: #ffffff; padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+            <strong style="color: var(--accent-gold-dark); font-size: 0.88rem;">📖 حفظ الغد:</strong>
+            <p style="margin-top: 4px; font-weight: 800; font-size: 1rem; color: #222;">${tomorrowHifz}</p>
+          </div>
+          <div style="background: #ffffff; padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+            <strong style="color: var(--accent-gold-dark); font-size: 0.88rem;">🔄 مراجعة الغد:</strong>
+            <p style="margin-top: 4px; font-weight: 800; font-size: 1rem; color: #222;">${tomorrowMurajaa}</p>
+          </div>
+          <div style="background: #ffffff; padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+            <strong style="color: var(--accent-gold-dark); font-size: 0.88rem;">🎧 تلاوة الغد:</strong>
+            <p style="margin-top: 4px; font-weight: 800; font-size: 1rem; color: #222;">${tomorrowTilawa}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. الصف الخامس: مقرر درس اليوم والتسميع والتحضير -->
     <div class="card mb-3">
       <div class="card-header flex-between">
         <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--primary-brown); margin: 0;">📖 مقرر اليوم والتسميع</h3>
@@ -1015,7 +1184,26 @@ function renderStudentData() {
 }
 
 function updateCircleDropdowns() {
-  const circlesList = window.appStore?.circles || [];
+  let circlesList = window.appStore?.circles || [];
+  const user = window.currentUser;
+
+  if (user && user.role === window.ROLES.TEACHER) {
+    const teacherObj = (window.appStore?.teachers || []).find(
+      (t) =>
+        t.userId === user.id ||
+        t.id === user.teacherId ||
+        t.id === user.id ||
+        t.phone === user.phone,
+    );
+    const teacherId = teacherObj ? teacherObj.id : user.teacherId || user.id;
+
+    circlesList = circlesList.filter(
+      (c) =>
+        (Array.isArray(c.teacherIds) && c.teacherIds.includes(teacherId)) ||
+        c.teacherId === teacherId,
+    );
+  }
+
   const dropdownIds = [
     "stu-circle",
     "filter-student-circle",
@@ -1023,7 +1211,6 @@ function updateCircleDropdowns() {
     "tasmeea-circle-select",
     "report-circle-select",
     "test-circle-select",
-    "edit-test-circle-select",
     "edit-comp-circle",
     "bulk-target-circle",
     "filter-teacher-notes-circle",
@@ -1038,10 +1225,12 @@ function updateCircleDropdowns() {
     if (
       id === "filter-student-circle" ||
       id === "report-circle-select" ||
-      id === "filter-teacher-notes-circle" ||
-      id === "filter-test-circle"
+      id === "filter-teacher-notes-circle"
     ) {
-      defaultText = "كل الحلقات";
+      defaultText =
+        user && user.role === window.ROLES.TEACHER
+          ? "حلقاتي المسندة"
+          : "كل الحلقات";
     }
 
     let optionsHtml = `<option value="${id.includes("filter") || id.includes("report") ? "all" : ""}">${defaultText}</option>`;
@@ -1050,7 +1239,16 @@ function updateCircleDropdowns() {
     });
 
     select.innerHTML = optionsHtml;
-    if (currentVal) select.value = currentVal;
+    if (currentVal && circlesList.some((c) => c.id === currentVal)) {
+      select.value = currentVal;
+    } else if (
+      user &&
+      user.role === window.ROLES.TEACHER &&
+      circlesList.length > 0 &&
+      id === "tasmeea-circle-select"
+    ) {
+      select.value = circlesList[0].id;
+    }
   });
 }
 
@@ -1164,7 +1362,10 @@ function renderDashboardView() {
 
     const teacherObj = (window.appStore?.teachers || []).find(
       (t) =>
-        t.userId === user.id || t.id === user.teacherId || t.id === user.id,
+        t.userId === user.id ||
+        t.id === user.teacherId ||
+        t.id === user.id ||
+        t.phone === user.phone,
     );
     const teacherId = teacherObj ? teacherObj.id : user.id;
 
