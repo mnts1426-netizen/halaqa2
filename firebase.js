@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * firebase.js - محرك الاتصال بـ Firebase وقاعدة البيانات المحمية للمَجْمَع
+ * firebase.js - محرك الاتصال بـ Firebase وقاعدة البيانات المحمية وتوحيد كلمات المرور
  * ==========================================================================
  */
 
@@ -32,7 +32,7 @@ const STORAGE_KEY =
     ? LOCAL_STORAGE_KEY
     : window.LOCAL_STORAGE_KEY || "HALAQAT_DATA_STORAGE_V1";
 
-// كائن تخزين البيانات العام المحمي (يبدأ نظيفاً تماماً بدون أي طلاب أو معلمين)
+// كائن تخزين البيانات العام المحمي
 window.appStore = window.appStore || {
   users: [],
   students: [],
@@ -82,7 +82,7 @@ function initFirebaseApp() {
   loadInitialData();
 }
 
-// تحميل البيانات والتحقق من حساب المدير المعتمد فقط
+// تحميل البيانات والتحقق من حساب المدير وتوحيد كلمات المرور للجميع
 function loadInitialData() {
   const localData = localStorage.getItem(STORAGE_KEY);
   if (localData) {
@@ -108,7 +108,7 @@ function loadInitialData() {
       if (!Array.isArray(window.appStore.screenOrder))
         window.appStore.screenOrder = [];
 
-      // ضمان وجود حساب المدير (صالح ال ناشع) وحساب الشاشة فقط
+      // ضمان وجود حساب المدير وحساب الشاشة
       let adminUser = window.appStore.users.find(
         (u) =>
           (u.username === "123456" || u.username === "admin") &&
@@ -147,6 +147,8 @@ function loadInitialData() {
         });
       }
 
+      // توحيد الأرقام السرية: 1111 للطلاب و 1234 للمعلمين
+      migrateAllPasswordsRoleBased();
       saveLocalStore();
     } catch (e) {
       console.error("خطأ في قراءة LocalStorage:", e);
@@ -162,6 +164,63 @@ function loadInitialData() {
   }
 }
 
+// دالة توحيد الرقم السري (1111 للطلاب و 1234 للمعلمين) لجميع الحسابات الحالية والقديمة
+function migrateAllPasswordsRoleBased() {
+  let hasChanges = false;
+  if (Array.isArray(window.appStore.users)) {
+    window.appStore.users.forEach((user) => {
+      if (user.role === SAFE_ROLES.STUDENT || user.role === "student") {
+        if (user.pass !== "1111") {
+          user.pass = "1111";
+          hasChanges = true;
+          if (typeof saveToCloud === "function") {
+            saveToCloud("users", user.id, user);
+          }
+        }
+      } else if (user.role === SAFE_ROLES.TEACHER || user.role === "teacher") {
+        if (!user.pass || user.pass === "") {
+          user.pass = "1234";
+          hasChanges = true;
+          if (typeof saveToCloud === "function") {
+            saveToCloud("users", user.id, user);
+          }
+        }
+      }
+    });
+  }
+
+  // مزامنة أرقام الطلاب في حال وجود حسابات مسجلة في قائمة students بدون user
+  if (Array.isArray(window.appStore.students)) {
+    window.appStore.students.forEach((stu) => {
+      let userRec = (window.appStore.users || []).find((u) => u.id === stu.id);
+      if (!userRec) {
+        userRec = {
+          id: stu.id,
+          name: stu.name,
+          phone: stu.phone || stu.parentPhone,
+          role: "student",
+          username: stu.nationalId || stu.phone || stu.id,
+          pass: "1111",
+          status: stu.status || "active",
+          createdAt: stu.createdAt || Date.now(),
+        };
+        window.appStore.users.push(userRec);
+        hasChanges = true;
+        if (typeof saveToCloud === "function") {
+          saveToCloud("users", userRec.id, userRec);
+        }
+      }
+    });
+  }
+
+  if (hasChanges) {
+    console.log(
+      "🔐 تم توحيد الرقم السري للطلاب إلى (1111) والمعلمين إلى (1234) بنجاح.",
+    );
+    saveLocalStore();
+  }
+}
+
 // حفظ الحالة في التخزين المحلي
 function saveLocalStore() {
   try {
@@ -171,7 +230,7 @@ function saveLocalStore() {
   }
 }
 
-// إنشاء الحسابات النظيفة الافتراضية دون أي طلاب أو معلمين مسبقين
+// إنشاء الحسابات النظيفة الافتراضية
 function seedProductionAdminOnly() {
   const baseTime = Date.now();
   window.appStore = {
@@ -257,6 +316,8 @@ async function syncDataFromCloud() {
         }
       }
     }
+    // تأكيد توحيد كلمة المرور بعد التحميل من السحابة
+    migrateAllPasswordsRoleBased();
     saveLocalStore();
     if (typeof refreshActiveView === "function") {
       refreshActiveView();
@@ -269,7 +330,7 @@ async function syncDataFromCloud() {
   }
 }
 
-// حفظ أو حذف مستند في السحابة بأمان
+// حفظ أو حذف مستند في السحابة بأمان وضمان عدم فقدان تعديلات المدير
 async function saveToCloud(collectionName, docId, data, isDelete = false) {
   saveLocalStore();
   if (isFirebaseOnline && dbFirestore) {
