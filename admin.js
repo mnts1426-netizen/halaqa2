@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * admin.js - المحرك الإداري الشامل لإدارة المَجْمَع (الحلقات، المعلمين، الطلاب، الحسابات، والاختبارات)
+ * admin.js - المحرك الإداري الشامل، شروط التميز الصارمة، والخريطة التفاعلية
  * ==========================================================================
  */
 
@@ -17,6 +17,11 @@ window.appStore = window.appStore || {
   screenOrder: [],
   settings: null,
 };
+
+// متغيرات الخريطة التفاعلية العصرية
+window.mapPickerInstance = null;
+window.mapPickerMarker = null;
+window.mapPickerCircle = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   // ربط نماذج الإضافة الأساسية
@@ -685,7 +690,9 @@ window.handleAddTeacher = function (e) {
 
   if (typeof saveLocalStore === "function") saveLocalStore();
   closeModal("modal-add-teacher");
-  alert("✅ تم إضافة المعلم وتكليفه بالحلقات بنجاح!");
+  alert(
+    "✅ تم إضافة المعلم وتكليفه بالحلقات بنجاح! (الرقم السري الافتراضي: 1234)",
+  );
   renderTeachersTable();
   if (typeof updateCircleDropdowns === "function") updateCircleDropdowns();
 };
@@ -706,7 +713,10 @@ window.openModalEditTeacher = function (teacherId) {
   setVal("edit-teach-phone", teacher.phone || "");
 
   const userRec = (window.appStore?.users || []).find(
-    (u) => u.id === teacher.userId || u.username === teacher.phone,
+    (u) =>
+      u.id === teacher.userId ||
+      u.id === teacher.id ||
+      u.username === teacher.phone,
   );
   setVal("edit-teach-password", userRec ? userRec.pass : "1234");
 
@@ -753,7 +763,7 @@ window.handleSaveTeacherEdit = function (e) {
     document.getElementById("edit-teach-phone")?.value || ""
   ).trim();
   const password = (
-    document.getElementById("edit-teach-password")?.value || ""
+    document.getElementById("edit-teach-password")?.value || "1234"
   ).trim();
   const isFinance = Boolean(
     document.getElementById("edit-teach-is-finance")?.checked,
@@ -775,13 +785,33 @@ window.handleSaveTeacherEdit = function (e) {
   teacher.phone = phone;
   teacher.isFinance = isFinance;
 
-  const userRec = (window.appStore?.users || []).find(
-    (u) => u.id === teacher.userId || u.username === teacher.phone,
+  let userRec = (window.appStore?.users || []).find(
+    (u) =>
+      u.id === teacher.userId ||
+      u.id === teacher.id ||
+      u.username === teacher.phone,
   );
   if (userRec) {
     userRec.name = name;
     userRec.phone = phone;
-    if (password) userRec.pass = password;
+    userRec.username = phone;
+    userRec.pass = password || "1234";
+    if (typeof saveToCloud === "function")
+      saveToCloud("users", userRec.id, userRec);
+  } else {
+    userRec = {
+      id: teacher.userId || "u_" + teacher.id,
+      name: name,
+      phone: phone,
+      role: "teacher",
+      username: phone,
+      pass: password || "1234",
+      status: teacher.status || "active",
+      createdAt: Date.now(),
+    };
+    if (!window.appStore.users) window.appStore.users = [];
+    window.appStore.users.push(userRec);
+    teacher.userId = userRec.id;
     if (typeof saveToCloud === "function")
       saveToCloud("users", userRec.id, userRec);
   }
@@ -803,7 +833,7 @@ window.handleSaveTeacherEdit = function (e) {
 
   if (typeof saveLocalStore === "function") saveLocalStore();
   closeModal("modal-edit-teacher");
-  alert("✅ تم تعديل بيانات المعلم بنجاح!");
+  alert("✅ تم اعتماد وتحديث بيانات المعلم بنجاح!");
   renderTeachersTable();
   if (typeof updateCircleDropdowns === "function") updateCircleDropdowns();
 };
@@ -823,7 +853,7 @@ window.deleteTeacher = function (teacherId) {
     (t) => t.id !== teacherId,
   );
   window.appStore.users = (window.appStore.users || []).filter(
-    (u) => u.id !== teacher.userId,
+    (u) => u.id !== teacher.userId && u.id !== teacher.id,
   );
 
   (window.appStore?.circles || []).forEach((c) => {
@@ -856,7 +886,7 @@ window.toggleTeacherStatus = function (teacherId) {
     saveToCloud("teachers", teacher.id, teacher);
 
   const userRec = (window.appStore?.users || []).find(
-    (u) => u.id === teacher.userId,
+    (u) => u.id === teacher.userId || u.id === teacher.id,
   );
   if (userRec) {
     userRec.status = teacher.status;
@@ -1132,7 +1162,7 @@ window.handleAddStudent = function (e) {
     phone: phone || parentPhone,
     role: "student",
     username: nationalId || phone || newStudent.id,
-    pass: "1234",
+    pass: "1111",
     status: "active",
     createdAt: Date.now(),
   });
@@ -1145,7 +1175,7 @@ window.handleAddStudent = function (e) {
       phone: phone || parentPhone,
       role: "student",
       username: nationalId || phone || newStudent.id,
-      pass: "1234",
+      pass: "1111",
       status: "active",
     });
   }
@@ -1153,7 +1183,7 @@ window.handleAddStudent = function (e) {
   if (typeof saveLocalStore === "function") saveLocalStore();
   closeModal("modal-add-student");
   e.target?.reset();
-  alert("✅ تم إضافة الطالب بنجاح!");
+  alert("✅ تم إضافة الطالب بنجاح! (الرقم السري الافتراضي: 1111)");
   renderStudentsTable();
 };
 
@@ -1180,7 +1210,7 @@ window.openModalEditStudentComprehensive = function (studentId) {
   const userRec = (window.appStore?.users || []).find(
     (u) => u.id === student.id,
   );
-  setVal("edit-comp-password", userRec ? userRec.pass : "1234");
+  setVal("edit-comp-password", userRec ? userRec.pass : "1111");
 
   const circleSelect = document.getElementById("edit-comp-circle");
   if (circleSelect) {
@@ -1225,17 +1255,31 @@ window.handleSaveStudentComprehensive = function (e) {
   student.status =
     document.getElementById("edit-comp-status")?.value || "active";
   const password = (
-    document.getElementById("edit-comp-password")?.value || ""
+    document.getElementById("edit-comp-password")?.value || "1111"
   ).trim();
 
-  const userRec = (window.appStore?.users || []).find(
-    (u) => u.id === student.id,
-  );
+  let userRec = (window.appStore?.users || []).find((u) => u.id === student.id);
   if (userRec) {
     userRec.name = student.name;
     userRec.phone = student.phone || student.parentPhone;
+    userRec.username = student.nationalId || student.phone || student.id;
     userRec.status = student.status;
-    if (password) userRec.pass = password;
+    userRec.pass = password || "1111";
+    if (typeof saveToCloud === "function")
+      saveToCloud("users", userRec.id, userRec);
+  } else {
+    userRec = {
+      id: student.id,
+      name: student.name,
+      phone: student.phone || student.parentPhone,
+      role: "student",
+      username: student.nationalId || student.phone || student.id,
+      pass: password || "1111",
+      status: student.status,
+      createdAt: Date.now(),
+    };
+    if (!window.appStore.users) window.appStore.users = [];
+    window.appStore.users.push(userRec);
     if (typeof saveToCloud === "function")
       saveToCloud("users", userRec.id, userRec);
   }
@@ -1245,7 +1289,7 @@ window.handleSaveStudentComprehensive = function (e) {
   if (typeof saveLocalStore === "function") saveLocalStore();
 
   closeModal("modal-edit-student-comprehensive");
-  alert("✅ تم حفظ التعديلات بنجاح!");
+  alert("✅ تم اعتماد وتحديث بيانات الطالب بنجاح!");
   renderStudentsTable();
 };
 
@@ -1365,7 +1409,7 @@ window.executeBulkDeleteStudents = function () {
 };
 
 // ==========================================================================
-// 5. استيراد الطلاب من Excel (7 أعمدة القياسية)
+// 5. استيراد الطلاب من Excel (7 أعمدة القياسية والرقم السري 1111)
 // ==========================================================================
 const STANDARD_7_COLUMNS = [
   { key: "name", label: "1. اسم الطالب" },
@@ -1474,7 +1518,7 @@ window.executeDynamicExcelImport = function () {
           phone: phone || parentPhone,
           role: "student",
           username: nationalId || phone || newStudent.id,
-          pass: "1234",
+          pass: "1111",
           status: "active",
           createdAt: Date.now(),
         });
@@ -1488,7 +1532,9 @@ window.executeDynamicExcelImport = function () {
       if (typeof saveLocalStore === "function") saveLocalStore();
       closeModal("modal-excel-import");
       fileInput.value = "";
-      alert(`✅ تم استيراد (${importedCount}) طالب بنجاح!`);
+      alert(
+        `✅ تم استيراد (${importedCount}) طالب بنجاح! تم تعيين الرقم السري 1111 للجميع.`,
+      );
       renderStudentsTable();
       if (typeof updateCircleDropdowns === "function") updateCircleDropdowns();
     } catch (err) {
@@ -1583,7 +1629,10 @@ window.openModalEditUserAccount = function (userId) {
   setVal("edit-account-user-id", user.id);
   setVal("edit-account-name", user.name);
   setVal("edit-account-username", user.username || "");
-  setVal("edit-account-password", user.pass || "");
+  setVal(
+    "edit-account-password",
+    user.pass || (user.role === "student" ? "1111" : "1234"),
+  );
 
   openModal("modal-edit-user-account");
 };
@@ -1602,15 +1651,35 @@ window.handleSaveUserAccount = function (e) {
     document.getElementById("edit-account-username")?.value || ""
   ).trim();
   const newPass = (
-    document.getElementById("edit-account-password")?.value || ""
+    document.getElementById("edit-account-password")?.value ||
+    (user.role === "student" ? "1111" : "1234")
   ).trim();
   if (newPass) user.pass = newPass;
+
+  if (user.role === "student") {
+    const stu = (window.appStore?.students || []).find((s) => s.id === user.id);
+    if (stu) {
+      stu.name = user.name;
+      if (typeof saveToCloud === "function")
+        saveToCloud("students", stu.id, stu);
+    }
+  } else if (user.role === "teacher") {
+    const teach = (window.appStore?.teachers || []).find(
+      (t) => t.userId === user.id || t.id === user.id,
+    );
+    if (teach) {
+      teach.name = user.name;
+      teach.phone = user.username;
+      if (typeof saveToCloud === "function")
+        saveToCloud("teachers", teach.id, teach);
+    }
+  }
 
   if (typeof saveToCloud === "function") saveToCloud("users", user.id, user);
   if (typeof saveLocalStore === "function") saveLocalStore();
 
   closeModal("modal-edit-user-account");
-  alert("✅ تم حفظ تعديلات الحساب بنجاح!");
+  alert("✅ تم حفظ وتأكيد تعديلات الحساب بنجاح!");
   renderAccountsTable();
 };
 
@@ -1653,7 +1722,7 @@ window.toggleUserAccountStatus = function (userId) {
 };
 
 // ==========================================================================
-// 7. شاشات التحضير وملاحظات المعلمين والاختبارات
+// 7. شاشات التحضير وملاحظات المعلمين
 // ==========================================================================
 window.renderAttendanceTable = function () {
   const tbody = document.getElementById("attendance-table-body");
@@ -2003,7 +2072,7 @@ window.deleteTest = function (testId) {
 };
 
 // ==========================================================================
-// 9. لوحة فرسان التميز والتميز الأسبوعي (شروط صارمة: حضور 4 أيام + ممتاز فقط)
+// 9. لوحة فرسان التميز والتميز الأسبوعي (شروط صارمة: حضور 4 أيام + ممتاز فقط أو فارغ)
 // ==========================================================================
 function getSundayToWednesdayDatesForWeek(weekOption = "current") {
   const now = new Date();
@@ -2032,44 +2101,42 @@ function getSundayToWednesdayDatesForWeek(weekOption = "current") {
 
 function isStudentTamayuzForWeek(studentId, weekOption = "current") {
   const weekDays = getSundayToWednesdayDatesForWeek(weekOption);
-  let attendedDaysCount = 0;
+  if (!weekDays || weekDays.length !== 4) return false;
 
-  const isDisqualifyingRating = (r) => {
-    if (!r) return false;
-    const clean = r.trim();
-    if (clean === "" || clean === "—" || clean === "لا يوجد" || clean === "-")
-      return false;
-    return !clean.includes("ممتاز");
+  const isCleanMumtazOrEmpty = (r) => {
+    if (!r) return true;
+    const clean = String(r).trim();
+    if (clean === "" || clean === "—" || clean === "-" || clean === "لا يوجد")
+      return true;
+    return clean.includes("ممتاز");
   };
 
   for (const day of weekDays) {
-    // 1. فحص الحضور
+    // الشرط 1: الحضور الكامل لجميع الأيام الأربعة (الأحد، الاثنين، الثلاثاء، الأربعاء)
     const att = (window.appStore?.attendance || []).find(
       (a) => a.studentId === studentId && a.date === day,
     );
-    if (att && (att.status === "present" || att.status === "late")) {
-      attendedDaysCount++;
-    } else {
-      return false;
+    if (!att || (att.status !== "present" && att.status !== "late")) {
+      return false; // غائب أو غير محضر في أي يوم -> استبعاد فوري
     }
 
-    // 2. فحص التسميع
+    // الشرط 2: ممتاز فقط في جميع المقررات أو لا يوجد
     const tasm = (window.appStore?.tasmeea || []).find(
       (t) => t.studentId === studentId && t.date === day,
     );
     if (tasm) {
       if (
-        isDisqualifyingRating(tasm.hifzRating) ||
-        isDisqualifyingRating(tasm.murajaaRating) ||
-        isDisqualifyingRating(tasm.tilawaRating) ||
-        isDisqualifyingRating(tasm.rating)
+        !isCleanMumtazOrEmpty(tasm.hifzRating) ||
+        !isCleanMumtazOrEmpty(tasm.murajaaRating) ||
+        !isCleanMumtazOrEmpty(tasm.tilawaRating) ||
+        !isCleanMumtazOrEmpty(tasm.rating)
       ) {
-        return false;
+        return false; // حصل على تقييم غير ممتاز في أي مقرر -> استبعاد فوري
       }
     }
   }
 
-  return attendedDaysCount === 4;
+  return true;
 }
 
 window.getQualifyingTamayuzStudents = function (weekOption = "current") {
@@ -2250,8 +2317,252 @@ window.resetScreenStudentOrder = function () {
 };
 
 // ==========================================================================
-// 10. طلبات التسجيل وإعدادات المَجْمَع
+// 10. طلبات التسجيل وإعدادات المَجْمَع والخريطة التفاعلية العصرية الحديثة
 // ==========================================================================
+window.openMapPickerModal = function () {
+  const currentLoc = (
+    document.getElementById("set-org-location")?.value || ""
+  ).trim();
+  const currentRadius =
+    parseInt(document.getElementById("set-org-radius")?.value || "50", 10) ||
+    50;
+
+  const radiusInput = document.getElementById("map-modal-radius-input");
+  if (radiusInput) radiusInput.value = currentRadius;
+
+  let defaultLat = 18.2165;
+  let defaultLng = 42.5053;
+
+  if (currentLoc && currentLoc.includes(",")) {
+    const parts = currentLoc.split(",");
+    const pLat = parseFloat(parts[0]);
+    const pLng = parseFloat(parts[1]);
+    if (!isNaN(pLat) && !isNaN(pLng)) {
+      defaultLat = pLat;
+      defaultLng = pLng;
+    }
+  }
+
+  const coordsDisplay = document.getElementById("map-modal-coords-display");
+  if (coordsDisplay)
+    coordsDisplay.value = `${defaultLat.toFixed(6)}, ${defaultLng.toFixed(6)}`;
+
+  openModal("modal-map-picker");
+
+  setTimeout(() => {
+    initOrUpdateMapPicker(defaultLat, defaultLng, currentRadius);
+  }, 250);
+};
+
+function initOrUpdateMapPicker(lat, lng, radius) {
+  const mapContainer = document.getElementById("map-picker-container");
+  if (!mapContainer || typeof L === "undefined") return;
+
+  const modernPinHtml = `
+    <div class="modern-leaflet-pin-wrapper">
+      <div class="pin-pulse"></div>
+      <div class="pin-head">
+        <span class="pin-symbol">🕌</span>
+      </div>
+      <div class="pin-tip"></div>
+    </div>
+  `;
+
+  const customModernIcon = L.divIcon({
+    className: "custom-modern-map-icon",
+    html: modernPinHtml,
+    iconSize: [44, 52],
+    iconAnchor: [22, 50],
+    popupAnchor: [0, -45],
+  });
+
+  if (!window.mapPickerInstance) {
+    window.mapPickerInstance = L.map("map-picker-container", {
+      zoomControl: false,
+    }).setView([lat, lng], 17);
+
+    L.control.zoom({ position: "bottomright" }).addTo(window.mapPickerInstance);
+
+    const modernVoyager = L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+      {
+        maxZoom: 20,
+        subdomains: "abcd",
+        attribution: "© CartoDB © OpenStreetMap",
+      },
+    );
+
+    const satelliteLayer = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      {
+        maxZoom: 19,
+        attribution: "© Esri World Imagery",
+      },
+    );
+
+    modernVoyager.addTo(window.mapPickerInstance);
+
+    const baseMaps = {
+      "🗺️ خريطة عصرية (Voyager)": modernVoyager,
+      "🛰️ قمر صناعي (Satellite)": satelliteLayer,
+    };
+    L.control
+      .layers(baseMaps, null, { position: "topright" })
+      .addTo(window.mapPickerInstance);
+
+    window.mapPickerMarker = L.marker([lat, lng], {
+      draggable: true,
+      icon: customModernIcon,
+    }).addTo(window.mapPickerInstance);
+
+    window.mapPickerMarker.bindPopup(`
+      <div style="font-family: 'Tajawal', sans-serif; text-align: center; padding: 4px;">
+        <strong style="color: #0b6b7d; font-size: 14px;">📍 موقع جامع الهدى / المَجْمَع</strong><br>
+        <span style="font-size: 12px; color: #555;">اسحب المؤشر لضبط المركز بدقة</span>
+      </div>
+    `);
+
+    window.mapPickerCircle = L.circle([lat, lng], {
+      color: "#0b6b7d",
+      fillColor: "#0b6b7d",
+      fillOpacity: 0.18,
+      weight: 2,
+      dashArray: "6, 6",
+      radius: radius,
+    }).addTo(window.mapPickerInstance);
+
+    window.mapPickerMarker.on("drag", function (e) {
+      const pos = e.target.getLatLng();
+      if (window.mapPickerCircle) window.mapPickerCircle.setLatLng(pos);
+    });
+
+    window.mapPickerMarker.on("dragend", function (e) {
+      const pos = e.target.getLatLng();
+      updateMapPickerElements(pos.lat, pos.lng);
+    });
+
+    window.mapPickerInstance.on("click", function (e) {
+      updateMapPickerElements(e.latlng.lat, e.latlng.lng);
+    });
+  } else {
+    window.mapPickerInstance.invalidateSize();
+    window.mapPickerInstance.setView([lat, lng], 17);
+    updateMapPickerElements(lat, lng);
+  }
+}
+
+function updateMapPickerElements(lat, lng) {
+  if (window.mapPickerMarker) window.mapPickerMarker.setLatLng([lat, lng]);
+  if (window.mapPickerCircle) window.mapPickerCircle.setLatLng([lat, lng]);
+
+  const coordsDisplay = document.getElementById("map-modal-coords-display");
+  if (coordsDisplay)
+    coordsDisplay.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+}
+
+window.updateMapPickerRadius = function (newRadius) {
+  const radVal = parseInt(newRadius, 10) || 50;
+  if (window.mapPickerCircle) {
+    window.mapPickerCircle.setRadius(radVal);
+  }
+};
+
+window.searchMapLocationQuery = function () {
+  const searchInput = document.getElementById("map-search-query-input");
+  const query = searchInput?.value.trim();
+  if (!query) {
+    alert("يرجى كتابة اسم الحي، الشارع، أو المعلم للبحث.");
+    return;
+  }
+
+  fetch(
+    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&accept-language=ar`,
+  )
+    .then((res) => res.json())
+    .then((data) => {
+      if (data && data.length > 0) {
+        const result = data[0];
+        const newLat = parseFloat(result.lat);
+        const newLng = parseFloat(result.lon);
+        if (window.mapPickerInstance) {
+          window.mapPickerInstance.setView([newLat, newLng], 17);
+          updateMapPickerElements(newLat, newLng);
+        }
+      } else {
+        alert("لم يتم العثور على نتائج مطابقة، يرجى تجربة اسم آخر.");
+      }
+    })
+    .catch((err) => {
+      console.warn("خطأ في البحث عن الموقع:", err);
+      alert("تعذر الاتصال بخدمة البحث عن الأماكن.");
+    });
+};
+
+window.confirmMapPickerLocation = function () {
+  const coords = (
+    document.getElementById("map-modal-coords-display")?.value || ""
+  ).trim();
+  const radius =
+    document.getElementById("map-modal-radius-input")?.value || "50";
+
+  const setLocInput = document.getElementById("set-org-location");
+  const setRadInput = document.getElementById("set-org-radius");
+
+  if (setLocInput && coords) setLocInput.value = coords;
+  if (setRadInput && radius) setRadInput.value = radius;
+
+  closeModal("modal-map-picker");
+  alert(
+    `✅ تم تحديد موقع ونطاق المسجد بنجاح:\nالإحداثيات: ${coords}\nنصف قطر التحضير: ${radius} متراً`,
+  );
+};
+
+window.handleSaveOrgSettings = function (e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const orgName = (document.getElementById("set-org-name")?.value || "").trim();
+  const mosqueName = (
+    document.getElementById("set-org-mosque")?.value || ""
+  ).trim();
+  const directorName = (
+    document.getElementById("set-org-director")?.value || ""
+  ).trim();
+  const location = (
+    document.getElementById("set-org-location")?.value || ""
+  ).trim();
+  const radius =
+    parseInt(document.getElementById("set-org-radius")?.value || "50", 10) ||
+    50;
+  const fontSize =
+    document.getElementById("set-header-font-size")?.value || "13px";
+  const logoNew =
+    (document.getElementById("set-org-logo-new")?.value || "").trim() ||
+    "logo12.jpeg";
+  const logoOld =
+    (document.getElementById("set-org-logo-old")?.value || "").trim() ||
+    "logo_transparent_1.png";
+
+  const newSettings = {
+    orgName: orgName || "مَجْمَع عبدالله بن مهدي القرآني",
+    subTitle: mosqueName || "جامع الهدى",
+    directorName: directorName || "صالح ال ناشع",
+    location: location,
+    radius: radius,
+    headerFontSize: fontSize,
+    logoNew: logoNew,
+    logoOld: logoOld,
+    logoLogin: "logo_transparent_2.png",
+  };
+
+  window.appStore.settings = newSettings;
+  if (typeof saveToCloud === "function")
+    saveToCloud("settings", "main_settings", newSettings);
+  if (typeof saveLocalStore === "function") saveLocalStore();
+
+  alert("✅ تم حفظ وتحديث إعدادات وهوية المَجْمَع ونطاق التحضير بنجاح!");
+  if (typeof applyAppIdentity === "function") applyAppIdentity();
+};
+
 window.renderPendingRequestsTable = function () {
   const tbody = document.getElementById("pending-requests-table-body");
   if (!tbody) return;
@@ -2311,7 +2622,7 @@ window.approveStudentRequest = function (studentId) {
     phone: stu.phone || stu.parentPhone,
     role: "student",
     username: stu.nationalId || stu.phone || stu.id,
-    pass: "1234",
+    pass: "1111",
     status: "active",
     createdAt: Date.now(),
   });
@@ -2324,13 +2635,15 @@ window.approveStudentRequest = function (studentId) {
       phone: stu.phone || stu.parentPhone,
       role: "student",
       username: stu.nationalId || stu.phone || stu.id,
-      pass: "1234",
+      pass: "1111",
       status: "active",
     });
   }
   if (typeof saveLocalStore === "function") saveLocalStore();
 
-  alert(`✅ تم قبول انضمام الطالب (${stu.name}) بنجاح!`);
+  alert(
+    `✅ تم قبول انضمام الطالب (${stu.name}) بنجاح! والرقم السري الخاص به هو (1111).`,
+  );
   renderPendingRequestsTable();
 };
 
@@ -2406,48 +2719,6 @@ window.handleSelfRegistration = function (e) {
   closeModal("modal-self-register");
   e.target?.reset();
   alert("✅ تم إرسال طلب الالتحاق بنجاح! سيتم مراجعته من قبل إدارة المَجْمَع.");
-};
-
-window.handleSaveOrgSettings = function (e) {
-  if (e && e.preventDefault) e.preventDefault();
-
-  const orgName = (document.getElementById("set-org-name")?.value || "").trim();
-  const mosqueName = (
-    document.getElementById("set-org-mosque")?.value || ""
-  ).trim();
-  const directorName = (
-    document.getElementById("set-org-director")?.value || ""
-  ).trim();
-  const location = (
-    document.getElementById("set-org-location")?.value || ""
-  ).trim();
-  const fontSize =
-    document.getElementById("set-header-font-size")?.value || "13px";
-  const logoNew =
-    (document.getElementById("set-org-logo-new")?.value || "").trim() ||
-    "logo12.jpeg";
-  const logoOld =
-    (document.getElementById("set-org-logo-old")?.value || "").trim() ||
-    "logo_transparent_1.png";
-
-  const newSettings = {
-    orgName: orgName || "مَجْمَع عبدالله بن مهدي القرآني",
-    subTitle: mosqueName || "جامع الهدى",
-    directorName: directorName || "صالح ال ناشع",
-    location: location,
-    headerFontSize: fontSize,
-    logoNew: logoNew,
-    logoOld: logoOld,
-    logoLogin: "logo_transparent_2.png",
-  };
-
-  window.appStore.settings = newSettings;
-  if (typeof saveToCloud === "function")
-    saveToCloud("settings", "main_settings", newSettings);
-  if (typeof saveLocalStore === "function") saveLocalStore();
-
-  alert("✅ تم حفظ وتحديث إعدادات وهوية المَجْمَع بنجاح!");
-  if (typeof applyAppIdentity === "function") applyAppIdentity();
 };
 
 function getCircleName(circleId) {
