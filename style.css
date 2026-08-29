@@ -1,5 +1,5 @@
 /* ==========================================================================
-   الهوية البصرية والطباعة المتمركزة والمضغوطة
+   الهوية البصرية والطباعة المتمركزة والمضغوطة + أنماط الخريطة العصرية
    ========================================================================== */
 
 :root {
@@ -202,7 +202,7 @@ body {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  mix-blend-mode: screen; /* إخفاء الخلفية السوداء تماماً وإظهار الشعار باللون الأبيض */
+  mix-blend-mode: screen;
 }
 
 .brand-name-big {
@@ -713,6 +713,120 @@ body {
 
 .checkbox-item-row:last-child {
   border-bottom: none;
+}
+
+/* ==========================================================================
+   تنسيقات الخريطة التفاعلية العصرية والدبوس المتحرك
+   ========================================================================== */
+.custom-modern-map-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.modern-leaflet-pin-wrapper {
+  position: relative;
+  width: 44px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pin-head {
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, #0b6b7d 0%, #074e5c 100%);
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(11, 107, 125, 0.45);
+  border: 2.5px solid #ffffff;
+  position: relative;
+  z-index: 2;
+  cursor: grab;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.pin-head:active {
+  cursor: grabbing;
+  transform: rotate(-45deg) scale(1.12);
+}
+
+.pin-symbol {
+  transform: rotate(45deg);
+  font-size: 1.15rem;
+  user-select: none;
+  line-height: 1;
+}
+
+.pin-pulse {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 10px;
+  background: rgba(11, 107, 125, 0.4);
+  border-radius: 50%;
+  animation: mapPinPulse 2s infinite ease-out;
+  z-index: 1;
+}
+
+@keyframes mapPinPulse {
+  0% {
+    transform: translateX(-50%) scale(0.6);
+    opacity: 0.8;
+  }
+  70% {
+    transform: translateX(-50%) scale(2.2);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(-50%) scale(2.4);
+    opacity: 0;
+  }
+}
+
+.map-search-bar-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.map-search-bar-row input {
+  flex: 1;
+}
+
+#map-picker-container {
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.05);
+}
+
+/* تحسين مظهر أدوات تحكم الخريطة */
+.leaflet-control-layers {
+  border-radius: var(--radius-sm) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+  font-family: var(--font-family) !important;
+  font-size: 0.85rem !important;
+  font-weight: 700 !important;
+  color: var(--text-dark) !important;
+  padding: 6px 10px !important;
+}
+
+.leaflet-bar a {
+  background-color: #ffffff !important;
+  color: var(--primary-brown) !important;
+  border-color: var(--border-color) !important;
+  font-weight: bold !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: var(--primary-light) !important;
 }
 
 /* شبكة لوحة التميز */
