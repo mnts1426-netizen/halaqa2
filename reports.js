@@ -44,10 +44,30 @@ function populateReportStudentsDropdown() {
     document.getElementById("report-circle-select")?.value || "all";
   if (!studentSelect) return;
 
+  const user = window.currentUser;
   const currentVal = studentSelect.value || "all";
   let students = (window.appStore.students || []).filter(
     (s) => s.status === "active",
   );
+
+  // حصر الطلاب في حلقات المعلم إذا كان المسجل معلماً
+  if (user && user.role === "teacher") {
+    const teacherObj = (window.appStore?.teachers || []).find(
+      (t) =>
+        t.userId === user.id ||
+        t.id === user.teacherId ||
+        t.id === user.id ||
+        t.phone === user.phone,
+    );
+    const teacherId = teacherObj ? teacherObj.id : user.teacherId || user.id;
+    const teacherCircles = (window.appStore?.circles || []).filter(
+      (c) =>
+        (Array.isArray(c.teacherIds) && c.teacherIds.includes(teacherId)) ||
+        c.teacherId === teacherId,
+    );
+    const teacherCircleIds = teacherCircles.map((c) => c.id);
+    students = students.filter((s) => teacherCircleIds.includes(s.circleId));
+  }
 
   if (circleId !== "all") {
     students = students.filter((s) => s.circleId === circleId);
@@ -304,7 +324,7 @@ function generateReport() {
         if (dateTo) stuAtt = stuAtt.filter((a) => a.date <= dateTo);
 
         const presentCount = stuAtt.filter(
-          (a) => a.status === "present",
+          (a) => a.status === "present" || a.status === "late",
         ).length;
         const absentCount = stuAtt.filter((a) => a.status === "absent").length;
 
@@ -448,7 +468,7 @@ function generateReport() {
     }
   }
 
-  // 4. تقرير التميز الأسبوعي
+  // 4. تقرير التميز الأسبوعي (تطبيق الشرطين الصارمين 100%: حضور 4 أيام + ممتاز فقط أو لا يوجد)
   else if (reportType === "tamayuz") {
     if (printTitle)
       printTitle.textContent = "تقرير التميز الأسبوعي (عدد بطاقات التميز)";
@@ -486,11 +506,12 @@ function generateReport() {
         ? allWeekKeys.slice(startIdx, endIdx + 1)
         : ["current"];
 
-    const isDisqualifying = (r) => {
-      if (!r) return false;
-      const clean = r.trim();
-      if (clean === "" || clean === "—" || clean === "لا يوجد") return false;
-      return !clean.includes("ممتاز");
+    const isCleanMumtazOrEmpty = (r) => {
+      if (!r) return true;
+      const clean = String(r).trim();
+      if (clean === "" || clean === "—" || clean === "-" || clean === "لا يوجد")
+        return true;
+      return clean.includes("ممتاز");
     };
 
     const studentBadgesCount = [];
@@ -500,35 +521,38 @@ function generateReport() {
 
       selectedWeeks.forEach((wk) => {
         const weekDays = getSundayToWednesdayDatesByWeekOption(wk);
-        let attendedCount = 0;
-        let hasDisqualifyingRating = false;
+        if (!weekDays || weekDays.length !== 4) return;
+
+        let isQualifiedForWeek = true;
 
         for (const day of weekDays) {
+          // الشرط الأول: حضور الأيام الأربعة كاملة (الأحد، الاثنين، الثلاثاء، الأربعاء)
           const att = (window.appStore?.attendance || []).find(
             (a) => a.studentId === s.id && a.date === day,
           );
-          if (att && (att.status === "present" || att.status === "late")) {
-            attendedCount++;
-          } else if (att && att.status === "absent") {
-            hasDisqualifyingRating = true;
+          if (!att || (att.status !== "present" && att.status !== "late")) {
+            isQualifiedForWeek = false;
+            break;
           }
 
+          // الشرط الثاني: ممتاز فقط أو لا يوجد (أي تقييم آخر كـ جيد جداً، جيد، يعيد، ضعيف يستبعد فوراً)
           const tasm = (window.appStore?.tasmeea || []).find(
             (t) => t.studentId === s.id && t.date === day,
           );
           if (tasm) {
             if (
-              isDisqualifying(tasm.hifzRating) ||
-              isDisqualifying(tasm.murajaaRating) ||
-              isDisqualifying(tasm.tilawaRating) ||
-              isDisqualifying(tasm.rating)
+              !isCleanMumtazOrEmpty(tasm.hifzRating) ||
+              !isCleanMumtazOrEmpty(tasm.murajaaRating) ||
+              !isCleanMumtazOrEmpty(tasm.tilawaRating) ||
+              !isCleanMumtazOrEmpty(tasm.rating)
             ) {
-              hasDisqualifyingRating = true;
+              isQualifiedForWeek = false;
+              break;
             }
           }
         }
 
-        if (attendedCount === 4 && !hasDisqualifyingRating) {
+        if (isQualifiedForWeek) {
           badgesSum++;
         }
       });
@@ -540,7 +564,7 @@ function generateReport() {
 
     if (studentBadgesCount.length === 0) {
       bodyHtml =
-        '<tr><td colspan="4" class="text-center text-muted p-4">لا توجد بطاقات تميز مسجلة للطلاب في نطاق الأسابيع المحدد</td></tr>';
+        '<tr><td colspan="4" class="text-center text-muted p-4">لا توجد بطاقات تميز مسجلة للطلاب في نطاق الأسابيع المحدد (يشترط حضور 4 أيام كاملة وتقييم ممتاز فقط)</td></tr>';
     } else {
       studentBadgesCount.forEach((item, idx) => {
         const circle = (window.appStore?.circles || []).find(
