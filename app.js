@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * app.js - المحرك الرئيسي للنظام، الصلاحيات، عزل بيانات المعلم، وبوابة الطالب المحدثة
+ * app.js - المحرك الرئيسي للنظام، الصلاحيات، التحقق الصارم بالرقم السري، وبوابة الطالب
  * ==========================================================================
  */
 
@@ -123,7 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
   checkSavedSession();
 });
 
-// دالة تسجيل الدخول الموحدة
+// دالة تسجيل الدخول الموحدة مع التحقق الصارم من كلمة المرور
 window.handleLoginFormSubmit = function (e) {
   if (e && e.preventDefault) e.preventDefault();
 
@@ -136,6 +136,11 @@ window.handleLoginFormSubmit = function (e) {
 
   if (!userVal) {
     alert("يرجى إدخال اسم المستخدم أو رقم الهوية أو الجوال.");
+    return false;
+  }
+
+  if (!passVal) {
+    alert("يرجى إدخال الرقم السري لتسجيل الدخول.");
     return false;
   }
 
@@ -159,22 +164,40 @@ window.handleLoginFormSubmit = function (e) {
       name: "صالح ال ناشع",
       role: window.ROLES.ADMIN,
       username: userVal,
+      pass: "1234",
       phone: "0500000000",
       createdAt: Date.now(),
     };
+
+    const expectedAdminPass = adminUser.pass || "1234";
+    if (passVal !== expectedAdminPass) {
+      alert("❌ الرقم السري للمدير غير صحيح!");
+      return false;
+    }
+
     doLogin(adminUser, false);
     return false;
   }
 
   // 2. حساب شاشة التميز الأسبوعي
   if (userVal === "121212") {
-    const screenUser = {
+    const screenUser = (window.appStore?.users || []).find(
+      (u) => u.username === "121212" && u.role === window.ROLES.SCREEN,
+    ) || {
       id: "u_screen_fixed",
       name: "التميز الأسبوعي",
       role: window.ROLES.SCREEN,
       username: "121212",
+      pass: "1234",
       createdAt: Date.now(),
     };
+
+    const expectedScreenPass = screenUser.pass || "1234";
+    if (passVal !== expectedScreenPass) {
+      alert("❌ الرقم السري لشاشة التميز غير صحيح!");
+      return false;
+    }
+
     doLogin(screenUser, false);
     return false;
   }
@@ -194,6 +217,20 @@ window.handleLoginFormSubmit = function (e) {
       alert("⚠️ هذا الحساب موقوف حالياً.");
       return false;
     }
+
+    const teacherUserRec = (window.appStore?.users || []).find(
+      (u) =>
+        u.id === foundTeacher.userId ||
+        u.id === foundTeacher.id ||
+        u.username === foundTeacher.phone,
+    );
+
+    const expectedTeacherPass = teacherUserRec ? teacherUserRec.pass : "1234";
+    if (passVal !== expectedTeacherPass) {
+      alert("❌ الرقم السري للمعلم غير صحيح!");
+      return false;
+    }
+
     const teacherSessionUser = {
       id: foundTeacher.id,
       teacherId: foundTeacher.id,
@@ -223,6 +260,20 @@ window.handleLoginFormSubmit = function (e) {
       alert("⚠️ هذا الحساب موقوف (مؤرشف).");
       return false;
     }
+
+    const studentUserRec = (window.appStore?.users || []).find(
+      (u) =>
+        u.id === foundStudent.id ||
+        u.username === foundStudent.nationalId ||
+        u.username === foundStudent.phone,
+    );
+
+    const expectedStudentPass = studentUserRec ? studentUserRec.pass : "1111";
+    if (passVal !== expectedStudentPass) {
+      alert("❌ الرقم السري للطالب غير صحيح! (الرقم السري الافتراضي: 1111)");
+      return false;
+    }
+
     const studentSessionUser = {
       id: foundStudent.id,
       name: foundStudent.name,
@@ -242,23 +293,40 @@ window.handleLoginFormSubmit = function (e) {
   );
 
   if (foundUser) {
+    const expectedPass =
+      foundUser.pass ||
+      (foundUser.role === window.ROLES.STUDENT ? "1111" : "1234");
+    if (passVal !== expectedPass) {
+      alert("❌ الرقم السري غير صحيح!");
+      return false;
+    }
     doLogin(foundUser, false);
     return false;
   }
 
   alert(
-    "⚠️ اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير مسجل بالنظام.",
+    "⚠️ اسم المستخدم أو رقم الهوية غير مسجل بالنظام. يرجى مراجعة إدارة المَجْمَع.",
   );
   return false;
 };
 
+// دالة تسجيل دخول الطالب مع التحقق الصارم من الرقم السري
 window.handleStudentLoginFormSubmit = function (e) {
   if (e && e.preventDefault) e.preventDefault();
   const identifier = (
     document.getElementById("stu-login-identifier")?.value || ""
   ).trim();
+  const passVal = (
+    document.getElementById("stu-login-password")?.value || ""
+  ).trim();
+
   if (!identifier) {
-    alert("يرجى إدخال رقم الهوية أو الجوال.");
+    alert("يرجى إدخال رقم الهوية أو رقم الجوال.");
+    return false;
+  }
+
+  if (!passVal) {
+    alert("يرجى إدخال الرقم السري للطالب (1111).");
     return false;
   }
 
@@ -267,10 +335,29 @@ window.handleStudentLoginFormSubmit = function (e) {
     (s) =>
       s.phone === identifier ||
       s.nationalId === identifier ||
-      s.name === identifier,
+      s.name === identifier ||
+      s.parentPhone === identifier,
   );
 
   if (foundStudent) {
+    if (foundStudent.status === "archived") {
+      alert("⚠️ هذا الحساب موقوف (مؤرشف).");
+      return false;
+    }
+
+    const userRec = (window.appStore?.users || []).find(
+      (u) =>
+        u.id === foundStudent.id ||
+        u.username === foundStudent.nationalId ||
+        u.username === foundStudent.phone,
+    );
+
+    const expectedPass = userRec ? userRec.pass : "1111";
+    if (passVal !== expectedPass) {
+      alert("❌ الرقم السري للطالب غير صحيح! يرجى إدخال (1111).");
+      return false;
+    }
+
     const studentSessionUser = {
       id: foundStudent.id,
       name: foundStudent.name,
@@ -602,11 +689,11 @@ function checkSavedSession() {
 }
 
 // دالة فحص التميز الأسبوعي الصارمة (شرطان فقط: حضور 4 أيام كاملة من الأحد للأربعاء + ممتاز فقط أو لا يوجد)
-function checkStudentCurrentWeekTamayuz(studentId) {
+function checkStudentCurrentWeekTamayuz(studentId, weekOffset = 0) {
   const now = new Date();
   const dayOfWeek = now.getDay();
   const sunday = new Date(now);
-  sunday.setDate(now.getDate() - dayOfWeek);
+  sunday.setDate(now.getDate() - dayOfWeek - weekOffset * 7);
 
   const weekDays = [];
   for (let i = 0; i < 4; i++) {
@@ -658,6 +745,18 @@ function checkStudentCurrentWeekTamayuz(studentId) {
   }
 
   return true;
+}
+
+// حساب العدد الفعلي لأسابيع التميز التي حقق فيها الطالب الشرطين بدقة
+function calculateActualQualifiedTamayuzWeeksCount(studentId) {
+  let qualifiedWeeks = 0;
+  // فحص الأسابيع المسجلة (من الأسبوع الحالي والأسابيع السابقة)
+  for (let w = 0; w < 16; w++) {
+    if (checkStudentCurrentWeekTamayuz(studentId, w)) {
+      qualifiedWeeks++;
+    }
+  }
+  return qualifiedWeeks;
 }
 
 window.calculateDistanceInMeters = function (lat1, lon1, lat2, lon2) {
@@ -839,11 +938,9 @@ function renderStudentData() {
     (a) => a.status === "present" || a.status === "late",
   ).length;
   const absentCount = studentAtt.filter((a) => a.status === "absent").length;
-  const tamayuzCount = studentTasmeea.filter(
-    (t) =>
-      (t.rating || "").includes("ممتاز") ||
-      (t.hifzRating || "").includes("ممتاز"),
-  ).length;
+
+  // احتساب عدد مرات التميز وفق الشروط الصارمة فقط
+  const tamayuzCount = calculateActualQualifiedTamayuzWeeksCount(studentId);
 
   const countRating = (records, field, type) => {
     return records.filter((r) => {
