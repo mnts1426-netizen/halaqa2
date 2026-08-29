@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * admin.js - المحرك الإداري الشامل، شروط التميز الصارمة، والخريطة التفاعلية
+ * admin.js - المحرك الإداري الشامل، شروط التميز الصارمة، وإرسال الإشعارات
  * ==========================================================================
  */
 
@@ -15,6 +15,7 @@ window.appStore = window.appStore || {
   profileRequests: [],
   tasmeea: [],
   screenOrder: [],
+  notifications: [],
   settings: null,
 };
 
@@ -2354,6 +2355,7 @@ window.openMapPickerModal = function () {
   }, 250);
 };
 
+// تهيئة وتحديث الخريطة التفاعلية بأحدث النماذج العصرية والمؤشرات المخصصة
 function initOrUpdateMapPicker(lat, lng, radius) {
   const mapContainer = document.getElementById("map-picker-container");
   if (!mapContainer || typeof L === "undefined") return;
@@ -2719,6 +2721,123 @@ window.handleSelfRegistration = function (e) {
   closeModal("modal-self-register");
   e.target?.reset();
   alert("✅ تم إرسال طلب الالتحاق بنجاح! سيتم مراجعته من قبل إدارة المَجْمَع.");
+};
+
+// ==========================================================================
+// 11. إدارة إرسال الإشعارات والرسائل الموحدة
+// ==========================================================================
+window.openModalSendUnifiedMessage = function () {
+  const recipientSelect = document.getElementById("msg-target-recipient");
+  if (recipientSelect) {
+    recipientSelect.value = "all";
+    handleRecipientTypeChange(recipientSelect);
+  }
+  const titleEl = document.getElementById("msg-title");
+  const bodyEl = document.getElementById("msg-body");
+  if (titleEl) titleEl.value = "";
+  if (bodyEl) bodyEl.value = "";
+
+  openModal("modal-send-unified-msg");
+};
+
+window.handleRecipientTypeChange = function (selectEl) {
+  const type = selectEl.value;
+  const specificGroup = document.getElementById("msg-specific-recipient-group");
+  const specificLabel = document.getElementById("msg-specific-label");
+  const specificSelect = document.getElementById("msg-specific-select");
+
+  if (!specificGroup || !specificSelect) return;
+
+  if (type === "specific_teacher") {
+    specificGroup.classList.remove("style-hidden");
+    specificGroup.style.display = "block";
+    if (specificLabel) specificLabel.textContent = "اختر المعلم المستهدف:";
+
+    let opts = '<option value="">— اختر المعلم —</option>';
+    (window.appStore?.teachers || []).forEach((t) => {
+      opts += `<option value="${t.id}" data-name="${t.name}">${t.name}</option>`;
+    });
+    specificSelect.innerHTML = opts;
+  } else if (type === "specific_student") {
+    specificGroup.classList.remove("style-hidden");
+    specificGroup.style.display = "block";
+    if (specificLabel) specificLabel.textContent = "اختر الطالب المستهدف:";
+
+    let opts = '<option value="">— اختر الطالب —</option>';
+    (window.appStore?.students || [])
+      .filter((s) => s.status === "active")
+      .forEach((s) => {
+        opts += `<option value="${s.id}" data-name="${s.name}">${s.name} (${getCircleName(s.circleId)})</option>`;
+      });
+    specificSelect.innerHTML = opts;
+  } else {
+    specificGroup.classList.add("style-hidden");
+    specificGroup.style.display = "none";
+    specificSelect.innerHTML = "";
+  }
+};
+
+window.handleSendUnifiedMessage = function (e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const recipient =
+    document.getElementById("msg-target-recipient")?.value || "all";
+  const specificSelect = document.getElementById("msg-specific-select");
+  const targetId = specificSelect?.value || "";
+  const selectedOption = specificSelect?.options[specificSelect.selectedIndex];
+  const targetName = selectedOption
+    ? selectedOption.getAttribute("data-name") || ""
+    : "";
+
+  const title = (document.getElementById("msg-title")?.value || "").trim();
+  const body = (document.getElementById("msg-body")?.value || "").trim();
+
+  if (!title || !body) {
+    alert("يرجى كتابة عنوان الرسالة ونص التنبيه.");
+    return;
+  }
+
+  if (
+    (recipient === "specific_student" || recipient === "specific_teacher") &&
+    !targetId
+  ) {
+    alert("يرجى تحديد الشخص المستهدف بالإشعار.");
+    return;
+  }
+
+  const currentUser = window.currentUser || {
+    name: "إدارة المَجْمَع",
+    role: "admin",
+  };
+  const senderName =
+    currentUser.role === "admin"
+      ? "إدارة المَجْمَع"
+      : `المعلم / ${currentUser.name}`;
+
+  const newNotif = {
+    id: "notif_" + Date.now(),
+    title: title,
+    body: body,
+    recipient: recipient,
+    targetId: targetId,
+    targetName: targetName,
+    sender: senderName,
+    date: new Date().toLocaleDateString("ar-SA"),
+    createdAt: Date.now(),
+  };
+
+  if (!window.appStore.notifications) window.appStore.notifications = [];
+  window.appStore.notifications.unshift(newNotif);
+
+  if (typeof saveToCloud === "function") {
+    saveToCloud("notifications", newNotif.id, newNotif);
+  }
+  if (typeof saveLocalStore === "function") saveLocalStore();
+
+  closeModal("modal-send-unified-msg");
+  e.target?.reset();
+  alert("✅ تم إرسال الإشعار بنجاح لجميع المستهدفين!");
+  if (typeof renderNotificationsView === "function") renderNotificationsView();
 };
 
 function getCircleName(circleId) {
