@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * firebase.js - محرك الاتصال بـ Firebase وقاعدة البيانات المحمية وتوحيد كلمات المرور
+ * firebase.js - محرك الاتصال بـ Firebase، التصفير السحابي والمحلي للسجلات، وحماية البيانات الأساسية
  * ==========================================================================
  */
 
@@ -8,7 +8,7 @@ let dbFirestore = null;
 let firebaseAuth = null;
 let isFirebaseOnline = false;
 
-// الإعدادات والمفاتيح الافتراضية الآمنة لمنع أي خطأ توقف برمجي
+// الإعدادات الافتراضية
 const SAFE_DEFAULT_SETTINGS = window.DEFAULT_SETTINGS || {
   orgName: "مَجْمَع عبدالله بن مهدي القرآني",
   subTitle: "جامع الهدى",
@@ -82,7 +82,7 @@ function initFirebaseApp() {
   loadInitialData();
 }
 
-// تحميل البيانات والتحقق من حساب المدير وتوحيد كلمات المرور للجميع
+// تحميل البيانات والتحقق من حساب المدير وتصفير السجلات التشغيلية مع الحفاظ على البيانات الأساسية
 function loadInitialData() {
   const localData = localStorage.getItem(STORAGE_KEY);
   if (localData) {
@@ -96,19 +96,39 @@ function loadInitialData() {
       if (!Array.isArray(window.appStore.teachers))
         window.appStore.teachers = [];
       if (!Array.isArray(window.appStore.circles)) window.appStore.circles = [];
-      if (!Array.isArray(window.appStore.attendance))
-        window.appStore.attendance = [];
-      if (!Array.isArray(window.appStore.teacherAttendance))
-        window.appStore.teacherAttendance = [];
-      if (!Array.isArray(window.appStore.tasmeea)) window.appStore.tasmeea = [];
-      if (!Array.isArray(window.appStore.tests)) window.appStore.tests = [];
-      if (!Array.isArray(window.appStore.notifications))
-        window.appStore.notifications = [];
       if (!Array.isArray(window.appStore.logs)) window.appStore.logs = [];
-      if (!Array.isArray(window.appStore.screenOrder))
-        window.appStore.screenOrder = [];
 
-      // ضمان وجود حساب المدير وحساب الشاشة
+      // 1. تصفير السجلات التشغيلية محلياً مع الحفاظ التام على الطلاب والمعلمين والحلقات والإعدادات
+      const resetFlagKey = "HALAQAT_PURGE_RESET_EXEC_V3";
+      if (!localStorage.getItem(resetFlagKey)) {
+        window.appStore.attendance = [];
+        window.appStore.teacherAttendance = [];
+        window.appStore.tasmeea = [];
+        window.appStore.tests = [];
+        window.appStore.notifications = [];
+        window.appStore.messages = [];
+        window.appStore.screenOrder = [];
+        localStorage.setItem(resetFlagKey, "true");
+        console.log(
+          "🧹 تم تصفير سجلات التحضير والتسميع والاختبارات والإشعارات والتميز محلياً مع حماية الطلاب والمعلمين والحلقات.",
+        );
+      } else {
+        if (!Array.isArray(window.appStore.attendance))
+          window.appStore.attendance = [];
+        if (!Array.isArray(window.appStore.teacherAttendance))
+          window.appStore.teacherAttendance = [];
+        if (!Array.isArray(window.appStore.tasmeea))
+          window.appStore.tasmeea = [];
+        if (!Array.isArray(window.appStore.tests)) window.appStore.tests = [];
+        if (!Array.isArray(window.appStore.notifications))
+          window.appStore.notifications = [];
+        if (!Array.isArray(window.appStore.messages))
+          window.appStore.messages = [];
+        if (!Array.isArray(window.appStore.screenOrder))
+          window.appStore.screenOrder = [];
+      }
+
+      // 2. ضمان وجود حساب المدير وحساب الشاشة
       let adminUser = window.appStore.users.find(
         (u) =>
           (u.username === "123456" || u.username === "admin") &&
@@ -147,7 +167,7 @@ function loadInitialData() {
         });
       }
 
-      // توحيد الأرقام السرية: 1111 للطلاب و 1234 للمعلمين
+      // 3. توحيد الأرقام السرية: 1111 للطلاب و 1234 للمعلمين
       migrateAllPasswordsRoleBased();
       saveLocalStore();
     } catch (e) {
@@ -158,13 +178,13 @@ function loadInitialData() {
     seedProductionAdminOnly();
   }
 
-  // مزامنة البيانات السحابية من Firestore
+  // مزامنة وتنظيف البيانات السحابية من Firestore
   if (isFirebaseOnline && dbFirestore) {
-    syncDataFromCloud();
+    syncAndPurgeDataFromCloud();
   }
 }
 
-// دالة توحيد الرقم السري (1111 للطلاب و 1234 للمعلمين) لجميع الحسابات الحالية والقديمة
+// دالة توحيد الرقم السري (1111 للطلاب و 1234 للمعلمين) لجميع الحسابات
 function migrateAllPasswordsRoleBased() {
   let hasChanges = false;
   if (Array.isArray(window.appStore.users)) {
@@ -189,7 +209,6 @@ function migrateAllPasswordsRoleBased() {
     });
   }
 
-  // مزامنة أرقام الطلاب في حال وجود حسابات مسجلة في قائمة students بدون user
   if (Array.isArray(window.appStore.students)) {
     window.appStore.students.forEach((stu) => {
       let userRec = (window.appStore.users || []).find((u) => u.id === stu.id);
@@ -281,26 +300,54 @@ function seedProductionAdminOnly() {
   saveLocalStore();
 }
 
-// مزامنة البيانات السحابية من Firestore
-async function syncDataFromCloud() {
+// تصفير المجموعات السحابية ومزامنة البيانات الأساسية فقط
+async function syncAndPurgeDataFromCloud() {
   if (!dbFirestore) return;
+
+  const cloudPurgeFlag = "HALAQAT_CLOUD_PURGE_EXEC_V3";
+  const collectionsToPurge = [
+    "attendance",
+    "teacherAttendance",
+    "tasmeea",
+    "tests",
+    "notifications",
+    "messages",
+    "screenOrder",
+  ];
+
+  // تنفيذ تصفير السحابة مرة واحدة للسجلات الماضية
+  if (!localStorage.getItem(cloudPurgeFlag)) {
+    for (const colName of collectionsToPurge) {
+      try {
+        const snapshot = await dbFirestore.collection(colName).get();
+        if (!snapshot.empty) {
+          const batch = dbFirestore.batch();
+          snapshot.docs.forEach((d) => {
+            batch.delete(d.ref);
+          });
+          await batch.commit();
+          console.log(
+            `🧹 تم مسح مستندات (${colName}) القديمة من Firestore سحابياً.`,
+          );
+        }
+      } catch (err) {
+        console.warn(`تنبيه أثناء مسح ${colName}:`, err);
+      }
+    }
+    localStorage.setItem(cloudPurgeFlag, "true");
+  }
+
+  // مزامنة المجموعات الأساسية المحمية فقط (الطلاب، المعلمين، الحلقات، الحسابات، الإعدادات)
   try {
-    const collections = [
+    const protectedCollections = [
       "users",
       "students",
       "teachers",
       "circles",
-      "attendance",
-      "teacherAttendance",
-      "tasmeea",
-      "tests",
-      "notifications",
-      "messages",
-      "screenOrder",
       "settings",
       "logs",
     ];
-    for (const col of collections) {
+    for (const col of protectedCollections) {
       const snapshot = await dbFirestore.collection(col).get();
       if (!snapshot.empty) {
         const items = snapshot.docs.map((doc) => ({
@@ -309,14 +356,28 @@ async function syncDataFromCloud() {
         }));
         if (col === "settings") {
           window.appStore.settings = items[0] || SAFE_DEFAULT_SETTINGS;
-        } else if (col === "screenOrder") {
+        } else {
+          window.appStore[col] = items;
+        }
+      }
+    }
+
+    // مزامنة المجموعات التشغيلية الجديدة
+    for (const col of collectionsToPurge) {
+      const snapshot = await dbFirestore.collection(col).get();
+      if (!snapshot.empty) {
+        const items = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        if (col === "screenOrder") {
           window.appStore.screenOrder = items[0]?.order || [];
         } else {
           window.appStore[col] = items;
         }
       }
     }
-    // تأكيد توحيد كلمة المرور بعد التحميل من السحابة
+
     migrateAllPasswordsRoleBased();
     saveLocalStore();
     if (typeof refreshActiveView === "function") {
@@ -329,6 +390,52 @@ async function syncDataFromCloud() {
     );
   }
 }
+
+// دالة تنفيذ التصفير اليدوي الآمن عند طلب الإدارة
+window.executeSafeOperationalReset = async function () {
+  const confirmAction = confirm(
+    "هل أنت متأكد من تصفير سجلات التحضير والتسميع والاختبارات والإشعارات السابقة؟\n(الطلاب والمعلمون والحلقات لن تتأثر نهائياً).",
+  );
+  if (!confirmAction) return;
+
+  const collectionsToPurge = [
+    "attendance",
+    "teacherAttendance",
+    "tasmeea",
+    "tests",
+    "notifications",
+    "messages",
+    "screenOrder",
+  ];
+
+  collectionsToPurge.forEach((key) => {
+    window.appStore[key] = [];
+  });
+
+  saveLocalStore();
+
+  if (isFirebaseOnline && dbFirestore) {
+    for (const colName of collectionsToPurge) {
+      try {
+        const snapshot = await dbFirestore.collection(colName).get();
+        if (!snapshot.empty) {
+          const batch = dbFirestore.batch();
+          snapshot.docs.forEach((d) => {
+            batch.delete(d.ref);
+          });
+          await batch.commit();
+        }
+      } catch (e) {
+        console.error(`خطأ أثناء تصفير ${colName}:`, e);
+      }
+    }
+  }
+
+  alert(
+    "✅ تم تصفير كافة السجلات التشغيلية السابقة بنجاح وبدء دورة جديدة نظيفة!",
+  );
+  if (typeof refreshAllViews === "function") refreshAllViews();
+};
 
 // حفظ أو حذف مستند في السحابة بأمان وضمان عدم فقدان تعديلات المدير
 async function saveToCloud(collectionName, docId, data, isDelete = false) {
