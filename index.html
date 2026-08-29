@@ -14,6 +14,12 @@
       href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap"
       rel="stylesheet"
     />
+    <!-- مكتبة الخرائط التفاعلية Leaflet -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <!-- مكتبة التصدير والاستيراد لـ Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- مكتبة تصدير الـ PDF المباشر -->
@@ -614,7 +620,7 @@
             </div>
           </div>
 
-          <!-- لوحة التميز خاصة بالمدير فقط (تم إزالة الإخفاء لعرض الطلاب المؤهلين) -->
+          <!-- لوحة التميز خاصة بالمدير فقط -->
           <div class="card mb-3 nav-admin-only" id="tamayuz-board-card">
             <div class="card-header flex-between">
               <div>
@@ -1603,7 +1609,7 @@
           </div>
         </section>
 
-        <!-- 12. شاشة الإعدادات -->
+        <!-- 12. شاشة الإعدادات (محدثة بخريطة تفاعلية ونطاق المسافة بالمتر) -->
         <section id="view-settings" class="content-view">
           <div class="dashboard-columns">
             <div class="card nav-admin-only" id="admin-org-settings-card">
@@ -1642,28 +1648,69 @@
                     required
                   />
                 </div>
+
+                <!-- إعداد الموقع الجغرافي بالخريطة التفاعلية -->
                 <div class="form-group">
                   <label
-                    >📍 الموقع الجغرافي للمَجْمَع (إحداثيات GPS / رابط خرائط
-                    Google)</label
+                    >📍 الموقع الجغرافي للمَجْمَع (إحداثيات GPS / الخريطة
+                    التفاعلية)</label
                   >
-                  <div style="display: flex; gap: 0.5rem">
+                  <div
+                    style="
+                      display: flex;
+                      gap: 0.5rem;
+                      flex-wrap: wrap;
+                      margin-bottom: 0.5rem;
+                    "
+                  >
                     <input
                       type="text"
                       id="set-org-location"
                       class="form-control"
-                      placeholder="مثال: 18.2165, 42.5053 أو رابط الخريطة..."
+                      placeholder="مثال: 18.216500, 42.505300"
+                      style="flex: 2; min-width: 200px"
                     />
+                    <button
+                      type="button"
+                      class="btn btn-primary"
+                      onclick="openMapPickerModal()"
+                      title="تحديد الموقع والنطاق عبر الخريطة التفاعلية"
+                    >
+                      🗺️ فتح الخريطة
+                    </button>
                     <button
                       type="button"
                       class="btn btn-outline-brown"
                       onclick="getCurrentLocationCoords()"
                       title="تحديد موقعي الحالي بدقة"
                     >
-                      📡 تحديد تلقائي
+                      📡 موقعي الحالي
                     </button>
                   </div>
                 </div>
+
+                <!-- إعداد نطاق مسافة التحضير بالمتر -->
+                <div class="form-group">
+                  <label
+                    >📏 مسافة نطاق التحضير المسموح بها حول المسجد
+                    (بالمتر)</label
+                  >
+                  <input
+                    type="number"
+                    id="set-org-radius"
+                    class="form-control"
+                    placeholder="مثال: 50"
+                    min="10"
+                    max="5000"
+                    value="50"
+                    required
+                  />
+                  <small class="text-muted"
+                    >المسافة القصوى المسموح بها للمعلم أو المدير لتسجيل الحضور
+                    الذاتي عن موقع المسجد (مثلاً: 50 متراً).</small
+                  >
+                </div>
+
                 <div class="form-group">
                   <label>حجم خط العناوين ورأس الصفحة</label>
                   <select id="set-header-font-size" class="form-control">
@@ -1758,7 +1805,110 @@
 
     <!-- MODALS: النوافذ المنبثقة -->
 
-    <!-- 1. نافذة إضافة اختبار (تمت إضافتها وتثبيتها بشكل سليم) -->
+    <!-- نافذة الخريطة التفاعلية لتحديد الموقع ونطاق المسافة بدقة مع شريط البحث العصري -->
+    <div id="modal-map-picker" class="modal-overlay">
+      <div class="modal-card modal-lg">
+        <div class="modal-header">
+          <h3>🗺️ تحديد موقع المسجد ونطاق التحضير المسموح به</h3>
+          <button class="modal-close" onclick="closeModal('modal-map-picker')">
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted mb-2" style="font-size: 0.88rem">
+            انقر على أي نقطة في الخريطة أو اسحب المؤشر لتحديد موقع المسجد بدقة.
+            يمكنك أيضاً البحث المباشر عن اسم الحي أو الشارع أو المعلم بالأسفل:
+          </p>
+
+          <!-- شريط البحث الذكي في الخريطة -->
+          <div class="map-search-bar-row mb-2">
+            <input
+              type="text"
+              id="map-search-query-input"
+              class="form-control"
+              placeholder="🔍 ابحث عن اسم الحي، الشارع، أو المسجد..."
+              onkeydown="
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  searchMapLocationQuery();
+                }
+              "
+            />
+            <button
+              type="button"
+              class="btn btn-outline-brown"
+              onclick="searchMapLocationQuery()"
+            >
+              بحث
+            </button>
+          </div>
+
+          <div
+            style="
+              display: flex;
+              gap: 0.8rem;
+              margin-bottom: 0.75rem;
+              flex-wrap: wrap;
+            "
+          >
+            <div style="flex: 1; min-width: 180px">
+              <label style="font-size: 0.85rem; font-weight: 700"
+                >نطاق المسافة المسموح بها (متر):</label
+              >
+              <input
+                type="number"
+                id="map-modal-radius-input"
+                class="form-control"
+                value="50"
+                min="10"
+                max="5000"
+                oninput="updateMapPickerRadius(this.value)"
+              />
+            </div>
+            <div style="flex: 2; min-width: 220px">
+              <label style="font-size: 0.85rem; font-weight: 700"
+                >الإحداثيات المختارة:</label
+              >
+              <input
+                type="text"
+                id="map-modal-coords-display"
+                class="form-control"
+                readonly
+                style="direction: ltr; font-weight: 700; background: #f9f9f9"
+              />
+            </div>
+          </div>
+          <div
+            id="map-picker-container"
+            style="
+              height: 380px;
+              width: 100%;
+              border-radius: 8px;
+              border: 1px solid var(--border-color);
+              z-index: 1;
+            "
+          ></div>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-primary"
+            onclick="confirmMapPickerLocation()"
+          >
+            ✅ اعتماد الموقع والمسافة
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline-brown"
+            onclick="closeModal('modal-map-picker')"
+          >
+            إلغاء
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. نافذة إضافة اختبار -->
     <div id="modal-add-test" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
@@ -2137,8 +2287,8 @@
             </div>
             <div class="form-row">
               <div class="form-group flex-1">
-                <label>الحلقة المسجل بها</label
-                ><select id="edit-comp-circle" class="form-control"></select>
+                <label>الحلقة المسجل بها</label>
+                <select id="edit-comp-circle" class="form-control"></select>
               </div>
               <div class="form-group flex-1">
                 <label>حالة الطالب</label
