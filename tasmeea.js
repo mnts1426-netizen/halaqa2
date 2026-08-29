@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * tasmeea.js - محرك التسميع اليومي الذكي وقائمة الطلاب المنسدلة والتحضير السريع
+ * tasmeea.js - محرك التسميع اليومي الذكي وعزل طلاب وحلقات المعلم
  * ==========================================================================
  */
 
@@ -12,7 +12,7 @@ window.appStore = window.appStore || {
   attendance: [],
 };
 
-// تهيئة شاشة التسميع عند تغيير الحلقة أو التاريخ
+// تهيئة شاشة التسميع عند تحميل الصفحة أو تغيير الحلقة والتاريخ
 document.addEventListener("DOMContentLoaded", () => {
   const circleSelect = document.getElementById("tasmeea-circle-select");
   const dateSelect = document.getElementById("tasmeea-date-select");
@@ -29,13 +29,44 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// عرض قائمة طلاب الحلقة مع التحضير السريع وإمكانية فتح بطاقة التسميع بالنقر
+// عرض قائمة طلاب الحلقة مع التحضير السريع وعزل الحلقات غير المصرح بها للمعلم
 function renderTasmeeaStudents() {
   const circleId = document.getElementById("tasmeea-circle-select")?.value;
   const dateVal = document.getElementById("tasmeea-date-select")?.value;
   const container = document.getElementById("tasmeea-students-container");
 
   if (!container) return;
+
+  const user = window.currentUser;
+
+  // التحقق الأمني من صلاحيات المعلم وحلقاته المسندة
+  if (user && user.role === "teacher") {
+    const teacherObj = (window.appStore?.teachers || []).find(
+      (t) =>
+        t.userId === user.id ||
+        t.id === user.teacherId ||
+        t.id === user.id ||
+        t.phone === user.phone,
+    );
+    const teacherId = teacherObj ? teacherObj.id : user.teacherId || user.id;
+
+    const teacherCircles = (window.appStore?.circles || []).filter(
+      (c) =>
+        (Array.isArray(c.teacherIds) && c.teacherIds.includes(teacherId)) ||
+        c.teacherId === teacherId,
+    );
+    const teacherCircleIds = teacherCircles.map((c) => c.id);
+
+    if (circleId && !teacherCircleIds.includes(circleId)) {
+      container.innerHTML = `
+        <div class="empty-state-card">
+          <h3>⚠️ غير مصرح لك بالوصول</h3>
+          <p class="text-muted">هذه الحلقة غير مسندة لك حالياً.</p>
+        </div>
+      `;
+      return;
+    }
+  }
 
   if (!circleId) {
     container.innerHTML = `
@@ -50,6 +81,7 @@ function renderTasmeeaStudents() {
     return;
   }
 
+  // تصفية الطلاب النشطين المسجلين في هذه الحلقة فقط
   const circleStudents = (window.appStore.students || []).filter(
     (s) => s.circleId === circleId && s.status === "active",
   );
@@ -72,7 +104,7 @@ function renderTasmeeaStudents() {
         (t) => t.studentId === student.id && t.date === dateVal,
       ) || {};
 
-    // 2. آخر خطة مسجلة قبل اليوم للترحيل التلقائي القابل للتعديل
+    // 2. آخر خطة مسجلة قبل اليوم للترحيل التلقائي
     const previousRecord =
       (window.appStore.tasmeea || [])
         .filter((t) => t.studentId === student.id && t.date < dateVal)
@@ -248,7 +280,6 @@ function buildStudentAccordionCard(
   `;
 }
 
-// دالة فتح وإغلاق بطاقة التسميع المنسدلة للطالب
 function toggleTasmeeaAccordion(studentId) {
   const details = document.getElementById(`tasmeea-details-${studentId}`);
   const arrow = document.getElementById(`tasmeea-arrow-${studentId}`);
@@ -262,7 +293,6 @@ function toggleTasmeeaAccordion(studentId) {
   }
 }
 
-// حفظ التحضير الفوري المباشر من شريط الطالب
 function saveQuickAttendance(studentId, status) {
   const dateVal = document.getElementById("tasmeea-date-select")?.value;
   const circleId = document.getElementById("tasmeea-circle-select")?.value;
@@ -294,9 +324,9 @@ function saveQuickAttendance(studentId, status) {
   if (typeof saveToCloud === "function") {
     saveToCloud("attendance", record.id, record);
   }
+  if (typeof saveLocalStore === "function") saveLocalStore();
 }
 
-// حفظ بيانات التسميع اليومي وخطة الغد والملاحظات
 function saveStudentTasmeea(e, studentId) {
   e.preventDefault();
   const form = e.target;
@@ -312,7 +342,6 @@ function saveStudentTasmeea(e, studentId) {
   const murajaaRating = form.elements["murajaa_rating"]?.value || "";
   const tilawaRating = form.elements["tilawa_rating"]?.value || "";
 
-  // تعيين قيمة تقدير متوافقة مع محركات التقارير
   const fallbackRating = hifzRating || murajaaRating || tilawaRating || "ممتاز";
 
   const tasmeeaData = {
@@ -349,6 +378,7 @@ function saveStudentTasmeea(e, studentId) {
   if (typeof saveToCloud === "function") {
     saveToCloud("tasmeea", tasmeeaData.id, tasmeeaData);
   }
+  if (typeof saveLocalStore === "function") saveLocalStore();
 
   alert("✅ تم حفظ التسميع وخطة الغد بنجاح!");
   renderTasmeeaStudents();
