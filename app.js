@@ -917,7 +917,7 @@ function renderStudentData() {
         '<span class="badge" style="background:#e3f2fd; color:#1565c0;">🔵 مستأذن</span>';
   }
 
-  // تسليم الإشعارات للطالب
+  // تسليم الإشعارات للطالب بكافة الصيغ لضمان وصولها بنسبة 100%
   const studentNotifs = (window.appStore?.notifications || []).filter((n) => {
     if (!n) return false;
     if (n.recipient === "all" || n.recipient === "students") return true;
@@ -925,8 +925,12 @@ function renderStudentData() {
       return (
         n.targetId === student.id ||
         n.targetId === student.nationalId ||
-        n.targetName === student.name ||
-        (student.phone && n.targetId === student.phone)
+        n.targetId === student.phone ||
+        n.targetId === student.parentPhone ||
+        (n.targetName &&
+          (n.targetName === student.name ||
+            n.targetName.includes(student.name) ||
+            student.name.includes(n.targetName)))
       );
     }
     return false;
@@ -945,7 +949,7 @@ function renderStudentData() {
   const container = document.getElementById("view-student-home");
   if (!container) return;
 
-  const logoNew = "logo12.jpeg";
+  const logoTransparent = "logo_transparent_2.png";
   const logoOld = "logo_transparent_1.png";
 
   // إعداد قسم التميز والاختبارات التفاعلي المشروط
@@ -1017,14 +1021,14 @@ function renderStudentData() {
   }
 
   container.innerHTML = `
-    <!-- ترويسة الحساب والمعلومات الأساسية -->
+    <!-- ترويسة الحساب والمعلومات الأساسية مع الشعار الشفاف المعتمد -->
     <div class="card mb-3" style="background: linear-gradient(135deg, var(--primary-brown) 0%, var(--primary-dark) 100%); color: #ffffff; border-radius: 12px; padding: 1.5rem; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
       <button onclick="handleLogout()" class="btn btn-danger btn-sm" style="position: absolute; top: 12px; left: 12px; font-size: 0.8rem; padding: 5px 12px; border-radius: 6px; z-index: 10;">
         🚪 تسجيل الخروج
       </button>
 
       <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
-        <img src="${logoNew}" alt="شعار المَجْمَع" style="height: 65px; width: auto; object-fit: contain; background: transparent; padding: 4px; border-radius: 8px;" />
+        <img src="${logoTransparent}" alt="شعار المَجْمَع" style="height: 70px; width: auto; object-fit: contain; background: transparent; padding: 4px; border-radius: 8px; mix-blend-mode: screen;" />
         <div style="text-align: center; flex: 1;">
           <h2 style="font-size: 1.4rem; font-weight: 900; margin-bottom: 4px;">${student.name}</h2>
           <p style="font-size: 0.95rem; opacity: 0.9; margin-bottom: 8px;">مَجْمَع عبدالله بن مهدي القرآني — جامع الهدى</p>
