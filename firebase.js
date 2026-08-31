@@ -181,6 +181,40 @@ function loadInitialData() {
   // مزامنة وتنظيف البيانات السحابية من Firestore
   if (isFirebaseOnline && dbFirestore) {
     syncAndPurgeDataFromCloud();
+    watchForAppUpdates();
+  }
+}
+
+// ===== نظام كشف التحديثات التلقائي =====
+// عند عمل إصلاح مهم مستقبلاً: غيّر القيمة التالية إلى نص جديد مختلف
+// (مثلاً تاريخ اليوم)، ثم بعد النشر حدّث حقل "latest" في مستند
+// meta/appVersion على Firestore ليطابق نفس القيمة. عندها أي جهاز يشغّل
+// نسخة قديمة سيكتشف ذلك فوراً ويُعيد تحميل الصفحة تلقائياً دون تدخل يدوي.
+const APP_BUILD_VERSION = "2026-08-31-1";
+
+function watchForAppUpdates() {
+  if (!dbFirestore) return;
+  try {
+    dbFirestore
+      .collection("meta")
+      .doc("appVersion")
+      .onSnapshot(
+        (doc) => {
+          if (!doc.exists) return;
+          const latest = doc.data().latest;
+          if (latest && latest !== APP_BUILD_VERSION) {
+            console.warn(
+              "⚠️ يوجد إصدار أحدث من التطبيق، سيتم تحديث الصفحة تلقائياً...",
+            );
+            window.location.reload();
+          }
+        },
+        (error) => {
+          console.warn("تنبيه أثناء التحقق من إصدار التطبيق:", error);
+        },
+      );
+  } catch (err) {
+    console.warn("خطأ في تفعيل التحقق من إصدار التطبيق:", err);
   }
 }
 
@@ -453,6 +487,29 @@ window.executeSafeOperationalReset = async function () {
 // حفظ أو حذف مستند في السحابة بأمان وضمان عدم فقدان تعديلات المدير
 async function saveToCloud(collectionName, docId, data, isDelete = false) {
   saveLocalStore();
+
+  // ===== بصمة آخر جهاز/متصفح قام بالكتابة (احتياطي للتشخيص لاحقاً) =====
+  if (isFirebaseOnline && dbFirestore) {
+    dbFirestore
+      .collection("meta")
+      .doc("lastWriteDebug")
+      .set(
+        {
+          collectionName,
+          docId: String(docId),
+          isDelete: !!isDelete,
+          userAgent: navigator.userAgent,
+          currentUser:
+            (window.currentUser && window.currentUser.name) ||
+            "غير مسجل دخول",
+          at: Date.now(),
+          atReadable: new Date().toLocaleString("ar-SA"),
+        },
+        { merge: true },
+      )
+      .catch(() => {});
+  }
+
   if (isFirebaseOnline && dbFirestore) {
     try {
       if (isDelete) {
