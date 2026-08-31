@@ -300,11 +300,45 @@ function seedProductionAdminOnly() {
   saveLocalStore();
 }
 
-// تصفير المجموعات السحابية ومزامنة البيانات الأساسية فقط
+// المدة الدنيا بين كل مزامنة كاملة من السحابة والتي تليها على نفس
+// الجهاز، لمنع قراءة 13 مجموعة كاملة في كل مرة تُفتح فيها الصفحة.
+const CLOUD_SYNC_MIN_INTERVAL_MS = 2 * 60 * 1000; // دقيقتان
+const LAST_SYNC_KEY = "HALAQAT_LAST_CLOUD_SYNC_AT";
+
+// تصفير المجموعات السحابية (مرة واحدة نهائياً) ومزامنة البيانات
 async function syncAndPurgeDataFromCloud() {
   if (!dbFirestore) return;
 
   const cloudPurgeFlag = "HALAQAT_CLOUD_PURGE_EXEC_V3";
+
+  // ===== إيقاف نهائي لعملية التصفير التلقائي =====
+  // كانت هذه الخطوة مصممة للتنفيذ مرة واحدة فقط عند إطلاق نسخة V3،
+  // لكن الاعتماد على علم محلي (لكل جهاز/متصفح على حدة) بدل علم مركزي
+  // كان يجعلها تُعيد حذف كامل سجلات الحضور والتسميع والاختبارات من
+  // Firestore في كل مرة يُفتح فيها التطبيق من جهاز جديد. تم اعتبار هذه
+  // الخطوة منتهية نهائياً، ولن تُنفَّذ عملية الحذف مرة أخرى من أي جهاز.
+  if (!localStorage.getItem(cloudPurgeFlag)) {
+    try {
+      await dbFirestore
+        .collection("meta")
+        .doc("purgeStatus")
+        .set({ purged: true, purgedAt: Date.now() }, { merge: true });
+    } catch (e) {
+      console.warn("تعذر تسجيل حالة التصفير مركزياً:", e);
+    }
+    localStorage.setItem(cloudPurgeFlag, "true");
+  }
+
+  // ===== تقليل قراءات السحابة المتكررة =====
+  // إذا تمت مزامنة كاملة خلال آخر دقيقتين على هذا الجهاز، لا داعي لإعادة
+  // قراءة كل المجموعات من جديد؛ يبقى ما تم تحميله محلياً في بداية
+  // loadInitialData سارياً. هذا يمنع قراءة 13 مجموعة كاملة في كل مرة
+  // تُفتح أو تُحدَّث فيها الصفحة خلال فترة قصيرة.
+  const lastSync = Number(localStorage.getItem(LAST_SYNC_KEY) || 0);
+  if (Date.now() - lastSync < CLOUD_SYNC_MIN_INTERVAL_MS) {
+    return;
+  }
+
   const collectionsToPurge = [
     "attendance",
     "teacherAttendance",
@@ -314,28 +348,6 @@ async function syncAndPurgeDataFromCloud() {
     "messages",
     "screenOrder",
   ];
-
-  // تنفيذ تصفير السحابة مرة واحدة للسجلات الماضية
-  if (!localStorage.getItem(cloudPurgeFlag)) {
-    for (const colName of collectionsToPurge) {
-      try {
-        const snapshot = await dbFirestore.collection(colName).get();
-        if (!snapshot.empty) {
-          const batch = dbFirestore.batch();
-          snapshot.docs.forEach((d) => {
-            batch.delete(d.ref);
-          });
-          await batch.commit();
-          console.log(
-            `🧹 تم مسح مستندات (${colName}) القديمة من Firestore سحابياً.`,
-          );
-        }
-      } catch (err) {
-        console.warn(`تنبيه أثناء مسح ${colName}:`, err);
-      }
-    }
-    localStorage.setItem(cloudPurgeFlag, "true");
-  }
 
   // مزامنة المجموعات الأساسية المحمية فقط (الطلاب، المعلمين، الحلقات، الحسابات، الإعدادات)
   try {
@@ -362,7 +374,7 @@ async function syncAndPurgeDataFromCloud() {
       }
     }
 
-    // مزامنة المجموعات التشغيلية الجديدة
+    // مزامنة المجموعات التشغيلية
     for (const col of collectionsToPurge) {
       const snapshot = await dbFirestore.collection(col).get();
       if (!snapshot.empty) {
@@ -380,6 +392,7 @@ async function syncAndPurgeDataFromCloud() {
 
     migrateAllPasswordsRoleBased();
     saveLocalStore();
+    localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
     if (typeof refreshActiveView === "function") {
       refreshActiveView();
     }
@@ -457,17 +470,21 @@ async function saveToCloud(collectionName, docId, data, isDelete = false) {
 }
 
 // تسجيل عملية جديدة في سجل العمليات Logs
+let __lastLogSignature = null;
+let __lastLogSignatureTime = 0;
+
 function addSystemLog(actionDesc) {
   const currentUser = window.currentUser || { name: "النظام" };
   const now = new Date();
   const timeString = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()} ${now.toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}`;
+  const nowMs = Date.now();
 
   const newLog = {
-    id: "log_" + Date.now(),
+    id: "log_" + nowMs,
     userName: currentUser.name,
     action: actionDesc,
     timestamp: timeString,
-    createdAt: Date.now(),
+    createdAt: nowMs,
   };
 
   if (!Array.isArray(window.appStore.logs)) window.appStore.logs = [];
@@ -475,6 +492,19 @@ function addSystemLog(actionDesc) {
   if (window.appStore.logs.length > 200) {
     window.appStore.logs.pop();
   }
+
+  // حماية بسيطة: إذا تكرر نفس الإجراء لنفس المستخدم خلال أقل من ثانية،
+  // يتم تجاهل الرفع للسحابة فقط، لمنع أي حلقة غير مقصودة من إغراق
+  // حصة الكتابة، دون التأثير على السجل المحلي أو الاستخدام الطبيعي.
+  const signature = currentUser.name + "|" + actionDesc;
+  if (
+    signature === __lastLogSignature &&
+    nowMs - __lastLogSignatureTime < 1000
+  ) {
+    return;
+  }
+  __lastLogSignature = signature;
+  __lastLogSignatureTime = nowMs;
 
   saveToCloud("logs", newLog.id, newLog);
 }
