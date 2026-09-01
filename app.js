@@ -750,7 +750,6 @@ function checkStudentCurrentWeekTamayuz(studentId, weekOffset = 0) {
 // حساب العدد الفعلي لأسابيع التميز التي حقق فيها الطالب الشرطين بدقة
 function calculateActualQualifiedTamayuzWeeksCount(studentId) {
   let qualifiedWeeks = 0;
-  // فحص الأسابيع المسجلة (من الأسبوع الحالي والأسابيع السابقة)
   for (let w = 0; w < 16; w++) {
     if (checkStudentCurrentWeekTamayuz(studentId, w)) {
       qualifiedWeeks++;
@@ -1014,24 +1013,42 @@ function renderStudentData() {
         '<span class="badge" style="background:#e3f2fd; color:#1565c0;">🔵 مستأذن</span>';
   }
 
-  // تسليم الإشعارات للطالب بكافة الصيغ لضمان وصولها بنسبة 100%
-  const studentNotifs = (window.appStore?.notifications || []).filter((n) => {
+  // 1. جلب الإشعارات العامة والخاصة من إدارة المَجْمَع والمعلم
+  const directNotifs = (window.appStore?.notifications || []).filter((n) => {
     if (!n) return false;
-    if (n.recipient === "all" || n.recipient === "students") return true;
-    if (n.recipient === "specific_student") {
-      return (
-        n.targetId === student.id ||
-        n.targetId === student.nationalId ||
-        n.targetId === student.phone ||
-        n.targetId === student.parentPhone ||
-        (n.targetName &&
-          (n.targetName === student.name ||
-            n.targetName.includes(student.name) ||
-            student.name.includes(n.targetName)))
-      );
+    const rec = String(n.recipient || "").trim();
+    if (rec === "all" || rec === "students") return true;
+    if (n.circleId && String(n.circleId) === String(student.circleId)) return true;
+    if (rec === "specific_student") {
+      const tId = String(n.targetId || "").trim();
+      const sId = String(student.id || "").trim();
+      const sNat = String(student.nationalId || "").trim();
+      const sPhone = String(student.phone || "").trim();
+      const pPhone = String(student.parentPhone || "").trim();
+      const tName = String(n.targetName || "").trim();
+      const sName = String(student.name || "").trim();
+
+      if (tId && (tId === sId || tId === sNat || tId === sPhone || tId === pPhone)) return true;
+      if (tName && sName && (tName === sName || tName.includes(sName) || sName.includes(tName))) return true;
     }
     return false;
   });
+
+  // 2. دمج ملاحظات وتوجيهات التسميع اليومية المكتوبة من المعلم للطالب
+  const tasmeeaTeacherNotes = studentTasmeea
+    .filter((t) => t.studentNotes && String(t.studentNotes).trim() !== "")
+    .map((t) => ({
+      id: `tasm_note_${t.id || t.date}`,
+      title: `💬 توجيه وملاحظة المعلم (تسميع ${t.date || "اليوم"})`,
+      body: t.studentNotes,
+      sender: "معلم الحلقة",
+      date: t.date || "",
+      createdAt: t.updatedAt || Date.now(),
+    }));
+
+  // دمج كافة الرسائل معاً وترتيبها زمنياً من الأحدث للأقدم
+  const studentNotifs = [...directNotifs, ...tasmeeaTeacherNotes];
+  studentNotifs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0) || (b.date || "").localeCompare(a.date || ""));
 
   // استخراج اختبارات الطالب
   const studentTests = (window.appStore?.tests || []).filter(
@@ -1196,7 +1213,7 @@ function renderStudentData() {
       </div>
     </div>
 
-    <!-- 3. الصف الثالث: صندوق الإشعارات والرسائل -->
+    <!-- 3. الصف الثالث: صندوق الإشعارات والرسائل والملاحظات -->
     <div class="card mb-3" style="border-right: 4px solid #0b6b7d;">
       <div class="card-header flex-between">
         <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--primary-brown); margin: 0;">
