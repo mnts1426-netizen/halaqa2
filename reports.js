@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * reports.js - محرك التقارير الشاملة الرقمية، إنجاز طالب، وتصدير PDF المباشر
+ * reports.js - محرك التقارير الرسمية الملكية المطابقة لنموذج المتابعة والإنجاز
  * ==========================================================================
  */
 
@@ -50,7 +50,6 @@ function populateReportStudentsDropdown() {
     (s) => s.status === "active",
   );
 
-  // حصر الطلاب في حلقات المعلم إذا كان المسجل معلماً
   if (user && user.role === "teacher") {
     const teacherObj = (window.appStore?.teachers || []).find(
       (t) =>
@@ -112,7 +111,7 @@ function handleReportTypeChange() {
 
   if (tbody) {
     tbody.innerHTML =
-      '<tr><td class="text-center text-muted p-4">حدد خيارات التقرير ثم اضغط على "استخراج التقرير"</td></tr>';
+      '<tr><td colspan="8" class="text-center text-muted p-4">حدد خيارات التقرير ثم اضغط على "استخراج التقرير"</td></tr>';
   }
   if (thead) thead.innerHTML = "";
 }
@@ -142,6 +141,7 @@ function getSundayToWednesdayDatesByWeekOption(weekOption) {
   return days;
 }
 
+// دالة توليد التقرير الفخم المطابق تماماً لنموذج الصورة المرفقة
 function generateReport() {
   const reportType = document.getElementById("report-type-select")?.value;
   const selectedStudentId =
@@ -153,6 +153,7 @@ function generateReport() {
   const weekFrom = document.getElementById("report-week-from")?.value || "w_4";
   const weekTo = document.getElementById("report-week-to")?.value || "current";
 
+  const wrapper = document.getElementById("report-results-wrapper");
   const thead = document.getElementById("report-thead");
   const tbody = document.getElementById("report-tbody");
   const printTitle = document.getElementById("print-report-title");
@@ -160,34 +161,41 @@ function generateReport() {
 
   if (!thead || !tbody) return;
 
+  const now = new Date();
+  const currentDateFormatted = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
+  const currentTimeFormatted = now.toLocaleTimeString("ar-SA", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
   let headHtml = "";
   let bodyHtml = "";
 
-  // 1. تقرير إنجاز طالب
-  if (reportType === "student_achievement") {
-    if (printTitle) printTitle.textContent = "تقرير إنجاز طالب";
+  // 1. تقرير إنجاز ومتابعة الطالب (مطابق لجدول وتوزيع الصورة المرفقة)
+  if (reportType === "student_achievement" || reportType === "tasmeea") {
+    const targetDateLabel =
+      dateTo || dateFrom || new Date().toISOString().split("T")[0];
 
+    if (printTitle)
+      printTitle.textContent = `تقرير الإنجاز والمتابعة (يوم: ${targetDateLabel})`;
     if (printPeriod) {
-      if (dateFrom && dateTo) {
-        printPeriod.textContent = `الفترة: من تاريخ ${dateFrom} إلى تاريخ ${dateTo}`;
-      } else if (dateFrom) {
-        printPeriod.textContent = `من تاريخ: ${dateFrom}`;
-      } else if (dateTo) {
-        printPeriod.textContent = `إلى تاريخ: ${dateTo}`;
-      } else {
-        printPeriod.textContent = "كامل الفترة المسجلة";
-      }
+      printPeriod.textContent =
+        dateFrom && dateTo
+          ? `الفترة من ${dateFrom} إلى ${dateTo}`
+          : `تاريخ التقرير: ${targetDateLabel}`;
       printPeriod.style.display = "block";
     }
 
+    // رأس الجدول مطابق للصورة المرفقة تماماً
     headHtml = `
-      <tr>
-        <th style="width: 50px; text-align: center;">م</th>
-        <th>اسم الطالب</th>
-        <th>الحلقة</th>
-        <th>الدرس الجديد</th>
-        <th>المراجعة</th>
-        <th>التلاوة</th>
+      <tr style="background: #1a365d; color: #ffffff;">
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">الطالب</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">الحلقة</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">الحضور</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">أيام الحضور</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">ما تم إنجازه اليوم</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">إجمالي الحفظ والمقرر</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">ملاحظات</th>
       </tr>
     `;
 
@@ -204,51 +212,77 @@ function generateReport() {
 
     if (students.length === 0) {
       bodyHtml =
-        '<tr><td colspan="6" class="text-center text-muted p-4">لا توجد بيانات مطابقة للطلاب</td></tr>';
+        '<tr><td colspan="7" class="text-center text-muted p-4">لا توجد بيانات مطابقة للطلاب</td></tr>';
     } else {
-      students.forEach((s, idx) => {
+      students.forEach((s) => {
         const circle = (window.appStore.circles || []).find(
           (c) => c.id === s.circleId,
         );
-        const circleName = circle ? circle.name : "غير مسجل";
+        const circleName = circle ? circle.name : "حلقة عامة";
 
-        let records = (window.appStore.tasmeea || []).filter(
+        // سجل حضور اليوم وإجمالي أيام الحضور
+        const allAtt = (window.appStore.attendance || []).filter(
+          (a) => a.studentId === s.id,
+        );
+        const presentDaysCount = allAtt.filter(
+          (a) => a.status === "present" || a.status === "late",
+        ).length;
+        const todayAttRec = allAtt.find((a) => a.date === targetDateLabel);
+
+        let attStatusText = '<span style="color:#777;">غير مسجل</span>';
+        if (todayAttRec) {
+          if (todayAttRec.status === "present")
+            attStatusText =
+              '<span style="color:#2e7d32; font-weight:800;">حاضر</span>';
+          else if (todayAttRec.status === "absent")
+            attStatusText =
+              '<span style="color:#c62828; font-weight:800;">غائب</span>';
+          else if (todayAttRec.status === "late")
+            attStatusText =
+              '<span style="color:#b78103; font-weight:800;">متأخر</span>';
+          else if (todayAttRec.status === "excused")
+            attStatusText =
+              '<span style="color:#1565c0; font-weight:800;">مستأذن</span>';
+        }
+
+        // إنجاز اليوم
+        const allTasm = (window.appStore.tasmeea || []).filter(
           (t) => t.studentId === s.id,
         );
-        if (dateFrom) records = records.filter((t) => t.date >= dateFrom);
-        if (dateTo) records = records.filter((t) => t.date <= dateTo);
-        records.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+        const todayTasm = allTasm.find((t) => t.date === targetDateLabel);
 
-        const formatBranchSpan = (fieldSurah) => {
-          const validRecords = records.filter((r) => r[fieldSurah]);
-          if (validRecords.length === 0)
-            return '<span class="text-muted">—</span>';
+        let todayAchievementText = "لا يوجد إنجاز جديد";
+        let todayNotes = "—";
+        if (todayTasm) {
+          const parts = [];
+          if (todayTasm.hifzSurah)
+            parts.push(
+              `حفظ: ${todayTasm.hifzSurah} (${todayTasm.hifzRating || "ممتاز"})`,
+            );
+          if (todayTasm.murajaaSurah)
+            parts.push(`مراجعة: ${todayTasm.murajaaSurah}`);
+          if (todayTasm.tilawaSurah)
+            parts.push(`تلاوة: ${todayTasm.tilawaSurah}`);
+          if (parts.length > 0) todayAchievementText = parts.join(" | ");
+          todayNotes = todayTasm.studentNotes || todayTasm.adminNotes || "—";
+        }
 
-          const first = validRecords[0];
-          const last = validRecords[validRecords.length - 1];
-
-          if (
-            validRecords.length === 1 ||
-            first[fieldSurah] === last[fieldSurah]
-          ) {
-            return `<strong>${first[fieldSurah]}</strong>`;
-          }
-
-          return `من: <strong>${first[fieldSurah]}</strong><br>إلى: <strong>${last[fieldSurah]}</strong>`;
-        };
-
-        const hifzSpan = formatBranchSpan("hifzSurah");
-        const murajaaSpan = formatBranchSpan("murajaaSurah");
-        const tilawaSpan = formatBranchSpan("tilawaSurah");
+        // إجمالي الحفظ (من السجلات السابقة أو حقل الطالب)
+        const completedHifzCount = allTasm.filter((t) => t.hifzSurah).length;
+        const totalHifzDisplay =
+          completedHifzCount > 0
+            ? `${completedHifzCount} مقررات منجزة`
+            : s.hifzAmount || "مستمر في المقرر";
 
         bodyHtml += `
-          <tr>
-            <td style="text-align: center;">${idx + 1}</td>
-            <td style="font-weight: 800;">${s.name}</td>
-            <td><span style="font-weight: 600; color: var(--text-dark);">${circleName}</span></td>
-            <td style="line-height: 1.5;">${hifzSpan}</td>
-            <td style="line-height: 1.5;">${murajaaSpan}</td>
-            <td style="line-height: 1.5;">${tilawaSpan}</td>
+          <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.88rem;">
+            <td style="padding: 8px; font-weight: 800; color: #1e293b; text-align: right;">${s.name}</td>
+            <td style="padding: 8px; color: #334155;">${circleName}</td>
+            <td style="padding: 8px;">${attStatusText}</td>
+            <td style="padding: 8px; font-weight: 800; color: #1e293b;">${presentDaysCount}</td>
+            <td style="padding: 8px; color: #334155; line-height: 1.4;">${todayAchievementText}</td>
+            <td style="padding: 8px; font-weight: 700; color: #0b6b7d;">${totalHifzDisplay}</td>
+            <td style="padding: 8px; color: #475569;">${todayNotes}</td>
           </tr>
         `;
       });
@@ -260,57 +294,48 @@ function generateReport() {
     if (printTitle)
       printTitle.textContent =
         "التقرير الإحصائي الشامل للطلاب (أعداد الإنجاز والحضور)";
-
     if (printPeriod) {
-      if (dateFrom && dateTo) {
-        printPeriod.textContent = `الفترة: من تاريخ ${dateFrom} إلى تاريخ ${dateTo}`;
-      } else if (dateFrom) {
-        printPeriod.textContent = `من تاريخ: ${dateFrom}`;
-      } else if (dateTo) {
-        printPeriod.textContent = `إلى تاريخ: ${dateTo}`;
-      } else {
-        printPeriod.textContent = "كامل الفترة المسجلة";
-      }
+      printPeriod.textContent =
+        dateFrom && dateTo
+          ? `الفترة: من تاريخ ${dateFrom} إلى تاريخ ${dateTo}`
+          : "كامل الفترة المسجلة";
       printPeriod.style.display = "block";
     }
 
     headHtml = `
-      <tr>
-        <th rowspan="2" style="vertical-align: middle; text-align: center;">م</th>
-        <th rowspan="2" style="vertical-align: middle;">اسم الطالب</th>
-        <th rowspan="2" style="vertical-align: middle; text-align: center; line-height: 1.2;">أيام<br>الحضور</th>
-        <th rowspan="2" style="vertical-align: middle; text-align: center; line-height: 1.2;">أيام<br>الغياب</th>
-        <th rowspan="2" style="vertical-align: middle; text-align: center; line-height: 1.2;">مرات<br>التميز</th>
-        <th colspan="4" class="text-center">الدرس الجديد</th>
-        <th colspan="4" class="text-center">المراجعة</th>
-        <th colspan="4" class="text-center">التلاوة</th>
+      <tr style="background: #1a365d; color: #ffffff;">
+        <th rowspan="2" style="vertical-align: middle; text-align: center; border: 1px solid #cbd5e1;">م</th>
+        <th rowspan="2" style="vertical-align: middle; border: 1px solid #cbd5e1;">اسم الطالب</th>
+        <th rowspan="2" style="vertical-align: middle; text-align: center; border: 1px solid #cbd5e1;">أيام الحضور</th>
+        <th rowspan="2" style="vertical-align: middle; text-align: center; border: 1px solid #cbd5e1;">أيام الغياب</th>
+        <th rowspan="2" style="vertical-align: middle; text-align: center; border: 1px solid #cbd5e1;">مرات التميز</th>
+        <th colspan="4" style="text-align: center; border: 1px solid #cbd5e1;">الدرس الجديد</th>
+        <th colspan="4" style="text-align: center; border: 1px solid #cbd5e1;">المراجعة</th>
+        <th colspan="4" style="text-align: center; border: 1px solid #cbd5e1;">التلاوة</th>
       </tr>
-      <tr>
-        <th>ممتاز</th>
-        <th>جيد جداً</th>
-        <th>جيد</th>
-        <th>يعيد</th>
-        <th>ممتاز</th>
-        <th>جيد جداً</th>
-        <th>جيد</th>
-        <th>يعيد</th>
-        <th>ممتاز</th>
-        <th>جيد جداً</th>
-        <th>جيد</th>
-        <th>يعيد</th>
+      <tr style="background: #2b4c7e; color: #ffffff; font-size: 0.8rem;">
+        <th style="border: 1px solid #cbd5e1;">ممتاز</th>
+        <th style="border: 1px solid #cbd5e1;">ج.جداً</th>
+        <th style="border: 1px solid #cbd5e1;">جيد</th>
+        <th style="border: 1px solid #cbd5e1;">يعيد</th>
+        <th style="border: 1px solid #cbd5e1;">ممتاز</th>
+        <th style="border: 1px solid #cbd5e1;">ج.جداً</th>
+        <th style="border: 1px solid #cbd5e1;">جيد</th>
+        <th style="border: 1px solid #cbd5e1;">يعيد</th>
+        <th style="border: 1px solid #cbd5e1;">ممتاز</th>
+        <th style="border: 1px solid #cbd5e1;">ج.جداً</th>
+        <th style="border: 1px solid #cbd5e1;">جيد</th>
+        <th style="border: 1px solid #cbd5e1;">يعيد</th>
       </tr>
     `;
 
     let students = (window.appStore.students || []).filter(
       (s) => s.status !== "pending",
     );
-
-    if (circleId !== "all") {
+    if (circleId !== "all")
       students = students.filter((s) => s.circleId === circleId);
-    }
-    if (selectedStudentId !== "all") {
+    if (selectedStudentId !== "all")
       students = students.filter((s) => s.id === selectedStudentId);
-    }
 
     if (students.length === 0) {
       bodyHtml =
@@ -346,157 +371,67 @@ function generateReport() {
           }).length;
         };
 
-        const hifzMumtaz = countRating(stuTasmeea, "hifzRating", "ممتاز");
-        const hifzJayyidJiddan = countRating(
-          stuTasmeea,
-          "hifzRating",
-          "جيد جداً",
-        );
-        const hifzJayyid = countRating(stuTasmeea, "hifzRating", "جيد");
-        const hifzRe = countRating(stuTasmeea, "hifzRating", "يعيد");
-
-        const murajaaMumtaz = countRating(stuTasmeea, "murajaaRating", "ممتاز");
-        const murajaaJayyidJiddan = countRating(
-          stuTasmeea,
-          "murajaaRating",
-          "جيد جداً",
-        );
-        const murajaaJayyid = countRating(stuTasmeea, "murajaaRating", "جيد");
-        const murajaaRe = countRating(stuTasmeea, "murajaaRating", "يعيد");
-
-        const tilawaMumtaz = countRating(stuTasmeea, "tilawaRating", "ممتاز");
-        const tilawaJayyidJiddan = countRating(
-          stuTasmeea,
-          "tilawaRating",
-          "جيد جداً",
-        );
-        const tilawaJayyid = countRating(stuTasmeea, "tilawaRating", "جيد");
-        const tilawaRe = countRating(stuTasmeea, "tilawaRating", "يعيد");
-
-        const tamayuzCount = stuTasmeea.filter(
-          (t) =>
-            (t.rating || "").includes("ممتاز") ||
-            (t.hifzRating || "").includes("ممتاز"),
-        ).length;
+        let tamayuzCount = 0;
+        for (let w = 0; w < 16; w++) {
+          if (
+            typeof checkStudentCurrentWeekTamayuz === "function" &&
+            checkStudentCurrentWeekTamayuz(s.id, w)
+          ) {
+            tamayuzCount++;
+          }
+        }
 
         bodyHtml += `
-          <tr>
-            <td style="text-align: center;">${idx + 1}</td>
-            <td style="font-weight:700;">${s.name}</td>
-            <td style="font-weight:700; color: #2e7d32; text-align: center;">${presentCount}</td>
-            <td style="font-weight:700; color: #c62828; text-align: center;">${absentCount}</td>
-            <td style="font-weight:700; color: var(--primary-brown); text-align: center;">${tamayuzCount}</td>
-            
-            <td>${hifzMumtaz}</td>
-            <td>${hifzJayyidJiddan}</td>
-            <td>${hifzJayyid}</td>
-            <td>${hifzRe}</td>
-
-            <td>${murajaaMumtaz}</td>
-            <td>${murajaaJayyidJiddan}</td>
-            <td>${murajaaJayyid}</td>
-            <td>${murajaaRe}</td>
-
-            <td>${tilawaMumtaz}</td>
-            <td>${tilawaJayyidJiddan}</td>
-            <td>${tilawaJayyid}</td>
-            <td>${tilawaRe}</td>
+          <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.85rem;">
+            <td style="padding: 6px;">${idx + 1}</td>
+            <td style="padding: 6px; font-weight:700; text-align: right;">${s.name}</td>
+            <td style="padding: 6px; font-weight:700; color: #2e7d32;">${presentCount}</td>
+            <td style="padding: 6px; font-weight:700; color: #c62828;">${absentCount}</td>
+            <td style="padding: 6px; font-weight:800; color: var(--primary-brown);">${tamayuzCount}</td>
+            <td>${countRating(stuTasmeea, "hifzRating", "ممتاز")}</td>
+            <td>${countRating(stuTasmeea, "hifzRating", "جيد جداً")}</td>
+            <td>${countRating(stuTasmeea, "hifzRating", "جيد")}</td>
+            <td>${countRating(stuTasmeea, "hifzRating", "يعيد")}</td>
+            <td>${countRating(stuTasmeea, "murajaaRating", "ممتاز")}</td>
+            <td>${countRating(stuTasmeea, "murajaaRating", "جيد جداً")}</td>
+            <td>${countRating(stuTasmeea, "murajaaRating", "جيد")}</td>
+            <td>${countRating(stuTasmeea, "murajaaRating", "يعيد")}</td>
+            <td>${countRating(stuTasmeea, "tilawaRating", "ممتاز")}</td>
+            <td>${countRating(stuTasmeea, "tilawaRating", "جيد جداً")}</td>
+            <td>${countRating(stuTasmeea, "tilawaRating", "جيد")}</td>
+            <td>${countRating(stuTasmeea, "tilawaRating", "يعيد")}</td>
           </tr>
         `;
       });
     }
   }
 
-  // 3. تقرير سجل التسميع اليومي
-  else if (reportType === "tasmeea") {
-    if (printTitle)
-      printTitle.textContent = "تقرير إنجاز وسجل التسميع والدرس الجديد";
-
-    if (printPeriod) {
-      if (dateFrom && dateTo) {
-        printPeriod.textContent = `الفترة: من تاريخ ${dateFrom} إلى تاريخ ${dateTo}`;
-      } else if (dateFrom) {
-        printPeriod.textContent = `من تاريخ: ${dateFrom}`;
-      } else if (dateTo) {
-        printPeriod.textContent = `إلى تاريخ: ${dateTo}`;
-      } else {
-        printPeriod.textContent = "كامل الفترة المسجلة";
-      }
-      printPeriod.style.display = "block";
-    }
-
-    headHtml = `
-      <tr>
-        <th style="width: 50px; text-align: center;">م</th>
-        <th>اسم الطالب</th>
-        <th>الدرس الجديد</th>
-        <th>المراجعة</th>
-        <th>التلاوة</th>
-        <th>التقدير</th>
-        <th>ملاحظة المعلم</th>
-      </tr>
-    `;
-
-    let records = window.appStore.tasmeea || [];
-    if (circleId !== "all")
-      records = records.filter((r) => r.circleId === circleId);
-    if (selectedStudentId !== "all")
-      records = records.filter((r) => r.studentId === selectedStudentId);
-    if (dateFrom) records = records.filter((r) => r.date >= dateFrom);
-    if (dateTo) records = records.filter((r) => r.date <= dateTo);
-
-    if (records.length === 0) {
-      bodyHtml =
-        '<tr><td colspan="7" class="text-center text-muted p-4">لا توجد سجلات تسميع في هذه الفترة</td></tr>';
-    } else {
-      records.forEach((t, idx) => {
-        const student = (window.appStore.students || []).find(
-          (s) => s.id === t.studentId,
-        );
-        bodyHtml += `
-          <tr>
-            <td style="text-align: center;">${idx + 1}</td>
-            <td style="font-weight:700;">${student ? student.name : "طالب"}</td>
-            <td>${t.hifzSurah || "—"}</td>
-            <td>${t.murajaaSurah || "—"}</td>
-            <td>${t.tilawaSurah || "—"}</td>
-            <td>${t.rating || t.hifzRating || "—"}</td>
-            <td>${t.studentNotes || "—"}</td>
-          </tr>
-        `;
-      });
-    }
-  }
-
-  // 4. تقرير التميز الأسبوعي (تطبيق الشرطين الصارمين 100%: حضور 4 أيام + ممتاز فقط أو لا يوجد)
+  // 3. تقرير التميز الأسبوعي
   else if (reportType === "tamayuz") {
     if (printTitle)
-      printTitle.textContent = "تقرير التميز الأسبوعي (عدد بطاقات التميز)";
-
+      printTitle.textContent =
+        "تقرير التميز الأسبوعي (عدد بطاقات التميز المعتمدة)";
     if (printPeriod) {
-      printPeriod.textContent = `نطاق الأسابيع (من الأسبوع ${weekFrom} إلى الأسبوع ${weekTo})`;
+      printPeriod.textContent = `نطاق الأسابيع (من ${weekFrom} إلى ${weekTo})`;
       printPeriod.style.display = "block";
     }
 
     headHtml = `
-      <tr>
-        <th style="width: 60px; text-align: center;">م</th>
-        <th>اسم الطالب</th>
-        <th>الحلقة</th>
-        <th style="text-align: center;">عدد بطاقات التميز</th>
+      <tr style="background: #1a365d; color: #ffffff;">
+        <th style="padding: 10px; width: 60px; text-align: center; border: 1px solid #cbd5e1;">م</th>
+        <th style="padding: 10px; text-align: right; border: 1px solid #cbd5e1;">اسم الطالب المتميز</th>
+        <th style="padding: 10px; text-align: center; border: 1px solid #cbd5e1;">الحلقة</th>
+        <th style="padding: 10px; text-align: center; border: 1px solid #cbd5e1;">عدد بطاقات التميز</th>
       </tr>
     `;
 
     let students = (window.appStore.students || []).filter(
       (s) => s.status === "active",
     );
-
-    if (circleId !== "all") {
+    if (circleId !== "all")
       students = students.filter((s) => s.circleId === circleId);
-    }
-    if (selectedStudentId !== "all") {
+    if (selectedStudentId !== "all")
       students = students.filter((s) => s.id === selectedStudentId);
-    }
 
     const allWeekKeys = ["w_4", "w_3", "w_2", "w_1", "current"];
     const startIdx = allWeekKeys.indexOf(weekFrom);
@@ -509,33 +444,30 @@ function generateReport() {
     const isCleanMumtazOrEmpty = (r) => {
       if (!r) return true;
       const clean = String(r).trim();
-      if (clean === "" || clean === "—" || clean === "-" || clean === "لا يوجد")
-        return true;
-      return clean.includes("ممتاز");
+      return (
+        clean === "" ||
+        clean === "—" ||
+        clean === "-" ||
+        clean === "لا يوجد" ||
+        clean.includes("ممتاز")
+      );
     };
 
     const studentBadgesCount = [];
-
     students.forEach((s) => {
       let badgesSum = 0;
-
       selectedWeeks.forEach((wk) => {
         const weekDays = getSundayToWednesdayDatesByWeekOption(wk);
         if (!weekDays || weekDays.length !== 4) return;
-
-        let isQualifiedForWeek = true;
-
+        let isQualified = true;
         for (const day of weekDays) {
-          // الشرط الأول: حضور الأيام الأربعة كاملة (الأحد، الاثنين، الثلاثاء، الأربعاء)
           const att = (window.appStore?.attendance || []).find(
             (a) => a.studentId === s.id && a.date === day,
           );
           if (!att || (att.status !== "present" && att.status !== "late")) {
-            isQualifiedForWeek = false;
+            isQualified = false;
             break;
           }
-
-          // الشرط الثاني: ممتاز فقط أو لا يوجد (أي تقييم آخر كـ جيد جداً، جيد، يعيد، ضعيف يستبعد فوراً)
           const tasm = (window.appStore?.tasmeea || []).find(
             (t) => t.studentId === s.id && t.date === day,
           );
@@ -546,48 +478,97 @@ function generateReport() {
               !isCleanMumtazOrEmpty(tasm.tilawaRating) ||
               !isCleanMumtazOrEmpty(tasm.rating)
             ) {
-              isQualifiedForWeek = false;
+              isQualified = false;
               break;
             }
           }
         }
-
-        if (isQualifiedForWeek) {
-          badgesSum++;
-        }
+        if (isQualified) badgesSum++;
       });
-
-      if (badgesSum > 0) {
+      if (badgesSum > 0)
         studentBadgesCount.push({ student: s, count: badgesSum });
-      }
     });
 
     if (studentBadgesCount.length === 0) {
       bodyHtml =
-        '<tr><td colspan="4" class="text-center text-muted p-4">لا توجد بطاقات تميز مسجلة للطلاب في نطاق الأسابيع المحدد (يشترط حضور 4 أيام كاملة وتقييم ممتاز فقط)</td></tr>';
+        '<tr><td colspan="4" class="text-center text-muted p-4">لا توجد بطاقات تميز مسجلة للطلاب في هذا النطاق</td></tr>';
     } else {
       studentBadgesCount.forEach((item, idx) => {
         const circle = (window.appStore?.circles || []).find(
           (c) => c.id === item.student.circleId,
         );
-        const circleName = circle ? circle.name : "جامع الهدى";
-
         bodyHtml += `
-          <tr>
-            <td style="text-align: center;">${idx + 1}</td>
-            <td style="font-weight: 800;">⭐ ${item.student.name}</td>
-            <td><span style="font-weight: 600; color: var(--text-dark);">${circleName}</span></td>
-            <td style="text-align: center; font-weight: 900; color: var(--primary-brown); font-size: 1.05rem;">
-              🎖️ ${item.count} بطاقات
-            </td>
+          <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.9rem;">
+            <td style="padding: 8px;">${idx + 1}</td>
+            <td style="padding: 8px; font-weight: 800; text-align: right;">⭐ ${item.student.name}</td>
+            <td style="padding: 8px;">${circle ? circle.name : "جامع الهدى"}</td>
+            <td style="padding: 8px; font-weight: 900; color: #1a365d;">🎖️ ${item.count} بطاقات</td>
           </tr>
         `;
       });
     }
   }
 
-  thead.innerHTML = headHtml;
-  tbody.innerHTML = bodyHtml;
+  // تطبيق الهيكل الملكي الفاخر المؤطر كاملاً
+  if (wrapper) {
+    wrapper.innerHTML = `
+      <div style="border: 2.5px double #1a365d; border-radius: 8px; padding: 1.5rem; background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-top: 1rem;">
+        
+        <!-- الترويسة الملكية الرسمية -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1a365d; padding-bottom: 0.8rem; margin-bottom: 1rem;">
+          <div style="width: 100px; text-align: right;">
+            <img src="logo12.jpeg" alt="شعار المَجْمَع" style="height: 65px; width: auto; object-fit: contain;" />
+          </div>
+          <div style="text-align: center; flex: 1;">
+            <h4 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: #475569;">المملكة العربية السعودية</h4>
+            <h2 style="margin: 3px 0; font-size: 1.35rem; font-weight: 900; color: #1a365d;">مَجْمَع عبدالله بن مهدي القرآني</h2>
+            <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #334155;">جامع الهدى</h4>
+            <div style="margin-top: 4px; font-size: 0.78rem; color: #64748b; font-weight: 600;">
+              تاريخ الطباعة: ${currentDateFormatted} | الوقت: ${currentTimeFormatted}
+            </div>
+          </div>
+          <div style="width: 100px; text-align: left;">
+            <img src="logo_transparent_1.png" alt="شعار المَجْمَع" style="height: 60px; width: auto; object-fit: contain;" />
+          </div>
+        </div>
+
+        <!-- صندوق العنوان المؤطر في المنتصف -->
+        <div style="text-align: center; margin-bottom: 1.25rem;">
+          <div style="display: inline-block; border: 2px solid #1a365d; border-radius: 6px; padding: 0.4rem 1.8rem; background: #f8fafc;">
+            <h3 id="print-report-title" style="margin: 0; font-size: 1.15rem; font-weight: 900; color: #1a365d;">
+              ${printTitle ? printTitle.textContent : "تقرير رسمي"}
+            </h3>
+            <p id="print-report-period" style="margin: 3px 0 0 0; font-size: 0.82rem; font-weight: 700; color: #475569;">
+              ${printPeriod ? printPeriod.textContent : ""}
+            </p>
+          </div>
+        </div>
+
+        <!-- جدول البيانات المؤطر الفخم -->
+        <div class="table-responsive" style="margin-bottom: 1.5rem;">
+          <table class="data-table" id="report-results-table" style="width: 100%; border-collapse: collapse; border: 1.5px solid #1a365d;">
+            <thead id="report-thead">${headHtml}</thead>
+            <tbody id="report-tbody">${bodyHtml}</tbody>
+          </table>
+        </div>
+
+        <!-- تذييل الاعتماد والختم الرسمي -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px solid #cbd5e1; padding-top: 1rem; margin-top: 1.5rem; font-size: 0.9rem;">
+          <div style="text-align: right;">
+            <strong style="color: #1a365d;">نظام إدارة الحلقات القرآني</strong>
+          </div>
+          <div style="text-align: center; color: #64748b; font-size: 0.82rem;">
+            صفحة 1 / 1
+          </div>
+          <div style="text-align: left;">
+            <div style="font-weight: 800; color: #1a365d; margin-bottom: 1.5rem;">الختم والاعتماد / مدير المَجْمَع</div>
+            <div style="font-weight: 900; color: #334155;">صالح ال ناشع</div>
+          </div>
+        </div>
+
+      </div>
+    `;
+  }
 }
 
 function exportReportExcel() {
@@ -613,11 +594,12 @@ function downloadReportPDF() {
   if (!element) return;
 
   const reportTitle =
-    document.getElementById("print-report-title")?.textContent || "تقرير_رسمي";
+    document.getElementById("print-report-title")?.textContent ||
+    "تقرير_المجمع_الرسمي";
 
   if (typeof html2pdf !== "undefined") {
     const opt = {
-      margin: [10, 10, 10, 10],
+      margin: [8, 8, 8, 8],
       filename: `${reportTitle.trim().replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`,
       image: { type: "jpeg", quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
