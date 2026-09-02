@@ -561,8 +561,8 @@ function generateReport() {
             صفحة 1 / 1
           </div>
           <div style="text-align: left;">
-            <div style="font-weight: 800; color: #1a365d; margin-bottom: 1.5rem;">الختم والاعتماد / مدير المَجْمَع</div>
-            <div style="font-weight: 900; color: #334155;">صالح ال ناشع</div>
+            <div style="font-weight: 800; color: #1a365d; margin-bottom: 1.5rem;"></div>
+            <div style="font-weight: 900; color: #334155;">احمد بن عبدالله ال مهدي </div>
           </div>
         </div>
 
