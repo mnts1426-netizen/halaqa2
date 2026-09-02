@@ -1,5 +1,5 @@
 /* ==========================================================================
-   الهوية البصرية والطباعة المتمركزة والمضغوطة + أنماط الخريطة العصرية
+   style.css - الهوية البصرية، التقرير الملكي المعتمد، وتنسيقات شاشة العرض
    ========================================================================== */
 
 :root {
@@ -183,7 +183,7 @@ body {
   text-align: center;
 }
 
-/* 1. شعار تسجيل الدخول - يندمج بدون خلفية ويظهر الرسم الأبيض ناصعاً */
+/* شعار تسجيل الدخول */
 .logo-icon-big {
   width: 120px;
   height: 120px;
@@ -265,7 +265,6 @@ body {
   gap: 0.5rem;
 }
 
-/* 2. شعار القائمة الجانبية داخل الحساب */
 .logo-icon {
   width: 38px;
   height: 38px;
@@ -716,7 +715,26 @@ body {
 }
 
 /* ==========================================================================
-   تنسيقات الخريطة التفاعلية العصرية والدبوس المتحرك
+   تنسيقات شاشة العرض التفاعلية المتقلبة
+   ========================================================================== */
+#mosque-screen-grid {
+  transition: opacity 0.4s ease-in-out;
+  animation: screenFadeIn 0.5s ease-out;
+}
+
+@keyframes screenFadeIn {
+  from {
+    opacity: 0.2;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ==========================================================================
+   تنسيقات الخريطة التفاعلية العصرية
    ========================================================================== */
 .custom-modern-map-icon {
   background: transparent !important;
@@ -806,7 +824,6 @@ body {
   box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.05);
 }
 
-/* تحسين مظهر أدوات تحكم الخريطة */
 .leaflet-control-layers {
   border-radius: var(--radius-sm) !important;
   border: 1px solid var(--border-color) !important;
@@ -829,38 +846,11 @@ body {
   background-color: var(--primary-light) !important;
 }
 
-/* شبكة لوحة التميز */
+/* لوحة فرسان التميز */
 .tamayuz-complex-board {
   display: grid;
   gap: 1.25rem;
   margin-top: 1rem;
-}
-
-.tamayuz-grid-4 {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-.tamayuz-grid-6 {
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.tamayuz-grid-5 {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1.25rem;
-}
-.tamayuz-grid-5 .tamayuz-circle-card {
-  flex: 0 1 calc(33.333% - 1rem);
-  min-width: 260px;
-}
-.tamayuz-grid-5 .tamayuz-circle-card:nth-child(4),
-.tamayuz-grid-5 .tamayuz-circle-card:nth-child(5) {
-  flex: 0 1 calc(38% - 1rem);
-}
-
-.tamayuz-grid-3 {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
 .tamayuz-circle-card {
@@ -895,20 +885,7 @@ body {
   background-color: #fafcfb;
 }
 
-@media (max-width: 900px) {
-  .tamayuz-grid-4,
-  .tamayuz-grid-6,
-  .tamayuz-grid-5 {
-    grid-template-columns: 1fr !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-  .tamayuz-grid-5 .tamayuz-circle-card {
-    flex: 1 1 100% !important;
-  }
-}
-
-/* نوافذ منبثقة */
+/* النوافذ المنبثقة */
 .modal-overlay {
   display: none;
   position: fixed;
@@ -1045,18 +1022,6 @@ body {
   gap: 0.8rem;
 }
 
-.dynamic-columns-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 0.6rem;
-  max-height: 180px;
-  overflow-y: auto;
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: #f4f9f9;
-}
-
 .complex-hub-cards .hub-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(11, 107, 125, 0.12);
@@ -1115,18 +1080,6 @@ body {
     grid-template-columns: repeat(3, 1fr) !important;
     gap: 0.4rem !important;
   }
-  .student-stats-report-grid .stat-card {
-    padding: 0.5rem 0.25rem !important;
-    border-radius: 8px !important;
-  }
-  .student-stats-report-grid .stat-label {
-    font-size: 0.68rem !important;
-    line-height: 1.2 !important;
-  }
-  .student-stats-report-grid .stat-value {
-    font-size: 1.15rem !important;
-    margin-top: 2px !important;
-  }
   .form-row {
     flex-direction: column;
     gap: 0.4rem;
@@ -1135,55 +1088,33 @@ body {
     grid-template-columns: 1fr 1fr;
     gap: 0.6rem;
   }
-  .stat-card {
-    padding: 0.8rem;
-    gap: 0.5rem;
-  }
-  .stat-value {
-    font-size: 1.3rem;
-  }
-  .modal-card {
-    max-height: 94vh !important;
-    height: 94vh !important;
-    border-radius: var(--radius-sm);
-  }
-  .modal-body {
-    padding: 0.8rem;
-  }
-  .word-page-container {
-    padding: 1rem;
-  }
-  .card {
-    padding: 0.9rem;
-  }
 }
 
 /* ==========================================================================
-   تنسيقات الطباعة الرسمية المخصصة للتقرير فقط بدون كامل الشاشة
+   تنسيقات الطباعة الرسمية الملكية المطابقة للنموذج المعتمد
    ========================================================================== */
-.print-official-header {
-  display: none;
-}
-.print-report-footer {
-  display: none !important;
-}
-
 @media print {
   @page {
-    margin: 1.2cm 0.8cm;
-    size: auto;
+    margin: 0.8cm !important;
+    size: A4 landscape !important;
+  }
+
+  *,
+  *:before,
+  *:after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   body {
     background-color: #ffffff !important;
     color: #000000 !important;
-    font-size: 10pt !important;
+    font-size: 9.5pt !important;
     margin: 0 !important;
     padding: 0 !important;
-    text-align: center !important;
   }
 
-  /* إخفاء كافة مكونات الصفحة غير المراد طباعتها */
+  /* إخفاء الواجهات الجانبية وأزرار التحكم أثناء الطباعة */
   .sidebar,
   .top-header,
   .no-print,
@@ -1194,20 +1125,29 @@ body {
   .complex-hub-cards,
   #tamayuz-board-card,
   #teacher-dash-columns,
-  #view-dashboard:not(.print-active),
-  #view-circles:not(.print-active),
-  #view-attendance:not(.print-active),
-  #view-tasmeea:not(.print-active),
-  #view-teacher-notes:not(.print-active),
-  #view-accounts:not(.print-active),
-  #view-screen:not(.print-active),
-  #view-notifications:not(.print-active),
-  #view-settings:not(.print-active) {
+  .modal-overlay,
+  #view-dashboard,
+  #view-circles,
+  #view-attendance,
+  #view-tasmeea,
+  #view-teacher-notes,
+  #view-accounts,
+  #view-screen,
+  #view-tests,
+  #view-notifications,
+  #view-settings {
     display: none !important;
   }
 
+  #view-reports {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
   .main-content {
-    margin: 0 auto !important;
+    margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -1217,125 +1157,58 @@ body {
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
-    margin: 0 auto !important;
-    width: 100% !important;
-  }
-
-  /* طباعة النوافذ المنبثقة إذا كانت نشطة */
-  .modal-overlay.active {
-    position: static !important;
-    display: block !important;
-    background: transparent !important;
-    padding: 0 !important;
-  }
-
-  .modal-overlay.active .modal-card {
-    box-shadow: none !important;
-    border: none !important;
-    max-width: 100% !important;
-    height: auto !important;
-    max-height: none !important;
-  }
-
-  .modal-overlay.active .modal-header,
-  .modal-overlay.active .modal-footer,
-  .modal-overlay.active .modal-close {
-    display: none !important;
-  }
-
-  .modal-overlay.active .modal-body {
-    overflow: visible !important;
-    padding: 0 !important;
-  }
-
-  /* الشريط والترويسة العلوية في كل صفحة مطبوعة */
-  .print-official-header {
-    display: block !important;
-    margin: 0 auto 0.6rem auto !important;
-    border-bottom: 1.5px solid var(--primary-brown) !important;
-    padding-bottom: 0.4rem !important;
-    width: 100% !important;
-    text-align: center !important;
-    page-break-inside: avoid !important;
-  }
-
-  .print-header-center-logos {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 1.8rem !important;
-    margin: 0 auto 0.2rem auto !important;
-  }
-
-  .print-header-center-logos img {
-    height: 48px !important;
-    width: auto !important;
-    object-fit: contain !important;
-    background: transparent !important;
-    mix-blend-mode: multiply !important;
-  }
-
-  .print-header-title-box {
-    text-align: center !important;
-    background: #f4f9f9 !important;
-    padding: 0.25rem 0.5rem !important;
-    border-radius: 4px !important;
-    margin: 0.3rem auto 0 auto !important;
-    border: 1px solid #ddd !important;
-    display: inline-block !important;
-    min-width: 260px !important;
-  }
-
-  .print-header-title-box h3 {
-    font-size: 1.05rem !important;
     margin: 0 !important;
+    width: 100% !important;
   }
 
-  .print-header-title-box p {
-    font-size: 0.8rem !important;
-    margin: 2px 0 0 0 !important;
+  /* الإطار الملكي المزدوج للتقرير */
+  #report-results-wrapper > div {
+    border: 2.5px double #1a365d !important;
+    border-radius: 6px !important;
+    padding: 1.2cm 1cm !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    margin: 0 auto !important;
+    page-break-inside: avoid !important;
   }
 
   .table-responsive {
     overflow: visible !important;
     width: 100% !important;
     margin: 0 auto !important;
-    display: flex !important;
-    justify-content: center !important;
   }
 
-  /* توسيط الجداول تماماً في منتصف الصفحة */
-  .data-table {
+  /* جدول التقرير الرسمي */
+  #report-results-table {
     width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 auto !important;
     border-collapse: collapse !important;
+    border: 1.5px solid #1a365d !important;
   }
 
-  .data-table th,
-  .data-table td {
-    border: 1px solid #bbb !important;
-    padding: 4.5pt 6pt !important;
-    color: #000000 !important;
+  #report-results-table thead tr {
+    background-color: #1a365d !important;
+    color: #ffffff !important;
+  }
+
+  #report-results-table th {
+    background-color: #1a365d !important;
+    color: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 7pt 6pt !important;
+    font-weight: 800 !important;
+    text-align: center !important;
+    font-size: 9pt !important;
+  }
+
+  #report-results-table td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 6pt 6pt !important;
+    color: #1e293b !important;
+    font-size: 8.5pt !important;
     text-align: center !important;
   }
 
-  .data-table th {
-    background-color: #f4f9f9 !important;
-    font-weight: bold !important;
-  }
-
-  .data-table tr {
+  #report-results-table tbody tr {
     page-break-inside: avoid !important;
-  }
-
-  .badge {
-    border: 1px solid #888 !important;
-    background: transparent !important;
-    color: #000 !important;
-  }
-
-  .hide-on-print {
-    display: none !important;
   }
 }
