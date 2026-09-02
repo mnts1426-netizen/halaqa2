@@ -123,7 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
   checkSavedSession();
 });
 
-// دالة تسجيل الدخول الموحدة مع التحقق الصارم من كلمة المرور
+// دالة تسجيل الدخول الموحدة مع التحقق الصارم وتوثيق وقت الدخول
 window.handleLoginFormSubmit = function (e) {
   if (e && e.preventDefault) e.preventDefault();
 
@@ -202,7 +202,7 @@ window.handleLoginFormSubmit = function (e) {
     return false;
   }
 
-  // 3. حسابات المعلمين
+  // 3. حسابات المعلمين وتوثيق وقت الدخول الدقيق والثابت
   const teachers = window.appStore?.teachers || [];
   const foundTeacher = teachers.find(
     (t) =>
@@ -230,6 +230,20 @@ window.handleLoginFormSubmit = function (e) {
       alert("❌ الرقم السري للمعلم غير صحيح!");
       return false;
     }
+
+    // تسجيل وتوثيق التاريخ والوقت الدقيق لدخول المعلم ليظهر دائماً عند المدير
+    const now = new Date();
+    const formattedDate = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
+    const formattedTime = now.toLocaleTimeString("ar-SA", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    foundTeacher.lastLogin = `${formattedDate} (${formattedTime})`;
+
+    if (typeof saveToCloud === "function") {
+      saveToCloud("teachers", foundTeacher.id, foundTeacher);
+    }
+    if (typeof saveLocalStore === "function") saveLocalStore();
 
     const teacherSessionUser = {
       id: foundTeacher.id,
@@ -376,15 +390,36 @@ window.handleStudentLoginFormSubmit = function (e) {
   return false;
 };
 
+// دالة اعتماد الجلسة ومؤقت الخروج التلقائي بعد ساعتين
 window.doLogin = function (user, isAutoSession = false) {
   if (!user) return;
 
   window.currentUser = user;
   try {
     localStorage.setItem("HALAQAT_SESSION_USER", JSON.stringify(user));
+    if (!isAutoSession) {
+      localStorage.setItem("HALAQAT_SESSION_TIME", Date.now().toString());
+    }
   } catch (e) {
     console.warn(e);
   }
+
+  // مؤقت الخروج التلقائي الصارم بعد ساعتين (7200000 مللي ثانية)
+  if (window.autoLogoutTimer) clearTimeout(window.autoLogoutTimer);
+  const sessionStartTime = parseInt(
+    localStorage.getItem("HALAQAT_SESSION_TIME") || Date.now().toString(),
+    10,
+  );
+  const elapsed = Date.now() - sessionStartTime;
+  const twoHoursMs = 2 * 60 * 60 * 1000;
+  const remaining = Math.max(0, twoHoursMs - elapsed);
+
+  window.autoLogoutTimer = setTimeout(() => {
+    alert(
+      "⚠️ انتهت جلستك الحالية (مرت ساعتان). تم تسجيل الخروج تلقائياً لأسباب أمنية.",
+    );
+    handleLogout();
+  }, remaining);
 
   const loginView = document.getElementById("view-login");
   const stuLoginView = document.getElementById("view-student-login");
@@ -674,9 +709,22 @@ function syncHeaderDateTime() {
   }
 }
 
+// فحص الجلسة والتحقق من عدم تجاوز مدة الساعتين
 function checkSavedSession() {
   const savedUserStr = localStorage.getItem("HALAQAT_SESSION_USER");
+  const sessionTime = parseInt(
+    localStorage.getItem("HALAQAT_SESSION_TIME") || "0",
+    10,
+  );
+  const twoHoursMs = 2 * 60 * 60 * 1000;
+
   if (savedUserStr) {
+    if (sessionTime && Date.now() - sessionTime > twoHoursMs) {
+      localStorage.removeItem("HALAQAT_SESSION_USER");
+      localStorage.removeItem("HALAQAT_SESSION_TIME");
+      showMainLoginView();
+      return;
+    }
     try {
       const user = JSON.parse(savedUserStr);
       doLogin(user, true);
@@ -688,7 +736,7 @@ function checkSavedSession() {
   }
 }
 
-// دالة فحص التميز الأسبوعي الصارمة (شرطان فقط: حضور 4 أيام كاملة من الأحد للأربعاء + ممتاز فقط أو لا يوجد)
+// دالة فحص التميز الأسبوعي الصارمة
 function checkStudentCurrentWeekTamayuz(studentId, weekOffset = 0) {
   const now = new Date();
   const dayOfWeek = now.getDay();
@@ -705,17 +753,14 @@ function checkStudentCurrentWeekTamayuz(studentId, weekOffset = 0) {
     weekDays.push(`${y}-${m}-${day}`);
   }
 
-  // فحص الأيام الأربعة يوماً بيوم
   for (const day of weekDays) {
-    // الشرط 1: التحضير (حاضر حضوراً كاملاً)
     const att = (window.appStore?.attendance || []).find(
       (a) => a.studentId === studentId && a.date === day,
     );
     if (!att || (att.status !== "present" && att.status !== "late")) {
-      return false; // غائب أو لم يحضر في أحد الأيام الأربعة -> استبعاد فوري
+      return false;
     }
 
-    // الشرط 2: التسميع (ممتاز فقط أو فارغ، وأي تقييم آخر كـ جيد جداً، جيد، يعيد، ضعيف يستبعد فوراً)
     const tasm = (window.appStore?.tasmeea || []).find(
       (t) => t.studentId === studentId && t.date === day,
     );
@@ -739,7 +784,7 @@ function checkStudentCurrentWeekTamayuz(studentId, weekOffset = 0) {
         !isCleanMumtazOrEmpty(tasm.tilawaRating) ||
         !isCleanMumtazOrEmpty(tasm.rating)
       ) {
-        return false; // حصل على تقييم غير ممتاز في أي مقرر -> استبعاد فوري
+        return false;
       }
     }
   }
@@ -747,7 +792,6 @@ function checkStudentCurrentWeekTamayuz(studentId, weekOffset = 0) {
   return true;
 }
 
-// حساب العدد الفعلي لأسابيع التميز التي حقق فيها الطالب الشرطين بدقة
 function calculateActualQualifiedTamayuzWeeksCount(studentId) {
   let qualifiedWeeks = 0;
   for (let w = 0; w < 16; w++) {
@@ -938,7 +982,6 @@ function renderStudentData() {
   ).length;
   const absentCount = studentAtt.filter((a) => a.status === "absent").length;
 
-  // احتساب عدد مرات التميز وفق الشروط الصارمة فقط
   const tamayuzCount = calculateActualQualifiedTamayuzWeeksCount(studentId);
 
   const countRating = (records, field, type) => {
@@ -986,7 +1029,6 @@ function renderStudentData() {
   const todayRecord = studentTasmeea.find((t) => t.date === todayStr) || {};
   const todayAttRecord = studentAtt.find((a) => a.date === todayStr);
 
-  // استخراج خطة درس الغد المسجلة للطالب
   const latestTasmWithNext =
     studentTasmeea
       .filter((t) => t.nextHifz || t.nextMurajaa || t.nextTilawa)
@@ -1018,7 +1060,8 @@ function renderStudentData() {
     if (!n) return false;
     const rec = String(n.recipient || "").trim();
     if (rec === "all" || rec === "students") return true;
-    if (n.circleId && String(n.circleId) === String(student.circleId)) return true;
+    if (n.circleId && String(n.circleId) === String(student.circleId))
+      return true;
     if (rec === "specific_student") {
       const tId = String(n.targetId || "").trim();
       const sId = String(student.id || "").trim();
@@ -1028,8 +1071,17 @@ function renderStudentData() {
       const tName = String(n.targetName || "").trim();
       const sName = String(student.name || "").trim();
 
-      if (tId && (tId === sId || tId === sNat || tId === sPhone || tId === pPhone)) return true;
-      if (tName && sName && (tName === sName || tName.includes(sName) || sName.includes(tName))) return true;
+      if (
+        tId &&
+        (tId === sId || tId === sNat || tId === sPhone || tId === pPhone)
+      )
+        return true;
+      if (
+        tName &&
+        sName &&
+        (tName === sName || tName.includes(sName) || sName.includes(tName))
+      )
+        return true;
     }
     return false;
   });
@@ -1046,11 +1098,13 @@ function renderStudentData() {
       createdAt: t.updatedAt || Date.now(),
     }));
 
-  // دمج كافة الرسائل معاً وترتيبها زمنياً من الأحدث للأقدم
   const studentNotifs = [...directNotifs, ...tasmeeaTeacherNotes];
-  studentNotifs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0) || (b.date || "").localeCompare(a.date || ""));
+  studentNotifs.sort(
+    (a, b) =>
+      (b.createdAt || 0) - (a.createdAt || 0) ||
+      (b.date || "").localeCompare(a.date || ""),
+  );
 
-  // استخراج اختبارات الطالب
   const studentTests = (window.appStore?.tests || []).filter(
     (t) => t.studentId === student.id || t.studentId === studentId,
   );
@@ -1066,7 +1120,6 @@ function renderStudentData() {
   const logoTransparent = "logo_transparent_2.png";
   const logoOld = "logo_transparent_1.png";
 
-  // إعداد قسم التميز والاختبارات التفاعلي المشروط
   const hasTamayuz = Boolean(isDistinguishedThisWeek);
   const hasTests = studentTests.length > 0;
 
@@ -1728,36 +1781,8 @@ window.exportTasmeeaDetailsPDF = function () {
 };
 
 window.printTasmeeaDetails = function () {
-  window.exportTasmeeaDetailsPDF();
+  printTableElement("tasmeea-details-table", "تفاصيل تسميع الطلاب لليوم");
 };
-
-function renderNotificationsView() {
-  const notifContainer = document.getElementById(
-    "unified-notifications-container",
-  );
-  if (!notifContainer) return;
-
-  const allNotifs = window.appStore?.notifications || [];
-  if (allNotifs.length === 0) {
-    notifContainer.innerHTML = `<div class="empty-state-card p-3"><p class="text-muted">لا توجد إشعارات جديدة حالياً</p></div>`;
-    return;
-  }
-
-  notifContainer.innerHTML = allNotifs
-    .map(
-      (n) => `
-      <div class="notification-item-card mb-2 p-3" style="background: #fafcfb; border: 1px solid var(--border-color); border-radius: 8px;">
-        <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 4px;">${n.title}</h4>
-        <p class="text-muted" style="font-size: 0.9rem; margin-bottom: 6px;">${n.body}</p>
-        <div class="flex-between" style="font-size: 0.75rem; color: #888;">
-          <span>من: ${n.sender || "الإدارة"}</span>
-          <span>${n.date || ""}</span>
-        </div>
-      </div>
-    `,
-    )
-    .join("");
-}
 
 window.handleUserProfileSave = function (e) {
   if (e && e.preventDefault) e.preventDefault();
@@ -1837,7 +1862,9 @@ window.handleUserProfileSave = function (e) {
 
 window.handleLogout = function () {
   window.currentUser = null;
+  if (window.autoLogoutTimer) clearTimeout(window.autoLogoutTimer);
   localStorage.removeItem("HALAQAT_SESSION_USER");
+  localStorage.removeItem("HALAQAT_SESSION_TIME");
   showMainLoginView();
 };
 
