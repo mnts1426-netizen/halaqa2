@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * admin.js - المحرك الإداري الشامل، شروط التميز الصارمة، وإرسال الإشعارات
+ * admin.js - المحرك الإداري الشامل، شاشة العرض المتقلبة الذكية، وإرسال الإشعارات
  * ==========================================================================
  */
 
@@ -19,10 +19,15 @@ window.appStore = window.appStore || {
   settings: null,
 };
 
-// متغيرات الخريطة التفاعلية العصرية
+// متغيرات الخريطة التفاعلية
 window.mapPickerInstance = null;
 window.mapPickerMarker = null;
 window.mapPickerCircle = null;
+
+// متغيرات شاشة العرض المتقلبة والمؤقتات الموفرة للموارد
+window.screenFlipTimer = null;
+window.screenDataRefreshTimer = null;
+window.screenCurrentSlide = "tamayuz"; // 'tamayuz' أو 'stats'
 
 document.addEventListener("DOMContentLoaded", () => {
   // ربط نماذج الإضافة الأساسية
@@ -115,7 +120,517 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ==========================================================================
-// 1. التنقل بين أقسام إدارة المَجْمَع (الحلقات، المعلمين، الطلاب)
+// دوال الطباعة والتصدير لكافة شاشات وجداول النظام
+// ==========================================================================
+window.printTableElement = function (tableId, title) {
+  const table = document.getElementById(tableId);
+  if (!table) {
+    alert("⚠️ لا يوجد جدول متاح للطباعة.");
+    return;
+  }
+  const orgName =
+    window.appStore?.settings?.orgName || "مَجْمَع عبدالله بن مهدي القرآني";
+  const mosqueName = window.appStore?.settings?.subTitle || "جامع الهدى";
+  const printWindow = window.open("", "_blank");
+  printWindow.document.write(`
+    <html dir="rtl" lang="ar">
+      <head>
+        <title>${title}</title>
+        <style>
+          body { font-family: 'Cairo', 'Tajawal', sans-serif; direction: rtl; padding: 25px; text-align: center; }
+          .header { border-bottom: 2px solid #0b6b7d; padding-bottom: 12px; margin-bottom: 15px; }
+          .header h2 { margin: 0; color: #0b6b7d; font-size: 1.4rem; }
+          .header p { margin: 5px 0 0 0; color: #475569; font-weight: 700; }
+          table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+          th, td { border: 1px solid #cbd5e1; padding: 8px 6px; text-align: center; }
+          th { background-color: #1a365d; color: #ffffff; font-weight: bold; }
+          .no-print, button { display: none !important; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>${orgName}</h2>
+          <p>${mosqueName} — ${title}</p>
+          <small>تاريخ الطباعة: ${new Date().toLocaleDateString("ar-SA")}</small>
+        </div>
+        ${table.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 300);
+};
+
+window.printTeachersTable = function () {
+  printTableElement("teachers-table-element", "قائمة المعلمين المكلفين");
+};
+
+window.printTeachersAttendance = function () {
+  printTableElement(
+    "teachers-attendance-table-element",
+    "كشف متابعة تحضير المعلمين",
+  );
+};
+
+window.printStudentsTable = function () {
+  printTableElement("students-table-element", "كشف الطلاب المسجلين");
+};
+
+window.printAttendanceTable = function () {
+  printTableElement("attendance-table-element", "كشف تحضير الطلاب");
+};
+
+window.printAccountsTable = function () {
+  printTableElement("accounts-table-element", "إدارة حسابات النظام");
+};
+
+window.printTestsTable = function () {
+  printTableElement("tests-table-element", "سجل الاختبارات والنتائج");
+};
+
+window.printTeacherNotes = function () {
+  printTableElement("teacher-notes-table-element", "ملاحظات المعلمين للإدارة");
+};
+
+window.exportTeachersExcel = function () {
+  const table = document.getElementById("teachers-table-element");
+  if (!table) return;
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة Excel غير متوفرة!");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "المعلمون" });
+  XLSX.writeFile(
+    wb,
+    `قائمة_المعلمين_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+};
+
+window.exportTeachersPDF = function () {
+  printTeachersTable();
+};
+
+window.exportTeachersAttendanceExcel = function () {
+  const table = document.getElementById("teachers-attendance-table-element");
+  if (!table) return;
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة Excel غير متوفرة!");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "تحضير_المعلمين" });
+  XLSX.writeFile(
+    wb,
+    `تحضير_المعلمين_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+};
+
+window.exportTeachersAttendancePDF = function () {
+  printTeachersAttendance();
+};
+
+window.exportStudentsPDF = function () {
+  printStudentsTable();
+};
+
+window.exportAttendanceExcel = function () {
+  const table = document.getElementById("attendance-table-element");
+  if (!table) return;
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة Excel غير متوفرة!");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "تحضير_الطلاب" });
+  XLSX.writeFile(
+    wb,
+    `تحضير_الطلاب_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+};
+
+window.exportAttendancePDF = function () {
+  printAttendanceTable();
+};
+
+window.exportAccountsExcel = function () {
+  const table = document.getElementById("accounts-table-element");
+  if (!table) return;
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة Excel غير متوفرة!");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "الحسابات" });
+  XLSX.writeFile(
+    wb,
+    `حسابات_النظام_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+};
+
+window.exportAccountsPDF = function () {
+  printAccountsTable();
+};
+
+window.exportTestsExcel = function () {
+  const table = document.getElementById("tests-table-element");
+  if (!table) return;
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة Excel غير متوفرة!");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "الاختبارات" });
+  XLSX.writeFile(
+    wb,
+    `سجل_الاختبارات_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+};
+
+window.exportTestsPDF = function () {
+  printTestsTable();
+};
+
+window.exportTeacherNotesExcel = function () {
+  const table = document.getElementById("teacher-notes-table-element");
+  if (!table) return;
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة Excel غير متوفرة!");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "ملاحظات_المعلمين" });
+  XLSX.writeFile(
+    wb,
+    `ملاحظات_المعلمين_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+};
+
+window.exportTeacherNotesPDF = function () {
+  printTeacherNotes();
+};
+
+// ==========================================================================
+// دالة نافذة (متابعة الطلاب لليوم) - متضمنة اسم الحلقة والطباعة
+// ==========================================================================
+window.openStudentsFollowupModal = function () {
+  const titleEl = document.getElementById("students-followup-modal-title");
+  const thead = document.querySelector(
+    "#students-followup-table-element thead",
+  );
+  const tbody = document.getElementById("students-followup-tbody");
+  if (!tbody) return;
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  if (titleEl) titleEl.textContent = `📋 متابعة الطلاب لليوم (${todayStr})`;
+
+  if (thead) {
+    thead.innerHTML = `
+      <tr>
+        <th style="width: 45px; text-align: center">م</th>
+        <th>اسم الطالب</th>
+        <th style="text-align: center">الحلقة</th>
+        <th style="text-align: center">الحضور</th>
+        <th style="text-align: center">سمّع</th>
+        <th style="text-align: center">لم يسمّع</th>
+      </tr>
+    `;
+  }
+
+  const activeStudents = (window.appStore?.students || []).filter(
+    (s) => s.status === "active",
+  );
+  const todayAtt = window.appStore?.attendance || [];
+  const todayTasm = window.appStore?.tasmeea || [];
+
+  const attMap = new Map();
+  todayAtt
+    .filter((a) => a.date === todayStr)
+    .forEach((a) => attMap.set(a.studentId, a));
+
+  const tasmMap = new Map();
+  todayTasm
+    .filter((t) => t.date === todayStr)
+    .forEach((t) => {
+      const hasRecited = Boolean(
+        t.hifzSurah ||
+        t.murajaaSurah ||
+        t.tilawaSurah ||
+        (t.rating && t.rating !== "—"),
+      );
+      if (hasRecited) tasmMap.set(t.studentId, t);
+    });
+
+  let html = "";
+  activeStudents.forEach((s, idx) => {
+    const circle = (window.appStore?.circles || []).find(
+      (c) => c.id === s.circleId,
+    );
+    const circleName = circle ? circle.name : "غير مسجل";
+
+    const att = attMap.get(s.id);
+    let attText =
+      '<span class="badge" style="background:#e0e0e0; color:#555;">لم يُسجّل</span>';
+    if (att) {
+      if (att.status === "present")
+        attText = '<span class="badge badge-active">🟢 حاضر</span>';
+      else if (att.status === "absent")
+        attText = '<span class="badge badge-danger">🔴 غائب</span>';
+      else if (att.status === "late")
+        attText = '<span class="badge badge-warning">🟡 متأخر</span>';
+      else if (att.status === "excused")
+        attText =
+          '<span class="badge" style="background:#e3f2fd; color:#1565c0;">🔵 مستأذن</span>';
+    }
+
+    const hasRecited = tasmMap.has(s.id);
+    const recitedCol = hasRecited
+      ? '<span class="badge badge-active" style="font-size:0.85rem;">✅ سمّع</span>'
+      : '<span class="text-muted">—</span>';
+    const notRecitedCol = !hasRecited
+      ? '<span class="badge badge-danger" style="font-size:0.85rem;">❌ لم يسمّع</span>'
+      : '<span class="text-muted">—</span>';
+
+    html += `
+      <tr>
+        <td style="text-align: center;">${idx + 1}</td>
+        <td style="font-weight: 700;">${s.name}</td>
+        <td style="text-align: center; font-weight: 600; color: var(--text-dark);">${circleName}</td>
+        <td style="text-align: center;">${attText}</td>
+        <td style="text-align: center;">${recitedCol}</td>
+        <td style="text-align: center;">${notRecitedCol}</td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML =
+    html ||
+    '<tr><td colspan="6" class="text-center text-muted p-4">لا توجد بيانات طلاب نشطين لليوم</td></tr>';
+  openModal("modal-students-followup");
+};
+
+window.filterStudentsFollowupModal = function () {
+  const q = (
+    document.getElementById("search-modal-students-followup")?.value || ""
+  )
+    .trim()
+    .toLowerCase();
+  document.querySelectorAll("#students-followup-tbody tr").forEach((row) => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none";
+  });
+};
+
+window.printStudentsFollowup = function () {
+  printTableElement("students-followup-table-element", "متابعة الطلاب لليوم");
+};
+
+window.exportStudentsFollowupExcel = function () {
+  const table = document.getElementById("students-followup-table-element");
+  if (!table) return;
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة Excel غير متوفرة!");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "متابعة_الطلاب_اليوم" });
+  XLSX.writeFile(
+    wb,
+    `متابعة_الطلاب_اليوم_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+};
+
+// ==========================================================================
+// دالة النقر على بطاقات لوحة التحكم الأخرى مع الطباعة
+// ==========================================================================
+window.openDashboardDetailsModal = function (type) {
+  const titleEl = document.getElementById("dashboard-details-modal-title");
+  const thead = document.getElementById("dashboard-details-thead");
+  const tbody = document.getElementById("dashboard-details-tbody");
+  if (!tbody || !thead) return;
+
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  if (type === "students") {
+    if (titleEl) titleEl.textContent = `👨‍🎓 كشف الطلاب المسجلين بالمَجْمَع`;
+    thead.innerHTML = `
+      <tr>
+        <th style="width: 45px; text-align: center;">م</th>
+        <th>اسم الطالب</th>
+        <th>رقم الهوية</th>
+        <th>جوال ولي الأمر</th>
+        <th>الحلقة</th>
+        <th>الحالة</th>
+      </tr>
+    `;
+    const list = (window.appStore?.students || []).filter(
+      (s) => s.status === "active",
+    );
+    let html = "";
+    list.forEach((s, idx) => {
+      const circle = (window.appStore?.circles || []).find(
+        (c) => c.id === s.circleId,
+      );
+      html += `
+        <tr>
+          <td style="text-align: center;">${idx + 1}</td>
+          <td style="font-weight: 700;">${s.name}</td>
+          <td>${s.nationalId || "—"}</td>
+          <td>${s.parentPhone || s.phone || "—"}</td>
+          <td>${circle ? circle.name : "غير مسجل"}</td>
+          <td><span class="badge badge-active">نشط</span></td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML =
+      html ||
+      '<tr><td colspan="6" class="text-center text-muted p-4">لا يوجد طلاب نشطون</td></tr>';
+  } else if (type === "teachers") {
+    if (titleEl) titleEl.textContent = `👨‍🏫 كشف المعلمين المكلفين بالمَجْمَع`;
+    thead.innerHTML = `
+      <tr>
+        <th style="width: 45px; text-align: center;">م</th>
+        <th>اسم المعلم</th>
+        <th>رقم الجوال</th>
+        <th>الحلقات المكلف بها</th>
+        <th>آخر دخول للنظام</th>
+      </tr>
+    `;
+    const list = (window.appStore?.teachers || []).filter(
+      (t) => t.status === "active",
+    );
+    let html = "";
+    list.forEach((t, idx) => {
+      const circles = (window.appStore?.circles || []).filter(
+        (c) =>
+          (Array.isArray(c.teacherIds) && c.teacherIds.includes(t.id)) ||
+          c.teacherId === t.id,
+      );
+      const circleNames = circles.map((c) => c.name).join(" ، ") || "غير مكلف";
+      html += `
+        <tr>
+          <td style="text-align: center;">${idx + 1}</td>
+          <td style="font-weight: 700;">${t.name}</td>
+          <td>${t.phone || "—"}</td>
+          <td>${circleNames}</td>
+          <td dir="ltr" style="text-align: right;">${t.lastLogin || "لم يدخل بعد"}</td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML =
+      html ||
+      '<tr><td colspan="5" class="text-center text-muted p-4">لا يوجد معلمون مسجلون</td></tr>';
+  } else if (type === "circles") {
+    if (titleEl) titleEl.textContent = `🏛️ قائمة الحلقات القرآنية بالمَجْمَع`;
+    thead.innerHTML = `
+      <tr>
+        <th style="width: 45px; text-align: center;">م</th>
+        <th>اسم الحلقة</th>
+        <th>المعلم المكلف</th>
+        <th style="text-align: center;">عدد الطلاب</th>
+        <th>الحالة</th>
+      </tr>
+    `;
+    const list = window.appStore?.circles || [];
+    let html = "";
+    list.forEach((c, idx) => {
+      const assignedTeachers = (window.appStore?.teachers || []).filter(
+        (t) =>
+          (Array.isArray(c.teacherIds) && c.teacherIds.includes(t.id)) ||
+          c.teacherId === t.id,
+      );
+      const teacherNames =
+        assignedTeachers.map((t) => t.name).join(" ، ") || "غير معين";
+      const stuCount = (window.appStore?.students || []).filter(
+        (s) => s.circleId === c.id && s.status === "active",
+      ).length;
+      html += `
+        <tr>
+          <td style="text-align: center;">${idx + 1}</td>
+          <td style="font-weight: 700;">${c.name}</td>
+          <td>${teacherNames}</td>
+          <td style="text-align: center; font-weight: 800;">${stuCount}</td>
+          <td><span class="badge badge-active">${c.status || "نشطة"}</span></td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML =
+      html ||
+      '<tr><td colspan="5" class="text-center text-muted p-4">لا توجد حلقات معرفة</td></tr>';
+  } else if (type === "present") {
+    if (titleEl)
+      titleEl.textContent = `🟢 كشف الطلاب الحاضرين اليوم بالمسجد (${todayStr})`;
+    thead.innerHTML = `
+      <tr>
+        <th style="width: 45px; text-align: center;">م</th>
+        <th>اسم الطالب</th>
+        <th>الحلقة</th>
+        <th>حالة الحضور</th>
+        <th>ملاحظات</th>
+      </tr>
+    `;
+    const presentAtt = (window.appStore?.attendance || []).filter(
+      (a) =>
+        a.date === todayStr && (a.status === "present" || a.status === "late"),
+    );
+    let html = "";
+    presentAtt.forEach((att, idx) => {
+      const s = (window.appStore?.students || []).find(
+        (st) => st.id === att.studentId,
+      );
+      if (!s) return;
+      const circle = (window.appStore?.circles || []).find(
+        (c) => c.id === s.circleId,
+      );
+      const statusLabel = att.status === "present" ? "🟢 حاضر" : "🟡 متأخر";
+      html += `
+        <tr>
+          <td style="text-align: center;">${idx + 1}</td>
+          <td style="font-weight: 700;">${s.name}</td>
+          <td>${circle ? circle.name : "غير مسجل"}</td>
+          <td><span class="badge ${att.status === "present" ? "badge-active" : "badge-warning"}">${statusLabel}</span></td>
+          <td>${att.notes || "—"}</td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML =
+      html ||
+      '<tr><td colspan="5" class="text-center text-muted p-4">لا يوجد طلاب حاضرون اليوم حتى الآن</td></tr>';
+  }
+
+  openModal("modal-dashboard-details");
+};
+
+window.filterDashboardDetailsModal = function () {
+  const q = (
+    document.getElementById("search-modal-dashboard-details")?.value || ""
+  )
+    .trim()
+    .toLowerCase();
+  document.querySelectorAll("#dashboard-details-tbody tr").forEach((row) => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none";
+  });
+};
+
+window.printDashboardDetails = function () {
+  const title =
+    document.getElementById("dashboard-details-modal-title")?.textContent ||
+    "بيانات لوحة التحكم";
+  printTableElement("dashboard-details-table-element", title);
+};
+
+window.exportDashboardDetailsExcel = function () {
+  const table = document.getElementById("dashboard-details-table-element");
+  if (!table) return;
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة Excel غير متوفرة!");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "بيانات_لوحة_التحكم" });
+  XLSX.writeFile(
+    wb,
+    `لوحة_التحكم_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+};
+
+// ==========================================================================
+// 1. التنقل بين أقسام إدارة المَجْمَع
 // ==========================================================================
 window.switchComplexSection = function (section) {
   const btnCircles = document.getElementById("hub-btn-circles");
@@ -178,7 +693,7 @@ window.switchComplexSection = function (section) {
 };
 
 // ==========================================================================
-// 2. إدارة الحلقات (إضافة وتعديل وحذف)
+// 2. إدارة الحلقات
 // ==========================================================================
 window.renderCirclesCards = function () {
   const container = document.getElementById("circles-cards-container");
@@ -456,6 +971,9 @@ window.handleSaveCircle = function (e) {
       if (selectedStudents.includes(s.id)) {
         s.circleId = newCircleId;
         if (typeof saveToCloud === "function") saveToCloud("students", s.id, s);
+      } else if (s.circleId === newCircleId) {
+        s.circleId = "";
+        if (typeof saveToCloud === "function") saveToCloud("students", s.id, s);
       }
     });
 
@@ -497,7 +1015,7 @@ window.deleteCircle = function (circleId) {
 };
 
 // ==========================================================================
-// 3. إدارة المعلمين (إضافة وتعديل وصلاحية المسؤول المالي)
+// 3. إدارة المعلمين (إضافة وتعديل والتحضير اليدوي متضمناً المدير وحذف الجوال)
 // ==========================================================================
 window.switchTeacherSubTab = function (tab) {
   const btnList = document.getElementById("tab-btn-teachers-list");
@@ -899,9 +1417,26 @@ window.toggleTeacherStatus = function (teacherId) {
   renderTeachersTable();
 };
 
+// كشف تحضير المعلمين والمدير (بدون عمود الجوال)
 window.renderTeachersAttendanceTable = function () {
   const tbody = document.getElementById("teachers-attendance-table-body");
+  const thead = document.querySelector(
+    "#teachers-attendance-table-element thead",
+  );
   if (!tbody) return;
+
+  if (thead) {
+    thead.innerHTML = `
+      <tr>
+        <th style="width: 45px; text-align: center">م</th>
+        <th>الاسم</th>
+        <th>الحلقات المكلف بها</th>
+        <th>وقت التحضير</th>
+        <th>حالة الحضور (تحضير يدوي للمدير)</th>
+        <th>ملاحظة المدير</th>
+      </tr>
+    `;
+  }
 
   const dateVal =
     document.getElementById("teacher-attendance-date-select")?.value ||
@@ -912,47 +1447,63 @@ window.renderTeachersAttendanceTable = function () {
     .trim()
     .toLowerCase();
 
-  const teachers = window.appStore?.teachers || [];
-  const filtered = teachers.filter(
-    (t) => t.name && t.name.toLowerCase().includes(searchVal),
-  );
+  const directorName =
+    window.appStore?.settings?.directorName || "صالح ال ناشع";
+  const directorObj = {
+    id: "admin_main",
+    name: `${directorName} (المدير)`,
+    isDirector: true,
+    circleNames: "اداري ",
+  };
 
-  if (filtered.length === 0) {
+  const teachers = window.appStore?.teachers || [];
+  let combinedList = [directorObj, ...teachers];
+
+  if (searchVal) {
+    combinedList = combinedList.filter(
+      (t) => t.name && t.name.toLowerCase().includes(searchVal),
+    );
+  }
+
+  if (combinedList.length === 0) {
     tbody.innerHTML =
-      '<tr><td colspan="7" class="text-center text-muted p-3">لا يوجد معلمون مطابقون</td></tr>';
+      '<tr><td colspan="6" class="text-center text-muted p-3">لا يوجد معلمون مطابقون</td></tr>';
     return;
   }
 
   let html = "";
-  filtered.forEach((t, idx) => {
+  combinedList.forEach((t, idx) => {
     const record =
       (window.appStore?.teacherAttendance || []).find(
         (a) => a.teacherId === t.id && a.date === dateVal,
       ) || {};
-    const circles = (window.appStore?.circles || []).filter(
-      (c) =>
-        (Array.isArray(c.teacherIds) && c.teacherIds.includes(t.id)) ||
-        c.teacherId === t.id,
-    );
-    const circleNames = circles.map((c) => c.name).join(" ، ") || "غير مكلف";
+    let circleNames = t.circleNames;
+    if (!circleNames) {
+      const circles = (window.appStore?.circles || []).filter(
+        (c) =>
+          (Array.isArray(c.teacherIds) && c.teacherIds.includes(t.id)) ||
+          c.teacherId === t.id,
+      );
+      circleNames = circles.map((c) => c.name).join(" ، ") || "غير مكلف";
+    }
 
     html += `
-      <tr>
+      <tr style="${t.isDirector ? "background: #fdfbf7;" : ""}">
         <td style="text-align: center;">${idx + 1}</td>
-        <td style="font-weight: 700;">${t.name}</td>
-        <td>${t.phone || "—"}</td>
+        <td style="font-weight: 800; color: ${t.isDirector ? "var(--primary-brown)" : "inherit"};">${t.name}</td>
         <td><span style="font-weight: 600; color: var(--text-dark);">${circleNames}</span></td>
-        <td>${record.time ? `🕒 ${record.time}` : '<span class="text-muted">لم يحضر ذاتياً</span>'}</td>
+        <td>${record.time ? `🕒 ${record.time}` : '<span class="text-muted">لم يُرصد بعد</span>'}</td>
         <td>
           <select class="form-control" style="font-weight: 700;" onchange="setTeacherAttendanceByAdmin('${t.id}', this.value)">
             <option value="" ${!record.status ? "selected" : ""}>— لم يحدد —</option>
             <option value="present" ${record.status === "present" ? "selected" : ""}>🟢 حاضر</option>
             <option value="absent" ${record.status === "absent" ? "selected" : ""}>🔴 غائب</option>
+            <option value="late" ${record.status === "late" ? "selected" : ""}>🟡 متأخر</option>
             <option value="excused" ${record.status === "excused" ? "selected" : ""}>🔵 مستأذن</option>
           </select>
         </td>
         <td>
-          <input type="text" class="form-control" placeholder="ملاحظة..." value="${record.notes || ""}" onchange="updateTeacherAttendanceNotes('${t.id}', this.value)">
+          <input type="text" class="form-control" placeholder="ملاحظة إدارية..." value="${record.notes || ""}" onchange="updateTeacherAttendanceNotes('${t.id}', this.value)">
         </td>
       </tr>
     `;
@@ -961,10 +1512,15 @@ window.renderTeachersAttendanceTable = function () {
   tbody.innerHTML = html;
 };
 
+// تسجيل الحضور اليدوي للمعلم أو المدير
 window.setTeacherAttendanceByAdmin = function (teacherId, status) {
   const dateVal =
     document.getElementById("teacher-attendance-date-select")?.value ||
     new Date().toISOString().split("T")[0];
+  const nowTime = new Date().toLocaleTimeString("ar-SA", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
   const recordId = `t_att_${teacherId}_${dateVal}`;
 
   if (!window.appStore.teacherAttendance)
@@ -976,20 +1532,25 @@ window.setTeacherAttendanceByAdmin = function (teacherId, status) {
       id: recordId,
       teacherId: teacherId,
       date: dateVal,
+      time: status === "present" || status === "late" ? nowTime : "",
       status: status,
-      notes: "رصد من المدير",
+      notes: "رصد يدوي من المدير",
       updatedBy: "admin",
       createdAt: Date.now(),
     };
     window.appStore.teacherAttendance.push(record);
   } else {
     record.status = status;
+    if ((status === "present" || status === "late") && !record.time) {
+      record.time = nowTime;
+    }
     record.updatedBy = "admin";
   }
 
   if (typeof saveToCloud === "function")
     saveToCloud("teacherAttendance", record.id, record);
   if (typeof saveLocalStore === "function") saveLocalStore();
+  renderTeachersAttendanceTable();
 };
 
 window.updateTeacherAttendanceNotes = function (teacherId, notesVal) {
@@ -1009,8 +1570,56 @@ window.updateTeacherAttendanceNotes = function (teacherId, notesVal) {
   }
 };
 
+// تحضير جميع المعلمين والمدير كحاضرين بضغطة زر واحدة
+window.markAllTeachersPresent = function () {
+  const dateVal =
+    document.getElementById("teacher-attendance-date-select")?.value ||
+    new Date().toISOString().split("T")[0];
+  const nowTime = new Date().toLocaleTimeString("ar-SA", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const teachers = window.appStore?.teachers || [];
+  const directorObj = { id: "admin_main" };
+  const allToMark = [directorObj, ...teachers];
+
+  if (!window.appStore.teacherAttendance)
+    window.appStore.teacherAttendance = [];
+
+  allToMark.forEach((t) => {
+    const recordId = `t_att_${t.id}_${dateVal}`;
+    let record = window.appStore.teacherAttendance.find(
+      (a) => a.id === recordId,
+    );
+    if (!record) {
+      record = {
+        id: recordId,
+        teacherId: t.id,
+        date: dateVal,
+        time: nowTime,
+        status: "present",
+        notes: "تحضير يدوي جماعي من المدير",
+        updatedBy: "admin",
+        createdAt: Date.now(),
+      };
+      window.appStore.teacherAttendance.push(record);
+    } else {
+      record.status = "present";
+      if (!record.time) record.time = nowTime;
+      record.updatedBy = "admin";
+    }
+    if (typeof saveToCloud === "function") {
+      saveToCloud("teacherAttendance", record.id, record);
+    }
+  });
+
+  if (typeof saveLocalStore === "function") saveLocalStore();
+  renderTeachersAttendanceTable();
+  alert("✅ تم تسجيل حضور المدير وجميع المعلمين بنجاح لهذا اليوم!");
+};
+
 // ==========================================================================
-// 4. إدارة الطلاب (إضافة وتعديل واستيراد وحذف جماعي)
+// 4. إدارة الطلاب
 // ==========================================================================
 window.switchStudentSubTab = function (tab) {
   const btnActive = document.getElementById("tab-btn-active-students");
@@ -1410,7 +2019,7 @@ window.executeBulkDeleteStudents = function () {
 };
 
 // ==========================================================================
-// 5. استيراد الطلاب من Excel (7 أعمدة القياسية والرقم السري 1111)
+// 5. استيراد الطلاب من Excel
 // ==========================================================================
 const STANDARD_7_COLUMNS = [
   { key: "name", label: "1. اسم الطالب" },
@@ -1723,7 +2332,7 @@ window.toggleUserAccountStatus = function (userId) {
 };
 
 // ==========================================================================
-// 7. شاشات التحضير وملاحظات المعلمين
+// 7. شاشات التحضير
 // ==========================================================================
 window.renderAttendanceTable = function () {
   const tbody = document.getElementById("attendance-table-body");
@@ -1845,6 +2454,9 @@ window.markAllAbsent = function () {
   alert("✅ تم تحديد جميع طلاب الحلقة كـ (غائب)!");
 };
 
+// ==========================================================================
+// 8. شاشة ملاحظات المعلمين (المدمجة داخل قسم الإشعارات والرسائل)
+// ==========================================================================
 window.renderTeacherNotesTable = function () {
   const tbody = document.getElementById("teacher-notes-table-body");
   if (!tbody) return;
@@ -1879,7 +2491,7 @@ window.renderTeacherNotesTable = function () {
 
   if (filtered.length === 0) {
     tbody.innerHTML =
-      '<tr><td colspan="6" class="text-center text-muted p-4">لا توجد ملاحظات موجهة للإدارة</td></tr>';
+      '<tr><td colspan="6" class="text-center text-muted p-4">لا توجد ملاحظات مسجلة موجهة للإدارة حالياً</td></tr>';
     return;
   }
 
@@ -1918,7 +2530,7 @@ window.renderTeacherNotesTable = function () {
 };
 
 // ==========================================================================
-// 8. شاشة الاختبارات (إضافة وعرض وحذف)
+// 9. شاشة الاختبارات
 // ==========================================================================
 window.renderTestsTable = function () {
   const tbody = document.getElementById("tests-table-body");
@@ -2073,7 +2685,7 @@ window.deleteTest = function (testId) {
 };
 
 // ==========================================================================
-// 9. لوحة فرسان التميز والتميز الأسبوعي (شروط صارمة: حضور 4 أيام + ممتاز فقط أو فارغ)
+// 10. لوحة فرسان التميز الأسبوعي والشاشة التفاعلية المتقلبة الذكية
 // ==========================================================================
 function getSundayToWednesdayDatesForWeek(weekOption = "current") {
   const now = new Date();
@@ -2113,15 +2725,13 @@ function isStudentTamayuzForWeek(studentId, weekOption = "current") {
   };
 
   for (const day of weekDays) {
-    // الشرط 1: الحضور الكامل لجميع الأيام الأربعة (الأحد، الاثنين، الثلاثاء، الأربعاء)
     const att = (window.appStore?.attendance || []).find(
       (a) => a.studentId === studentId && a.date === day,
     );
     if (!att || (att.status !== "present" && att.status !== "late")) {
-      return false; // غائب أو غير محضر في أي يوم -> استبعاد فوري
+      return false;
     }
 
-    // الشرط 2: ممتاز فقط في جميع المقررات أو لا يوجد
     const tasm = (window.appStore?.tasmeea || []).find(
       (t) => t.studentId === studentId && t.date === day,
     );
@@ -2132,7 +2742,7 @@ function isStudentTamayuzForWeek(studentId, weekOption = "current") {
         !isCleanMumtazOrEmpty(tasm.tilawaRating) ||
         !isCleanMumtazOrEmpty(tasm.rating)
       ) {
-        return false; // حصل على تقييم غير ممتاز في أي مقرر -> استبعاد فوري
+        return false;
       }
     }
   }
@@ -2205,54 +2815,151 @@ window.renderTamayuzBoard = function () {
   tbody.innerHTML = html;
 };
 
+// تشغيل شاشة العرض التفاعلية المتقلبة كل 10 ثوانٍ مع تحديث البيانات كل 5 دقائق
 window.renderScreenView = function () {
   const grid = document.getElementById("mosque-screen-grid");
   const tbody = document.getElementById("screen-manage-table-body");
+  const qualifyingStudents = getQualifyingTamayuzStudents("current");
 
-  const students = getQualifyingTamayuzStudents("current");
+  const displayCurrentSlide = () => {
+    if (!grid) return;
 
-  if (grid) {
-    if (students.length === 0) {
-      grid.innerHTML = `
-        <div class="empty-state-card" style="grid-column:1/-1; padding:2.5rem; text-align:center; background:#fff; border-radius:10px;">
-          <h3>لوحة فرسان التميز الأسبوعي</h3>
-          <p class="text-muted">لا يوجد طلاب حققوا شروط التميز لهذا الأسبوع حتى الآن (حضور 4 أيام من الأحد للأربعاء وتقييم ممتاز)</p>
-        </div>
-      `;
-    } else {
-      let gridHtml = "";
-      students.forEach((stu, idx) => {
-        const circle = (window.appStore?.circles || []).find(
-          (c) => c.id === stu.circleId,
-        );
-        const circleName = circle ? circle.name : "جامع الهدى";
-        const isFirst = idx === 0;
-
-        gridHtml += `
-          <div class="card" style="text-align: center; border: ${isFirst ? "2px solid var(--primary-brown)" : "1px solid var(--border-color)"}; background: ${isFirst ? "#faf3eb" : "#fff"}; border-radius: 10px; padding: 1.25rem;">
-            <div style="font-size: 1.6rem; font-weight: 900; color: var(--primary-brown); margin-bottom: 0.4rem;">
-              #${idx + 1} ${isFirst ? "🏆" : "⭐"}
-            </div>
-            <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text-dark); margin-bottom: 4px;">${stu.name}</h3>
-            <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 8px;">حلقة: ${circleName}</p>
-            <div style="display: flex; justify-content: center; gap: 0.4rem;">
-              <span class="badge badge-active">حضور 4 أيام</span>
-              <span class="badge badge-active">ممتاز</span>
-            </div>
+    if (window.screenCurrentSlide === "tamayuz") {
+      if (qualifyingStudents.length === 0) {
+        grid.innerHTML = `
+          <div class="empty-state-card" style="grid-column:1/-1; padding:3rem 1.5rem; text-align:center; background:#fff; border-radius:12px; border:2px dashed #d7ccc8;">
+            <h2 style="color:var(--primary-brown); font-size:1.8rem; font-weight:900; margin-bottom:0.6rem;">🌟 لوحة فرسان التميز الأسبوعي 🌟</h2>
+            <p class="text-muted" style="font-size:1.1rem;">لا يوجد طلاب حققوا شروط التميز لهذا الأسبوع حتى الآن (حضور 4 أيام كاملة من الأحد للأربعاء وتقييم ممتاز)</p>
           </div>
         `;
-      });
-      grid.innerHTML = gridHtml;
+      } else {
+        let cardsHtml = `
+          <div style="grid-column: 1 / -1; text-align: center; margin-bottom: 0.5rem;">
+            <h2 style="font-size: 1.8rem; font-weight: 900; color: var(--primary-brown); margin: 0;">
+              🌟 لوحة فرسان التميز الأسبوعي 🌟
+            </h2>
+            <p class="text-muted" style="font-size: 0.95rem; margin: 4px 0 0 0;">نخبة الطلاب المحققين لنسبة حضور 100% وإتقان التسميع (ممتاز)</p>
+          </div>
+        `;
+
+        qualifyingStudents.forEach((stu, idx) => {
+          const circle = (window.appStore?.circles || []).find(
+            (c) => c.id === stu.circleId,
+          );
+          const circleName = circle ? circle.name : "جامع الهدى";
+          const isFirst = idx === 0;
+
+          cardsHtml += `
+            <div class="card" style="text-align: center; border: ${isFirst ? "2.5px solid var(--primary-brown)" : "1.5px solid var(--border-color)"}; background: ${isFirst ? "#faf3eb" : "#ffffff"}; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.06); transition: all 0.3s ease;">
+              <div style="font-size: 2rem; font-weight: 900; color: var(--primary-brown); margin-bottom: 0.4rem;">
+                #${idx + 1} ${isFirst ? "🏆" : "⭐"}
+              </div>
+              <h3 style="font-size: 1.3rem; font-weight: 900; color: var(--text-dark); margin-bottom: 6px;">${stu.name}</h3>
+              <p class="text-muted" style="font-size: 0.95rem; font-weight: 700; margin-bottom: 12px;">🕌 حلقة: ${circleName}</p>
+              <div style="display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap;">
+                <span class="badge badge-active" style="font-size: 0.82rem; padding: 0.4rem 0.8rem;">حضور 4 أيام كاملة</span>
+                <span class="badge badge-active" style="font-size: 0.82rem; padding: 0.4rem 0.8rem;">إتقان ممتاز</span>
+              </div>
+            </div>
+          `;
+        });
+        grid.innerHTML = cardsHtml;
+      }
+    } else {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const activeStudents = (window.appStore?.students || []).filter(
+        (s) => s.status === "active",
+      );
+      const teachersCount = (window.appStore?.teachers || []).filter(
+        (t) => t.status === "active",
+      ).length;
+      const circlesCount = (window.appStore?.circles || []).length;
+      const todayAtt = (window.appStore?.attendance || []).filter(
+        (a) => a.date === todayStr,
+      );
+      const presentCount = todayAtt.filter(
+        (a) => a.status === "present" || a.status === "late",
+      ).length;
+      const todayTasmeea = (window.appStore?.tasmeea || []).filter(
+        (t) => t.date === todayStr,
+      );
+      const recitedCount = new Set(
+        todayTasmeea
+          .filter((t) => t.hifzSurah || t.murajaaSurah || t.tilawaSurah)
+          .map((t) => t.studentId),
+      ).size;
+
+      grid.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; margin-bottom: 0.8rem;">
+          <h2 style="font-size: 1.8rem; font-weight: 900; color: var(--primary-brown); margin: 0;">
+            📊 لوحة الإحصائيات الحية لمَجْمَع عبدالله بن مهدي القرآني
+          </h2>
+          <p class="text-muted" style="font-size: 0.95rem; margin: 4px 0 0 0;">جامع الهدى — تقرير المتابعة والإنجاز لليوم</p>
+        </div>
+
+        <div class="card" style="text-align: center; border: 1.5px solid var(--border-color); border-radius: 12px; padding: 1.5rem; background: #ffffff;">
+          <div style="font-size: 2.2rem; margin-bottom: 4px;">👨‍🎓</div>
+          <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted);">إجمالي الطلاب المسجلين</span>
+          <h3 style="font-size: 2.2rem; font-weight: 900; color: var(--primary-brown); margin: 6px 0 0 0;">${activeStudents.length}</h3>
+        </div>
+
+        <div class="card" style="text-align: center; border: 1.5px solid var(--border-color); border-radius: 12px; padding: 1.5rem; background: #ffffff;">
+          <div style="font-size: 2.2rem; margin-bottom: 4px;">🟢</div>
+          <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted);">حاضرون اليوم بالمسجد</span>
+          <h3 style="font-size: 2.2rem; font-weight: 900; color: #2e7d32; margin: 6px 0 0 0;">${presentCount}</h3>
+        </div>
+
+        <div class="card" style="text-align: center; border: 1.5px solid var(--border-color); border-radius: 12px; padding: 1.5rem; background: #ffffff;">
+          <div style="font-size: 2.2rem; margin-bottom: 4px;">📖</div>
+          <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted);">سمّعوا مقررهم اليوم</span>
+          <h3 style="font-size: 2.2rem; font-weight: 900; color: #0b6b7d; margin: 6px 0 0 0;">${recitedCount}</h3>
+        </div>
+
+        <div class="card" style="text-align: center; border: 1.5px solid var(--border-color); border-radius: 12px; padding: 1.5rem; background: #ffffff;">
+          <div style="font-size: 2.2rem; margin-bottom: 4px;">🏛️</div>
+          <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted);">عدد الحلقات القرآنية</span>
+          <h3 style="font-size: 2.2rem; font-weight: 900; color: var(--primary-brown); margin: 6px 0 0 0;">${circlesCount}</h3>
+        </div>
+
+        <div class="card" style="text-align: center; border: 1.5px solid var(--border-color); border-radius: 12px; padding: 1.5rem; background: #ffffff;">
+          <div style="font-size: 2.2rem; margin-bottom: 4px;">👨‍🏫</div>
+          <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted);">المعلمون والمقرئون</span>
+          <h3 style="font-size: 2.2rem; font-weight: 900; color: var(--primary-brown); margin: 6px 0 0 0;">${teachersCount}</h3>
+        </div>
+
+        <div class="card" style="text-align: center; border: 1.5px solid var(--border-color); border-radius: 12px; padding: 1.5rem; background: #ffffff;">
+          <div style="font-size: 2.2rem; margin-bottom: 4px;">🏆</div>
+          <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted);">فرسان التميز لهذا الأسبوع</span>
+          <h3 style="font-size: 2.2rem; font-weight: 900; color: #b78103; margin: 6px 0 0 0;">${qualifyingStudents.length}</h3>
+        </div>
+      `;
     }
-  }
+  };
+
+  displayCurrentSlide();
+
+  if (window.screenFlipTimer) clearInterval(window.screenFlipTimer);
+  window.screenFlipTimer = setInterval(() => {
+    window.screenCurrentSlide =
+      window.screenCurrentSlide === "tamayuz" ? "stats" : "tamayuz";
+    displayCurrentSlide();
+  }, 10000);
+
+  if (window.screenDataRefreshTimer)
+    clearInterval(window.screenDataRefreshTimer);
+  window.screenDataRefreshTimer = setInterval(() => {
+    if (typeof syncDataFromCloud === "function") {
+      syncDataFromCloud();
+    }
+  }, 300000);
 
   if (tbody) {
-    if (students.length === 0) {
+    if (qualifyingStudents.length === 0) {
       tbody.innerHTML =
         '<tr><td colspan="5" class="text-center text-muted p-3">لا يوجد طلاب متميزون حالياً للترتيب</td></tr>';
     } else {
       let tbodyHtml = "";
-      students.forEach((stu, idx) => {
+      qualifyingStudents.forEach((stu, idx) => {
         const circle = (window.appStore?.circles || []).find(
           (c) => c.id === stu.circleId,
         );
@@ -2266,7 +2973,7 @@ window.renderScreenView = function () {
             <td><span class="badge badge-active">متميز (حضور 100% وممتاز)</span></td>
             <td style="text-align: center;">
               <button class="btn btn-outline-brown btn-sm" onclick="moveScreenStudentUp(${idx})" ${idx === 0 ? "disabled" : ""}>⬆️ للأعلى</button>
-              <button class="btn btn-outline-brown btn-sm" onclick="moveScreenStudentDown(${idx})" ${idx === students.length - 1 ? "disabled" : ""}>⬇️ للأسفل</button>
+              <button class="btn btn-outline-brown btn-sm" onclick="moveScreenStudentDown(${idx})" ${idx === qualifyingStudents.length - 1 ? "disabled" : ""}>⬇️ للأسفل</button>
             </td>
           </tr>
         `;
@@ -2318,7 +3025,7 @@ window.resetScreenStudentOrder = function () {
 };
 
 // ==========================================================================
-// 10. طلبات التسجيل وإعدادات المَجْمَع والخريطة التفاعلية العصرية الحديثة
+// 11. إعدادات المَجْمَع والخريطة التفاعلية
 // ==========================================================================
 window.openMapPickerModal = function () {
   const currentLoc = (
@@ -2355,7 +3062,6 @@ window.openMapPickerModal = function () {
   }, 250);
 };
 
-// تهيئة وتحديث الخريطة التفاعلية بأحدث النماذج العصرية والمؤشرات المخصصة
 function initOrUpdateMapPicker(lat, lng, radius) {
   const mapContainer = document.getElementById("map-picker-container");
   if (!mapContainer || typeof L === "undefined") return;
@@ -2557,8 +3263,9 @@ window.handleSaveOrgSettings = function (e) {
   };
 
   window.appStore.settings = newSettings;
-  if (typeof saveToCloud === "function")
+  if (typeof saveToCloud === "function") {
     saveToCloud("settings", "main_settings", newSettings);
+  }
   if (typeof saveLocalStore === "function") saveLocalStore();
 
   alert("✅ تم حفظ وتحديث إعدادات وهوية المَجْمَع ونطاق التحضير بنجاح!");
@@ -2634,7 +3341,7 @@ window.approveStudentRequest = function (studentId) {
     saveToCloud("users", stu.id, {
       id: stu.id,
       name: stu.name,
-      phone: stu.phone || stu.parentPhone,
+      phone: phone || parentPhone,
       role: "student",
       username: stu.nationalId || stu.phone || stu.id,
       pass: "1111",
@@ -2724,8 +3431,39 @@ window.handleSelfRegistration = function (e) {
 };
 
 // ==========================================================================
-// 11. إدارة إرسال الإشعارات والرسائل الموحدة
+// 12. إدارة إرسال الإشعارات والرسائل وعرض الملاحظات المدمجة
 // ==========================================================================
+window.renderNotificationsView = function () {
+  const notifContainer = document.getElementById(
+    "unified-notifications-container",
+  );
+  if (notifContainer) {
+    const allNotifs = window.appStore?.notifications || [];
+    if (allNotifs.length === 0) {
+      notifContainer.innerHTML = `<div class="empty-state-card p-3"><p class="text-muted">لا توجد إشعارات جديدة حالياً</p></div>`;
+    } else {
+      notifContainer.innerHTML = allNotifs
+        .map(
+          (n) => `
+          <div class="notification-item-card mb-2 p-3" style="background: #fafcfb; border: 1px solid var(--border-color); border-radius: 8px;">
+            <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 4px;">${n.title}</h4>
+            <p class="text-muted" style="font-size: 0.9rem; margin-bottom: 6px;">${n.body}</p>
+            <div class="flex-between" style="font-size: 0.75rem; color: #888;">
+              <span>من: ${n.sender || "الإدارة"}</span>
+              <span>${n.date || ""}</span>
+            </div>
+          </div>
+        `,
+        )
+        .join("");
+    }
+  }
+
+  if (typeof renderTeacherNotesTable === "function") {
+    renderTeacherNotesTable();
+  }
+};
+
 window.openModalSendUnifiedMessage = function () {
   const recipientSelect = document.getElementById("msg-target-recipient");
   if (recipientSelect) {
