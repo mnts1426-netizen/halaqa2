@@ -57,7 +57,7 @@
                   type="text"
                   id="login-username"
                   class="form-control"
-                  placeholder="admin أو رقم الهوية للطالب أو الجوال..."
+                  placeholder="رقم الهوية او اسم المستخدم"
                   required
                 />
               </div>
@@ -270,25 +270,6 @@
             <a
               href="#"
               class="nav-link nav-admin-only"
-              data-target="view-teacher-notes"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-                />
-              </svg>
-              <span>ملاحظات المعلمين</span>
-            </a>
-            <a
-              href="#"
-              class="nav-link nav-admin-only"
               data-target="view-accounts"
             >
               <svg
@@ -451,7 +432,13 @@
         <!-- 1. لوحة التحكم -->
         <section id="view-dashboard" class="content-view active">
           <div class="stats-grid" id="dashboard-stats-grid">
-            <div class="stat-card">
+            <!-- 1. الطلاب -->
+            <div
+              class="stat-card"
+              style="cursor: pointer"
+              onclick="openDashboardDetailsModal('students')"
+              title="انقر لعرض قائمة الطلاب وطباعتها"
+            >
               <div class="stat-icon icon-brown">
                 <svg
                   width="24"
@@ -469,7 +456,14 @@
                 <h3 class="stat-value" id="val-stat-1">0</h3>
               </div>
             </div>
-            <div class="stat-card">
+
+            <!-- 2. المعلمون -->
+            <div
+              class="stat-card"
+              style="cursor: pointer"
+              onclick="openDashboardDetailsModal('teachers')"
+              title="انقر لعرض قائمة المعلمين ومواعيد دخولهم وطباعتها"
+            >
               <div class="stat-icon icon-brown">
                 <svg
                   width="24"
@@ -488,7 +482,14 @@
                 <h3 class="stat-value" id="val-stat-2">0</h3>
               </div>
             </div>
-            <div class="stat-card">
+
+            <!-- 3. الحلقات -->
+            <div
+              class="stat-card"
+              style="cursor: pointer"
+              onclick="openDashboardDetailsModal('circles')"
+              title="انقر لعرض قائمة الحلقات وطباعتها"
+            >
               <div class="stat-icon icon-red-soft">
                 <svg
                   width="24"
@@ -509,7 +510,14 @@
                 <h3 class="stat-value" id="val-stat-3">0</h3>
               </div>
             </div>
-            <div class="stat-card">
+
+            <!-- 4. حاضرون اليوم -->
+            <div
+              class="stat-card"
+              style="cursor: pointer"
+              onclick="openDashboardDetailsModal('present')"
+              title="انقر لعرض قائمة الحاضرين اليوم وطباعتها"
+            >
               <div class="stat-icon icon-green">
                 <svg
                   width="24"
@@ -531,12 +539,12 @@
               </div>
             </div>
 
-            <!-- المربع 5: سمّعوا اليوم -->
+            <!-- 5. سمّعوا اليوم -->
             <div
               class="stat-card nav-admin-only"
               style="cursor: pointer"
               onclick="openTasmeeaDetailsModal('recited')"
-              title="انقر لعرض قائمة وتفاصيل الطلاب الذين سمّعوا اليوم"
+              title="انقر لعرض تفاصيل الطلاب الذين سمّعوا اليوم وطباعتها"
             >
               <div class="stat-icon icon-green">
                 <svg
@@ -559,12 +567,12 @@
               </div>
             </div>
 
-            <!-- المربع 6: لم يسمّعوا اليوم -->
+            <!-- 6. لم يسمّعوا اليوم -->
             <div
               class="stat-card nav-admin-only"
               style="cursor: pointer"
               onclick="openTasmeeaDetailsModal('not_recited')"
-              title="انقر لعرض قائمة وتفاصيل الطلاب الذين لم يسمّعوا اليوم"
+              title="انقر لعرض تفاصيل الطلاب الذين لم يسمّعوا اليوم وطباعتها"
             >
               <div class="stat-icon icon-red-soft">
                 <svg
@@ -585,6 +593,48 @@
                   >لم يسمّعوا اليوم</span
                 >
                 <h3 class="stat-value" id="val-stat-not-recited-today">0</h3>
+              </div>
+            </div>
+
+            <!-- 7. الأيقونة الجديدة: متابعة الطلاب لليوم -->
+            <div
+              class="stat-card nav-admin-only"
+              style="
+                cursor: pointer;
+                border: 1.5px solid #0b6b7d;
+                background: #fdfefe;
+              "
+              onclick="openStudentsFollowupModal()"
+              title="انقر لعرض جدول متابعة حضور وتسميع الطلاب لليوم وطباعته"
+            >
+              <div
+                class="stat-icon icon-brown"
+                style="background: #e8f4f6; color: #0b6b7d"
+              >
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M9 11l3 3L22 4" />
+                  <path
+                    d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"
+                  />
+                </svg>
+              </div>
+              <div class="stat-details">
+                <span
+                  class="stat-label"
+                  style="font-weight: 800; color: #0b6b7d"
+                  >متابعة الطلاب لليوم</span
+                >
+                <h3
+                  class="stat-value"
+                  style="font-size: 1.15rem; color: #0b6b7d"
+                ></h3>
               </div>
             </div>
           </div>
@@ -819,7 +869,7 @@
                   📋 متابعة تحضير المعلمين اليومي
                 </button>
               </div>
-              <div class="header-actions">
+              <div class="header-actions flex-align-gap">
                 <button
                   class="btn btn-outline-brown"
                   onclick="exportTeachersExcel()"
@@ -831,6 +881,12 @@
                   onclick="exportTeachersPDF()"
                 >
                   📄 تنزيل PDF
+                </button>
+                <button
+                  class="btn btn-outline-brown"
+                  onclick="printTeachersTable()"
+                >
+                  🖨️ طباعة
                 </button>
                 <button class="btn btn-primary" onclick="openModalAddTeacher()">
                   ➕ إضافة معلم
@@ -865,7 +921,9 @@
 
             <div class="card style-hidden" id="box-teachers-attendance-table">
               <div class="card-filter-bar flex-between">
-                <div style="display: flex; gap: 0.8rem; flex: 1">
+                <div
+                  style="display: flex; gap: 0.8rem; flex: 1; flex-wrap: wrap"
+                >
                   <input
                     type="date"
                     id="teacher-attendance-date-select"
@@ -880,7 +938,14 @@
                     oninput="renderTeachersAttendanceTable()"
                   />
                 </div>
-                <div class="flex-align-gap">
+                <div class="flex-align-gap" style="flex-wrap: wrap">
+                  <button
+                    class="btn btn-success btn-sm"
+                    onclick="markAllTeachersPresent()"
+                    title="تسجيل حضور جميع المعلمين والمدير اليوم بضغطة واحدة"
+                  >
+                    🟢 تحضير الكل اليوم
+                  </button>
                   <button
                     class="btn btn-outline-brown btn-sm"
                     onclick="exportTeachersAttendanceExcel()"
@@ -893,6 +958,12 @@
                   >
                     📄 تنزيل PDF
                   </button>
+                  <button
+                    class="btn btn-outline-brown btn-sm"
+                    onclick="printTeachersAttendance()"
+                  >
+                    🖨️ طباعة
+                  </button>
                 </div>
               </div>
               <div class="table-responsive">
@@ -903,17 +974,16 @@
                   <thead>
                     <tr>
                       <th style="width: 45px; text-align: center">م</th>
-                      <th>اسم المعلم</th>
-                      <th>رقم الجوال</th>
+                      <th>الاسم</th>
                       <th>الحلقات المكلف بها</th>
-                      <th>وقت التحضير الذاتي</th>
-                      <th>حالة الحضور (تعديل المدير)</th>
+                      <th>وقت التحضير</th>
+                      <th>حالة الحضور (تحضير يدوي للمدير)</th>
                       <th>ملاحظة المدير</th>
                     </tr>
                   </thead>
                   <tbody id="teachers-attendance-table-body">
                     <tr>
-                      <td colspan="7" class="text-center text-muted p-3">
+                      <td colspan="6" class="text-center text-muted p-3">
                         جاري تجهيز السجل...
                       </td>
                     </tr>
@@ -946,7 +1016,7 @@
                   >)
                 </button>
               </div>
-              <div class="header-actions">
+              <div class="header-actions flex-align-gap">
                 <button
                   class="btn btn-outline-brown nav-admin-only"
                   onclick="openModal('modal-excel-import')"
@@ -964,6 +1034,12 @@
                   onclick="exportStudentsPDF()"
                 >
                   📄 تنزيل PDF
+                </button>
+                <button
+                  class="btn btn-outline-brown"
+                  onclick="printStudentsTable()"
+                >
+                  🖨️ طباعة
                 </button>
                 <button
                   class="btn btn-primary nav-admin-only"
@@ -1145,6 +1221,12 @@
                 </button>
                 <button
                   class="btn btn-outline-brown btn-sm"
+                  onclick="printAttendanceTable()"
+                >
+                  🖨️ طباعة
+                </button>
+                <button
+                  class="btn btn-outline-brown btn-sm"
                   onclick="markAllAbsent()"
                 >
                   الكل غائب
@@ -1197,65 +1279,7 @@
           </div>
         </section>
 
-        <!-- 5. شاشة ملاحظات المعلمين -->
-        <section id="view-teacher-notes" class="content-view">
-          <div class="card">
-            <div class="card-header flex-between">
-              <div>
-                <h3>📝 ملاحظات المعلمين للإدارة</h3>
-                <small class="text-muted"
-                  >الملاحظات والرسائل التي يدوّنها المعلمون أثناء التسميع اليومي
-                  للطلاب</small
-                >
-              </div>
-              <div class="flex-align-gap no-print">
-                <button
-                  class="btn btn-outline-brown btn-sm"
-                  onclick="exportTeacherNotesExcel()"
-                >
-                  📤 تصدير Excel
-                </button>
-                <button
-                  class="btn btn-outline-brown btn-sm"
-                  onclick="exportTeacherNotesPDF()"
-                >
-                  📄 تنزيل PDF
-                </button>
-              </div>
-            </div>
-            <div class="card-filter-bar no-print mt-2">
-              <input
-                type="text"
-                id="search-teacher-notes"
-                class="form-control search-input"
-                placeholder="ابحث باسم الطالب أو نص الملاحظة..."
-              />
-              <select
-                id="filter-teacher-notes-circle"
-                class="form-control select-input"
-              >
-                <option value="all">كل الحلقات</option>
-              </select>
-            </div>
-            <div class="table-responsive">
-              <table class="data-table" id="teacher-notes-table-element">
-                <thead>
-                  <tr>
-                    <th style="width: 50px">م</th>
-                    <th>التاريخ</th>
-                    <th>اسم المعلم</th>
-                    <th>الحلقة</th>
-                    <th>اسم الطالب</th>
-                    <th>ملاحظة المعلم للإدارة</th>
-                  </tr>
-                </thead>
-                <tbody id="teacher-notes-table-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- 6. شاشة إدارة الحسابات -->
+        <!-- 5. شاشة إدارة الحسابات -->
         <section id="view-accounts" class="content-view">
           <div class="card">
             <div class="card-header flex-between">
@@ -1278,6 +1302,12 @@
                   onclick="exportAccountsPDF()"
                 >
                   📄 تنزيل PDF
+                </button>
+                <button
+                  class="btn btn-outline-brown btn-sm"
+                  onclick="printAccountsTable()"
+                >
+                  🖨️ طباعة
                 </button>
               </div>
             </div>
@@ -1324,7 +1354,7 @@
           </div>
         </section>
 
-        <!-- 7. شاشة التميز الأسبوعي -->
+        <!-- 6. شاشة التميز الأسبوعي -->
         <section id="view-screen" class="content-view">
           <div class="card mb-3">
             <div class="card-header flex-between">
@@ -1386,7 +1416,7 @@
           </div>
         </section>
 
-        <!-- 8. شاشة الاختبارات -->
+        <!-- 7. شاشة الاختبارات -->
         <section id="view-tests" class="content-view">
           <div class="flex-between mb-3 no-print">
             <div class="flex-align-gap">
@@ -1398,6 +1428,9 @@
               </button>
               <button class="btn btn-outline-brown" onclick="exportTestsPDF()">
                 📄 تنزيل PDF
+              </button>
+              <button class="btn btn-outline-brown" onclick="printTestsTable()">
+                🖨️ طباعة
               </button>
             </div>
             <button class="btn btn-primary" onclick="openModalAddTest()">
@@ -1440,7 +1473,7 @@
           </div>
         </section>
 
-        <!-- 9. شاشة التقارير الرسمية -->
+        <!-- 8. شاشة التقارير الرسمية -->
         <section id="view-reports" class="content-view">
           <div class="card no-print">
             <div
@@ -1516,6 +1549,12 @@
               >
                 📄 تنزيل PDF
               </button>
+              <button
+                class="btn btn-outline-brown"
+                onclick="printOfficialReport()"
+              >
+                🖨️ طباعة
+              </button>
             </div>
           </div>
 
@@ -1574,7 +1613,7 @@
           </div>
         </section>
 
-        <!-- 10. شاشة التقارير المالية -->
+        <!-- 9. شاشة التقارير المالية -->
         <section id="view-finance" class="content-view">
           <div class="card">
             <div class="card-header flex-between">
@@ -1592,7 +1631,7 @@
           </div>
         </section>
 
-        <!-- 11. شاشة الإشعارات والرسائل -->
+        <!-- 10. شاشة الإشعارات والرسائل (مدمجة مع ملاحظات المعلمين للإدارة) -->
         <section id="view-notifications" class="content-view">
           <div class="flex-between mb-3">
             <div></div>
@@ -1617,9 +1656,79 @@
               </div>
             </div>
           </div>
+
+          <!-- البطاقة المدمجة: ملاحظات وتوجيهات المعلمين للإدارة -->
+          <div class="card mt-3">
+            <div class="card-header flex-between">
+              <div>
+                <h3
+                  style="
+                    color: var(--primary-brown);
+                    font-weight: 800;
+                    margin: 0;
+                  "
+                >
+                  📝 ملاحظات وتنبيهات المعلمين للإدارة
+                </h3>
+                <small class="text-muted"
+                  >الملاحظات التي يدوّنها المعلمون أثناء التسميع اليومي للطلاب
+                  وموجهة للمدير</small
+                >
+              </div>
+              <div class="flex-align-gap no-print">
+                <button
+                  class="btn btn-outline-brown btn-sm"
+                  onclick="exportTeacherNotesExcel()"
+                >
+                  📤 تصدير Excel
+                </button>
+                <button
+                  class="btn btn-outline-brown btn-sm"
+                  onclick="exportTeacherNotesPDF()"
+                >
+                  📄 تنزيل PDF
+                </button>
+                <button
+                  class="btn btn-outline-brown btn-sm"
+                  onclick="printTeacherNotes()"
+                >
+                  🖨️ طباعة
+                </button>
+              </div>
+            </div>
+            <div class="card-filter-bar no-print mt-2">
+              <input
+                type="text"
+                id="search-teacher-notes"
+                class="form-control search-input"
+                placeholder="ابحث باسم الطالب أو نص الملاحظة..."
+              />
+              <select
+                id="filter-teacher-notes-circle"
+                class="form-control select-input"
+              >
+                <option value="all">كل الحلقات</option>
+              </select>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table" id="teacher-notes-table-element">
+                <thead>
+                  <tr>
+                    <th style="width: 50px">م</th>
+                    <th>التاريخ</th>
+                    <th>اسم المعلم</th>
+                    <th>الحلقة</th>
+                    <th>اسم الطالب</th>
+                    <th>ملاحظة المعلم للإدارة</th>
+                  </tr>
+                </thead>
+                <tbody id="teacher-notes-table-body"></tbody>
+              </table>
+            </div>
+          </div>
         </section>
 
-        <!-- 12. شاشة الإعدادات (محدثة بخريطة تفاعلية ونطاق المسافة بالمتر) -->
+        <!-- 11. شاشة الإعدادات -->
         <section id="view-settings" class="content-view">
           <div class="dashboard-columns">
             <div class="card nav-admin-only" id="admin-org-settings-card">
@@ -1801,7 +1910,7 @@
           </div>
         </section>
 
-        <!-- 13. شاشات الطالب -->
+        <!-- 12. شاشات الطالب -->
         <section id="view-student-home" class="content-view"></section>
         <section id="view-student-lessons" class="content-view">
           <div id="stu-lessons-container">
@@ -1815,7 +1924,136 @@
 
     <!-- MODALS: النوافذ المنبثقة -->
 
-    <!-- نافذة الخريطة التفاعلية لتحديد الموقع ونطاق المسافة بدقة مع شريط البحث العصري -->
+    <!-- نافذة متابعة الطلاب لليوم (متضمنة عمود الحلقة الرباعي والطباعة) -->
+    <div id="modal-students-followup" class="modal-overlay">
+      <div class="modal-card modal-lg">
+        <div class="modal-header">
+          <h3 id="students-followup-modal-title">📋 متابعة الطلاب لليوم</h3>
+          <button
+            class="modal-close"
+            onclick="closeModal('modal-students-followup')"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="flex-between mb-2 no-print">
+            <input
+              type="text"
+              id="search-modal-students-followup"
+              class="form-control search-input"
+              placeholder="🔍 ابحث باسم الطالب..."
+              oninput="filterStudentsFollowupModal()"
+            />
+            <div class="flex-align-gap">
+              <button
+                class="btn btn-outline-brown btn-sm"
+                onclick="exportStudentsFollowupExcel()"
+              >
+                📤 تصدير Excel
+              </button>
+              <button
+                class="btn btn-outline-brown btn-sm"
+                onclick="printStudentsFollowup()"
+              >
+                🖨️ طباعة
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table" id="students-followup-table-element">
+              <thead>
+                <tr>
+                  <th style="width: 45px; text-align: center">م</th>
+                  <th>اسم الطالب</th>
+                  <th style="text-align: center">الحلقة</th>
+                  <th style="text-align: center">الحضور</th>
+                  <th style="text-align: center">سمّع</th>
+                  <th style="text-align: center">لم يسمّع</th>
+                </tr>
+              </thead>
+              <tbody id="students-followup-tbody">
+                <tr>
+                  <td colspan="6" class="text-center text-muted p-3">
+                    جاري التحميل...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-outline-brown"
+            onclick="closeModal('modal-students-followup')"
+          >
+            إغلاق
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- نافذة تفاصيل إحصائيات لوحة التحكم والطباعة -->
+    <div id="modal-dashboard-details" class="modal-overlay">
+      <div class="modal-card modal-lg">
+        <div class="modal-header">
+          <h3 id="dashboard-details-modal-title">تفاصيل الإحصائية</h3>
+          <button
+            class="modal-close"
+            onclick="closeModal('modal-dashboard-details')"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="flex-between mb-2 no-print">
+            <input
+              type="text"
+              id="search-modal-dashboard-details"
+              class="form-control search-input"
+              placeholder="🔍 ابحث في القائمة..."
+              oninput="filterDashboardDetailsModal()"
+            />
+            <div class="flex-align-gap">
+              <button
+                class="btn btn-outline-brown btn-sm"
+                onclick="exportDashboardDetailsExcel()"
+              >
+                📤 تصدير Excel
+              </button>
+              <button
+                class="btn btn-outline-brown btn-sm"
+                onclick="printDashboardDetails()"
+              >
+                🖨️ طباعة
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table" id="dashboard-details-table-element">
+              <thead id="dashboard-details-thead"></thead>
+              <tbody id="dashboard-details-tbody">
+                <tr>
+                  <td class="text-center text-muted p-3">جاري التحميل...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-outline-brown"
+            onclick="closeModal('modal-dashboard-details')"
+          >
+            إغلاق
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- نافذة الخريطة التفاعلية -->
     <div id="modal-map-picker" class="modal-overlay">
       <div class="modal-card modal-lg">
         <div class="modal-header">
@@ -1830,7 +2068,6 @@
             يمكنك أيضاً البحث المباشر عن اسم الحي أو الشارع أو المعلم بالأسفل:
           </p>
 
-          <!-- شريط البحث الذكي في الخريطة -->
           <div class="map-search-bar-row mb-2">
             <input
               type="text"
@@ -2029,6 +2266,12 @@
                 onclick="exportTasmeeaDetailsPDF()"
               >
                 📄 تنزيل PDF
+              </button>
+              <button
+                class="btn btn-outline-brown btn-sm"
+                onclick="printTasmeeaDetails()"
+              >
+                🖨️ طباعة
               </button>
             </div>
           </div>
@@ -2334,66 +2577,7 @@
       </div>
     </div>
 
-    <!-- 6. نافذة تعديل سجل الطالب للمعلم -->
-    <div id="modal-teacher-edit-student-record" class="modal-overlay">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3>تعديل سجل وتسميع الطالب</h3>
-          <button
-            class="modal-close"
-            onclick="closeModal('modal-teacher-edit-student-record')"
-          >
-            &times;
-          </button>
-        </div>
-        <form
-          id="form-teacher-edit-student"
-          onsubmit="handleTeacherSaveStudentRecord(event)"
-        >
-          <input type="hidden" id="teacher-edit-stu-id" value="" />
-          <div class="modal-body">
-            <div class="form-group">
-              <label>اسم الطالب</label
-              ><input
-                type="text"
-                id="teacher-edit-stu-name"
-                class="form-control"
-                readonly
-              />
-            </div>
-            <div class="form-group">
-              <label>حالة حضور اليوم</label
-              ><select id="teacher-edit-stu-att" class="form-control">
-                <option value="present">🟢 حاضر</option>
-                <option value="absent">🔴 غائب</option>
-                <option value="late">🟡 متأخر</option>
-                <option value="excused">🔵 مستأذن</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>ملاحظة المعلم</label
-              ><textarea
-                id="teacher-edit-stu-notes"
-                class="form-control"
-                rows="3"
-              ></textarea>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="submit" class="btn btn-primary">حفظ التعديل</button
-            ><button
-              type="button"
-              class="btn btn-outline-brown"
-              onclick="closeModal('modal-teacher-edit-student-record')"
-            >
-              إلغاء
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- 7. نافذة إضافة معلم -->
+    <!-- 6. نافذة إضافة معلم -->
     <div id="modal-add-teacher" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
@@ -2470,7 +2654,7 @@
       </div>
     </div>
 
-    <!-- 8. نافذة تعديل بيانات المعلم -->
+    <!-- 7. نافذة تعديل بيانات المعلم -->
     <div id="modal-edit-teacher" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
@@ -2562,7 +2746,7 @@
       </div>
     </div>
 
-    <!-- 9. نافذة تعديل بيانات الحساب -->
+    <!-- 8. نافذة تعديل بيانات الحساب -->
     <div id="modal-edit-user-account" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
@@ -2624,7 +2808,7 @@
       </div>
     </div>
 
-    <!-- 10. نافذة استيراد Excel -->
+    <!-- 9. نافذة استيراد Excel -->
     <div id="modal-excel-import" class="modal-overlay">
       <div class="modal-card modal-lg">
         <div class="modal-header">
@@ -2679,7 +2863,7 @@
       </div>
     </div>
 
-    <!-- 11. نافذة إرسال رسالة / إشعار -->
+    <!-- 10. نافذة إرسال رسالة / إشعار -->
     <div id="modal-send-unified-msg" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
@@ -2752,7 +2936,7 @@
       </div>
     </div>
 
-    <!-- 12. نافذة الإجراءات الجماعية للحلقات -->
+    <!-- 11. نافذة الإجراءات الجماعية للحلقات -->
     <div id="modal-bulk-circle" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
@@ -2797,7 +2981,7 @@
       </div>
     </div>
 
-    <!-- 13. استمارة التسجيل الذاتي -->
+    <!-- 12. استمارة التسجيل الذاتي -->
     <div id="modal-self-register" class="modal-overlay">
       <div class="modal-card word-doc-style">
         <div class="modal-header">
