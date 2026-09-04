@@ -116,6 +116,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const attSearchStudent = document.getElementById("search-attendance-student");
   if (attSearchStudent) attSearchStudent.oninput = renderAttendanceTable;
 
+  // تهيئة حقل تاريخ لوحة التحكم
+  const dashDateSelect = document.getElementById("dashboard-date-select");
+  if (dashDateSelect) {
+    if (!dashDateSelect.value) {
+      dashDateSelect.value = new Date().toISOString().split("T")[0];
+    }
+    dashDateSelect.onchange = () => {
+      if (typeof renderDashboardView === "function") renderDashboardView();
+    };
+  }
+
   renderExcelColumnMappingInputs();
 });
 
@@ -309,7 +320,7 @@ window.exportTeacherNotesPDF = function () {
 };
 
 // ==========================================================================
-// دالة نافذة (متابعة الطلاب لليوم) - متضمنة اسم الحلقة والطباعة
+// دالة نافذة (متابعة الطلاب لليوم) - متضمنة اسم الحلقة ومحددة التاريخ
 // ==========================================================================
 window.openStudentsFollowupModal = function () {
   const titleEl = document.getElementById("students-followup-modal-title");
@@ -319,8 +330,11 @@ window.openStudentsFollowupModal = function () {
   const tbody = document.getElementById("students-followup-tbody");
   if (!tbody) return;
 
-  const todayStr = new Date().toISOString().split("T")[0];
-  if (titleEl) titleEl.textContent = `📋 متابعة الطلاب لليوم (${todayStr})`;
+  const targetDateStr =
+    document.getElementById("dashboard-date-select")?.value ||
+    new Date().toISOString().split("T")[0];
+
+  if (titleEl) titleEl.textContent = `📋 متابعة الطلاب ليوم (${targetDateStr})`;
 
   if (thead) {
     thead.innerHTML = `
@@ -343,12 +357,12 @@ window.openStudentsFollowupModal = function () {
 
   const attMap = new Map();
   todayAtt
-    .filter((a) => a.date === todayStr)
+    .filter((a) => a.date === targetDateStr)
     .forEach((a) => attMap.set(a.studentId, a));
 
   const tasmMap = new Map();
   todayTasm
-    .filter((t) => t.date === todayStr)
+    .filter((t) => t.date === targetDateStr)
     .forEach((t) => {
       const hasRecited = Boolean(
         t.hifzSurah ||
@@ -403,7 +417,7 @@ window.openStudentsFollowupModal = function () {
 
   tbody.innerHTML =
     html ||
-    '<tr><td colspan="6" class="text-center text-muted p-4">لا توجد بيانات طلاب نشطين لليوم</td></tr>';
+    '<tr><td colspan="6" class="text-center text-muted p-4">لا توجد بيانات طلاب نشطين لهذا اليوم</td></tr>';
   openModal("modal-students-followup");
 };
 
@@ -419,7 +433,7 @@ window.filterStudentsFollowupModal = function () {
 };
 
 window.printStudentsFollowup = function () {
-  printTableElement("students-followup-table-element", "متابعة الطلاب لليوم");
+  printTableElement("students-followup-table-element", "متابعة الطلاب");
 };
 
 window.exportStudentsFollowupExcel = function () {
@@ -429,15 +443,15 @@ window.exportStudentsFollowupExcel = function () {
     alert("⚠️ مكتبة Excel غير متوفرة!");
     return;
   }
-  const wb = XLSX.utils.table_to_book(table, { sheet: "متابعة_الطلاب_اليوم" });
+  const wb = XLSX.utils.table_to_book(table, { sheet: "متابعة_الطلاب" });
   XLSX.writeFile(
     wb,
-    `متابعة_الطلاب_اليوم_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `متابعة_الطلاب_${new Date().toISOString().split("T")[0]}.xlsx`,
   );
 };
 
 // ==========================================================================
-// دالة النقر على بطاقات لوحة التحكم الأخرى مع الطباعة
+// دالة النقر على بطاقات لوحة التحكم الأخرى مع الطباعة وتحديد التاريخ
 // ==========================================================================
 window.openDashboardDetailsModal = function (type) {
   const titleEl = document.getElementById("dashboard-details-modal-title");
@@ -445,7 +459,9 @@ window.openDashboardDetailsModal = function (type) {
   const tbody = document.getElementById("dashboard-details-tbody");
   if (!tbody || !thead) return;
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const targetDateStr =
+    document.getElementById("dashboard-date-select")?.value ||
+    new Date().toISOString().split("T")[0];
 
   if (type === "students") {
     if (titleEl) titleEl.textContent = `👨‍🎓 كشف الطلاب المسجلين بالمَجْمَع`;
@@ -456,6 +472,7 @@ window.openDashboardDetailsModal = function (type) {
         <th>رقم الهوية</th>
         <th>جوال ولي الأمر</th>
         <th>الحلقة</th>
+        <th>آخر دخول للنظام</th>
         <th>الحالة</th>
       </tr>
     `;
@@ -474,13 +491,14 @@ window.openDashboardDetailsModal = function (type) {
           <td>${s.nationalId || "—"}</td>
           <td>${s.parentPhone || s.phone || "—"}</td>
           <td>${circle ? circle.name : "غير مسجل"}</td>
+          <td dir="ltr" style="text-align: right;">${s.lastLogin || "لم يدخل بعد"}</td>
           <td><span class="badge badge-active">نشط</span></td>
         </tr>
       `;
     });
     tbody.innerHTML =
       html ||
-      '<tr><td colspan="6" class="text-center text-muted p-4">لا يوجد طلاب نشطون</td></tr>';
+      '<tr><td colspan="7" class="text-center text-muted p-4">لا يوجد طلاب نشطون</td></tr>';
   } else if (type === "teachers") {
     if (titleEl) titleEl.textContent = `👨‍🏫 كشف المعلمين المكلفين بالمَجْمَع`;
     thead.innerHTML = `
@@ -555,7 +573,7 @@ window.openDashboardDetailsModal = function (type) {
       '<tr><td colspan="5" class="text-center text-muted p-4">لا توجد حلقات معرفة</td></tr>';
   } else if (type === "present") {
     if (titleEl)
-      titleEl.textContent = `🟢 كشف الطلاب الحاضرين اليوم بالمسجد (${todayStr})`;
+      titleEl.textContent = `🟢 كشف الطلاب الحاضرين ليوم (${targetDateStr})`;
     thead.innerHTML = `
       <tr>
         <th style="width: 45px; text-align: center;">م</th>
@@ -567,7 +585,8 @@ window.openDashboardDetailsModal = function (type) {
     `;
     const presentAtt = (window.appStore?.attendance || []).filter(
       (a) =>
-        a.date === todayStr && (a.status === "present" || a.status === "late"),
+        a.date === targetDateStr &&
+        (a.status === "present" || a.status === "late"),
     );
     let html = "";
     presentAtt.forEach((att, idx) => {
@@ -591,7 +610,7 @@ window.openDashboardDetailsModal = function (type) {
     });
     tbody.innerHTML =
       html ||
-      '<tr><td colspan="5" class="text-center text-muted p-4">لا يوجد طلاب حاضرون اليوم حتى الآن</td></tr>';
+      '<tr><td colspan="5" class="text-center text-muted p-4">لا يوجد طلاب حاضرون في هذا التاريخ</td></tr>';
   }
 
   openModal("modal-dashboard-details");
@@ -1453,7 +1472,7 @@ window.renderTeachersAttendanceTable = function () {
     id: "admin_main",
     name: `${directorName} (المدير)`,
     isDirector: true,
-    circleNames: "اداري ",
+    circleNames: "إداري",
   };
 
   const teachers = window.appStore?.teachers || [];
@@ -1619,7 +1638,7 @@ window.markAllTeachersPresent = function () {
 };
 
 // ==========================================================================
-// 4. إدارة الطلاب
+// 4. إدارة الطلاب (إضافة عمود آخر دخول للنظام وتصحيح استدعاء البيانات)
 // ==========================================================================
 window.switchStudentSubTab = function (tab) {
   const btnActive = document.getElementById("tab-btn-active-students");
@@ -1684,7 +1703,7 @@ window.renderStudentsTable = function () {
 
   if (filtered.length === 0) {
     tbody.innerHTML =
-      '<tr><td colspan="10" class="text-center text-muted p-4">لا يوجد طلاب مطابقون للبحث</td></tr>';
+      '<tr><td colspan="11" class="text-center text-muted p-4">لا يوجد طلاب مطابقون للبحث</td></tr>';
     updatePendingBadgeCount();
     return;
   }
@@ -1708,6 +1727,7 @@ window.renderStudentsTable = function () {
         <td>${s.parentRelation || "—"}</td>
         <td style="color: var(--primary-brown); font-weight: 700;">${s.parentPhone || "—"}</td>
         <td><span style="font-weight: 600; color: var(--text-dark);">${circleName}</span></td>
+        <td dir="ltr" class="text-muted" style="text-align: right;">${s.lastLogin || "لم يدخل بعد"}</td>
         <td>
           <span class="badge ${s.status === "active" ? "badge-active" : "badge-danger"}">
             ${s.status === "active" ? "نشط" : "موقوف"}
@@ -1759,6 +1779,7 @@ window.handleAddStudent = function (e) {
     parentPhone: parentPhone,
     circleId: circleId,
     status: "active",
+    lastLogin: "لم يدخل بعد",
     createdAt: Date.now(),
   };
 
@@ -2118,6 +2139,7 @@ window.executeDynamicExcelImport = function () {
           parentPhone: parentPhone,
           circleId: targetCircleId,
           status: "active",
+          lastLogin: "لم يدخل بعد",
           createdAt: Date.now(),
         };
 
@@ -2866,7 +2888,10 @@ window.renderScreenView = function () {
         grid.innerHTML = cardsHtml;
       }
     } else {
-      const todayStr = new Date().toISOString().split("T")[0];
+      const todayStr =
+        document.getElementById("dashboard-date-select")?.value ||
+        new Date().toISOString().split("T")[0];
+
       const activeStudents = (window.appStore?.students || []).filter(
         (s) => s.status === "active",
       );
@@ -3341,7 +3366,7 @@ window.approveStudentRequest = function (studentId) {
     saveToCloud("users", stu.id, {
       id: stu.id,
       name: stu.name,
-      phone: phone || parentPhone,
+      phone: stu.phone || stu.parentPhone,
       role: "student",
       username: stu.nationalId || stu.phone || stu.id,
       pass: "1111",
