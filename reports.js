@@ -94,6 +94,10 @@ function handleReportTypeChange() {
   const dateToGroup = document.getElementById("report-date-to-group");
   const thead = document.getElementById("report-thead");
   const tbody = document.getElementById("report-tbody");
+  const wrapper = document.getElementById("report-results-wrapper");
+
+  // إخفاء صندوق النتائج والشعارات لحين الضغط على زر الاستخراج
+  if (wrapper) wrapper.style.display = "none";
 
   if (circleGroup) circleGroup.style.display = "block";
   if (studentGroup) studentGroup.style.display = "block";
@@ -141,7 +145,7 @@ function getSundayToWednesdayDatesByWeekOption(weekOption) {
   return days;
 }
 
-// دالة توليد التقرير الفخم المطابق تماماً لنموذج الصورة المرفقة
+// دالة توليد التقرير الفخم المطابق تماماً لنموذج المتابعة والإنجاز
 function generateReport() {
   const reportType = document.getElementById("report-type-select")?.value;
   const selectedStudentId =
@@ -171,7 +175,7 @@ function generateReport() {
   let headHtml = "";
   let bodyHtml = "";
 
-  // 1. تقرير إنجاز ومتابعة الطالب (مطابق لجدول وتوزيع الصورة المرفقة)
+  // 1. تقرير إنجاز ومتابعة الطالب
   if (reportType === "student_achievement" || reportType === "tasmeea") {
     const targetDateLabel =
       dateTo || dateFrom || new Date().toISOString().split("T")[0];
@@ -186,7 +190,6 @@ function generateReport() {
       printPeriod.style.display = "block";
     }
 
-    // رأس الجدول مطابق للصورة المرفقة تماماً
     headHtml = `
       <tr style="background: #1a365d; color: #ffffff;">
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">الطالب</th>
@@ -220,7 +223,6 @@ function generateReport() {
         );
         const circleName = circle ? circle.name : "حلقة عامة";
 
-        // سجل حضور اليوم وإجمالي أيام الحضور
         const allAtt = (window.appStore.attendance || []).filter(
           (a) => a.studentId === s.id,
         );
@@ -245,7 +247,6 @@ function generateReport() {
               '<span style="color:#1565c0; font-weight:800;">مستأذن</span>';
         }
 
-        // إنجاز اليوم
         const allTasm = (window.appStore.tasmeea || []).filter(
           (t) => t.studentId === s.id,
         );
@@ -267,7 +268,6 @@ function generateReport() {
           todayNotes = todayTasm.studentNotes || todayTasm.adminNotes || "—";
         }
 
-        // إجمالي الحفظ (من السجلات السابقة أو حقل الطالب)
         const completedHifzCount = allTasm.filter((t) => t.hifzSurah).length;
         const totalHifzDisplay =
           completedHifzCount > 0
@@ -509,8 +509,9 @@ function generateReport() {
     }
   }
 
-  // تطبيق الهيكل الملكي الفاخر المؤطر كاملاً
+  // إظهار الصندوق وتطبيق الهيكل الملكي الفاخر كاملاً
   if (wrapper) {
+    wrapper.style.display = "block";
     wrapper.innerHTML = `
       <div style="border: 2.5px double #1a365d; border-radius: 8px; padding: 1.5rem; background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-top: 1rem;">
         
@@ -524,7 +525,7 @@ function generateReport() {
             <h2 style="margin: 3px 0; font-size: 1.35rem; font-weight: 900; color: #1a365d;">مَجْمَع عبدالله بن مهدي القرآني</h2>
             <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #334155;">جامع الهدى</h4>
             <div style="margin-top: 4px; font-size: 0.78rem; color: #64748b; font-weight: 600;">
-              تاريخ الطباعة: ${currentDateFormatted} | الوقت: ${currentTimeFormatted}
+              تاريخ التقرير: ${currentDateFormatted} | الوقت: ${currentTimeFormatted}
             </div>
           </div>
           <div style="width: 100px; text-align: left;">
@@ -561,8 +562,7 @@ function generateReport() {
             صفحة 1 / 1
           </div>
           <div style="text-align: left;">
-            <div style="font-weight: 800; color: #1a365d; margin-bottom: 1.5rem;"></div>
-            <div style="font-weight: 900; color: #334155;">احمد بن عبدالله ال مهدي </div>
+            <div style="font-weight: 900; color: #334155;">احمد بن عبدالله ال مهدي</div>
           </div>
         </div>
 
@@ -571,10 +571,11 @@ function generateReport() {
   }
 }
 
+// تنزيل Excel مباشر وفوري على الجهاز
 function exportReportExcel() {
   const table = document.getElementById("report-results-table");
   if (!table || table.rows.length <= 1) {
-    alert("⚠️ لا توجد بيانات في التقرير لتصديرها!");
+    alert("⚠️ لا توجد بيانات في التقرير لتصديرها! يرجى استخراج التقرير أولاً.");
     return;
   }
   if (typeof XLSX === "undefined") {
@@ -588,10 +589,17 @@ function exportReportExcel() {
   );
 }
 
-// دالة تنزيل التقرير الرسمي PDF
+// تنزيل PDF مباشر وفوري على الجهاز دون فتح نوافذ
 function downloadReportPDF() {
   const element = document.getElementById("report-results-wrapper");
-  if (!element) return;
+  if (
+    !element ||
+    element.style.display === "none" ||
+    !element.innerHTML.trim()
+  ) {
+    alert("⚠️ يرجى استخراج التقرير أولاً قبل التنزيل!");
+    return;
+  }
 
   const reportTitle =
     document.getElementById("print-report-title")?.textContent ||
@@ -599,7 +607,7 @@ function downloadReportPDF() {
 
   if (typeof html2pdf !== "undefined") {
     const opt = {
-      margin: [8, 8, 8, 8],
+      margin: [6, 6, 6, 6],
       filename: `${reportTitle.trim().replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`,
       image: { type: "jpeg", quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
@@ -607,10 +615,75 @@ function downloadReportPDF() {
     };
     html2pdf().set(opt).from(element).save();
   } else {
-    window.print();
+    printOfficialReport();
   }
 }
 
+// الطباعة التفاعلية تتيح تحديد الألوان، عدد النسخ، والاتجاه بحرية
 function printOfficialReport() {
-  downloadReportPDF();
+  const wrapper = document.getElementById("report-results-wrapper");
+  if (
+    !wrapper ||
+    wrapper.style.display === "none" ||
+    !wrapper.innerHTML.trim()
+  ) {
+    alert("⚠️ يرجى استخراج التقرير أولاً قبل الطباعة!");
+    return;
+  }
+
+  const reportTitle =
+    document.getElementById("print-report-title")?.textContent ||
+    "تقرير المَجْمَع الرسمي";
+
+  const printWindow = window.open("", "_blank");
+  printWindow.document.write(`
+    <html dir="rtl" lang="ar">
+      <head>
+        <title>${reportTitle}</title>
+        <style>
+          @page {
+            size: A4 landscape;
+            margin: 10mm;
+          }
+          body {
+            font-family: 'Cairo', 'Tajawal', sans-serif;
+            direction: rtl;
+            padding: 15px;
+            background: #fff;
+            color: #000;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 11px;
+          }
+          th, td {
+            border: 1px solid #cbd5e1;
+            padding: 6px 4px;
+            text-align: center;
+          }
+          th {
+            background-color: #1a365d !important;
+            color: #ffffff !important;
+            font-weight: bold;
+          }
+          .no-print, button {
+            display: none !important;
+          }
+        </style>
+      </head>
+      <body>
+        ${wrapper.innerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow.print();
+    printWindow.close();
+  }, 350);
 }
