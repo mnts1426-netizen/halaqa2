@@ -1,6 +1,6 @@
 /**
  * ==========================================================================
- * admin.js - المحرك الإداري الشامل، شاشة العرض المتقلبة الذكية، وإرسال الإشعارات
+ * admin.js - المحرك الإداري الشامل، عرض آخر 50 عملية للمعلمين، والفلترة بالأيام
  * ==========================================================================
  */
 
@@ -16,21 +16,19 @@ window.appStore = window.appStore || {
   tasmeea: [],
   screenOrder: [],
   notifications: [],
+  teacherLogs: [],
   settings: null,
 };
 
-// متغيرات الخريطة التفاعلية
 window.mapPickerInstance = null;
 window.mapPickerMarker = null;
 window.mapPickerCircle = null;
 
-// متغيرات شاشة العرض المتقلبة والمؤقتات الموفرة للموارد
 window.screenFlipTimer = null;
 window.screenDataRefreshTimer = null;
-window.screenCurrentSlide = "tamayuz"; // 'tamayuz' أو 'stats'
+window.screenCurrentSlide = "tamayuz";
 
 document.addEventListener("DOMContentLoaded", () => {
-  // ربط نماذج الإضافة الأساسية
   const formAddStudent = document.getElementById("form-add-student");
   if (formAddStudent) {
     formAddStudent.onsubmit = function (e) {
@@ -63,7 +61,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // أحداث البحث والتصفية
   const searchStudents = document.getElementById("search-students");
   if (searchStudents) searchStudents.oninput = renderStudentsTable;
 
@@ -116,7 +113,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const attSearchStudent = document.getElementById("search-attendance-student");
   if (attSearchStudent) attSearchStudent.oninput = renderAttendanceTable;
 
-  // تهيئة حقل تاريخ لوحة التحكم
   const dashDateSelect = document.getElementById("dashboard-date-select");
   if (dashDateSelect) {
     if (!dashDateSelect.value) {
@@ -128,11 +124,155 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   renderExcelColumnMappingInputs();
+  ensureTeacherLogsContainer();
+  renderTeacherLogsTable();
 });
 
-// ==========================================================================
-// دوال الطباعة والتصدير لكافة شاشات وجداول النظام
-// ==========================================================================
+window.isOfficialWorkday = function (dateStr) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr + "T00:00:00");
+  const day = d.getDay();
+  return day >= 0 && day <= 3;
+};
+
+// التأكد من توفر بطاقة سجل العمليات وبنائها برمجياً دون الحاجة لتعديل index.html
+function ensureTeacherLogsContainer() {
+  if (document.getElementById("teacher-logs-card")) return;
+
+  const dashboardView = document.getElementById("view-dashboard");
+  if (!dashboardView) return;
+
+  const logsCard = document.createElement("div");
+  logsCard.id = "teacher-logs-card";
+  logsCard.className = "card mb-3 nav-admin-only";
+  logsCard.style.marginTop = "1rem";
+  logsCard.innerHTML = `
+    <div class="card-header flex-between">
+      <div>
+        <h3 style="color: var(--primary-brown); font-weight: 800; margin: 0;">
+          📜 سجل متابعة آخر 50 عملية للمعلمين
+        </h3>
+        <small class="text-muted">متابعة فورية لدخول المعلمين ورصد المقررات والتحضير مع إمكانية التصفية بالأيام</small>
+      </div>
+      <div class="flex-align-gap no-print">
+        <button class="btn btn-outline-brown btn-sm" onclick="exportTeacherLogsExcel()">📤 تصدير Excel</button>
+        <button class="btn btn-outline-brown btn-sm" onclick="exportTeacherLogsPDF()">📄 تنزيل PDF</button>
+        <button class="btn btn-outline-brown btn-sm" onclick="printTeacherLogs()">🖨️ طباعة</button>
+      </div>
+    </div>
+    <div class="card-filter-bar no-print flex-between" style="flex-wrap: wrap; gap: 0.8rem;">
+      <div style="display: flex; gap: 0.8rem; flex: 1; flex-wrap: wrap;">
+        <input type="date" id="filter-teacher-logs-date" class="form-control select-input" onchange="renderTeacherLogsTable()" title="فلترة العمليات بتاريخ محدد" />
+        <input type="text" id="search-teacher-logs" class="form-control search-input" placeholder="🔍 ابحث باسم المعلم، نوع العملية، أو اسم الطالب..." oninput="renderTeacherLogsTable()" />
+      </div>
+      <div>
+        <button type="button" class="btn btn-outline-brown btn-sm" onclick="document.getElementById('filter-teacher-logs-date').value = ''; renderTeacherLogsTable();">
+          عرض كل الأيام
+        </button>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="data-table" id="teacher-logs-table-element">
+        <thead>
+          <tr>
+            <th style="width: 45px; text-align: center;">م</th>
+            <th style="width: 145px; text-align: center;">التاريخ والوقت</th>
+            <th>اسم المعلم</th>
+            <th>نوع الإجراء</th>
+            <th>الحلقة</th>
+            <th>تفاصيل العملية</th>
+          </tr>
+        </thead>
+        <tbody id="teacher-logs-table-body">
+          <tr><td colspan="6" class="text-center text-muted p-3">جاري تحميل سجل العمليات...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  dashboardView.appendChild(logsCard);
+}
+
+// عرض وتصفية آخر 50 عملية للمعلمين
+window.renderTeacherLogsTable = function () {
+  ensureTeacherLogsContainer();
+  const tbody = document.getElementById("teacher-logs-table-body");
+  if (!tbody) return;
+
+  const searchVal = (
+    document.getElementById("search-teacher-logs")?.value || ""
+  )
+    .trim()
+    .toLowerCase();
+  const filterDate =
+    document.getElementById("filter-teacher-logs-date")?.value || "";
+
+  let logs = window.appStore?.teacherLogs || [];
+  logs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+  let filtered = logs.filter((log) => {
+    const matchSearch =
+      !searchVal ||
+      (log.teacherName && log.teacherName.toLowerCase().includes(searchVal)) ||
+      (log.action && log.action.toLowerCase().includes(searchVal)) ||
+      (log.details && log.details.toLowerCase().includes(searchVal)) ||
+      (log.circleName && log.circleName.toLowerCase().includes(searchVal));
+
+    const matchDate = !filterDate || log.date === filterDate;
+    return matchSearch && matchDate;
+  });
+
+  const latest50 = filtered.slice(0, 50);
+
+  if (latest50.length === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="6" class="text-center text-muted p-4">لا توجد عمليات مسجلة للمعلمين في هذا التاريخ</td></tr>';
+    return;
+  }
+
+  let html = "";
+  latest50.forEach((item, idx) => {
+    html += `
+      <tr>
+        <td style="text-align: center;">${idx + 1}</td>
+        <td dir="ltr" style="text-align: center; font-size: 0.85rem; font-weight: 700;">${item.date} (${item.time})</td>
+        <td style="font-weight: 700; color: var(--primary-brown);">${item.teacherName}</td>
+        <td><span class="badge badge-active">${item.action}</span></td>
+        <td><span style="font-weight: 600;">${item.circleName || "—"}</span></td>
+        <td style="text-align: right; font-size: 0.88rem; line-height: 1.4;">${item.details}</td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+};
+
+window.printTeacherLogs = function () {
+  printTableElement("teacher-logs-table-element", "سجل آخر 50 عملية للمعلمين");
+};
+
+window.exportTeacherLogsExcel = function () {
+  const table = document.getElementById("teacher-logs-table-element");
+  if (!table) return;
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة Excel غير متوفرة!");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "عمليات_المعلمين" });
+  XLSX.writeFile(
+    wb,
+    `سجل_عمليات_المعلمين_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+};
+
+window.exportTeacherLogsPDF = function () {
+  directDownloadPDF(
+    "teacher-logs-table-element",
+    "سجل_عمليات_المعلمين",
+    "سجل آخر 50 عملية للمعلمين",
+  );
+};
+
+// دوال الطباعة والتصدير العام
 window.printTableElement = function (tableId, title) {
   const table = document.getElementById(tableId);
   if (!table) {
@@ -173,7 +313,28 @@ window.printTableElement = function (tableId, title) {
   setTimeout(() => {
     printWindow.print();
     printWindow.close();
-  }, 300);
+  }, 350);
+};
+
+window.directDownloadPDF = function (elementId, filename, title) {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    alert("⚠️ لا توجد بيانات متاحة للتنزيل!");
+    return;
+  }
+
+  if (typeof html2pdf !== "undefined") {
+    const opt = {
+      margin: [8, 8, 8, 8],
+      filename: `${filename}_${new Date().toISOString().split("T")[0]}.pdf`,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+    };
+    html2pdf().set(opt).from(element).save();
+  } else {
+    window.printTableElement(elementId, title);
+  }
 };
 
 window.printTeachersTable = function () {
@@ -222,7 +383,11 @@ window.exportTeachersExcel = function () {
 };
 
 window.exportTeachersPDF = function () {
-  printTeachersTable();
+  directDownloadPDF(
+    "teachers-table-element",
+    "قائمة_المعلمين",
+    "قائمة المعلمين المكلفين",
+  );
 };
 
 window.exportTeachersAttendanceExcel = function () {
@@ -240,11 +405,19 @@ window.exportTeachersAttendanceExcel = function () {
 };
 
 window.exportTeachersAttendancePDF = function () {
-  printTeachersAttendance();
+  directDownloadPDF(
+    "teachers-attendance-table-element",
+    "تحضير_المعلمين",
+    "كشف متابعة تحضير المعلمين",
+  );
 };
 
 window.exportStudentsPDF = function () {
-  printStudentsTable();
+  directDownloadPDF(
+    "students-table-element",
+    "كشف_الطلاب",
+    "كشف الطلاب المسجلين",
+  );
 };
 
 window.exportAttendanceExcel = function () {
@@ -262,7 +435,11 @@ window.exportAttendanceExcel = function () {
 };
 
 window.exportAttendancePDF = function () {
-  printAttendanceTable();
+  directDownloadPDF(
+    "attendance-table-element",
+    "تحضير_الطلاب",
+    "كشف تحضير الطلاب",
+  );
 };
 
 window.exportAccountsExcel = function () {
@@ -280,7 +457,11 @@ window.exportAccountsExcel = function () {
 };
 
 window.exportAccountsPDF = function () {
-  printAccountsTable();
+  directDownloadPDF(
+    "accounts-table-element",
+    "حسابات_النظام",
+    "إدارة حسابات النظام",
+  );
 };
 
 window.exportTestsExcel = function () {
@@ -298,7 +479,11 @@ window.exportTestsExcel = function () {
 };
 
 window.exportTestsPDF = function () {
-  printTestsTable();
+  directDownloadPDF(
+    "tests-table-element",
+    "سجل_الاختبارات",
+    "سجل الاختبارات والنتائج",
+  );
 };
 
 window.exportTeacherNotesExcel = function () {
@@ -316,12 +501,14 @@ window.exportTeacherNotesExcel = function () {
 };
 
 window.exportTeacherNotesPDF = function () {
-  printTeacherNotes();
+  directDownloadPDF(
+    "teacher-notes-table-element",
+    "ملاحظات_المعلمين",
+    "ملاحظات المعلمين للإدارة",
+  );
 };
 
-// ==========================================================================
-// دالة نافذة (متابعة الطلاب لليوم) - متضمنة اسم الحلقة ومحددة التاريخ
-// ==========================================================================
+// نافذة متابعة الطلاب لليوم
 window.openStudentsFollowupModal = function () {
   const titleEl = document.getElementById("students-followup-modal-title");
   const thead = document.querySelector(
@@ -354,6 +541,7 @@ window.openStudentsFollowupModal = function () {
   );
   const todayAtt = window.appStore?.attendance || [];
   const todayTasm = window.appStore?.tasmeea || [];
+  const isWorkday = isOfficialWorkday(targetDateStr);
 
   const attMap = new Map();
   todayAtt
@@ -381,8 +569,10 @@ window.openStudentsFollowupModal = function () {
     const circleName = circle ? circle.name : "غير مسجل";
 
     const att = attMap.get(s.id);
-    let attText =
-      '<span class="badge" style="background:#e0e0e0; color:#555;">لم يُسجّل</span>';
+    let attText = isWorkday
+      ? '<span class="badge badge-danger">🔴 غائب (تلقائي)</span>'
+      : '<span class="badge" style="background:#e0e0e0; color:#555;">— غير محدد —</span>';
+
     if (att) {
       if (att.status === "present")
         attText = '<span class="badge badge-active">🟢 حاضر</span>';
@@ -450,9 +640,15 @@ window.exportStudentsFollowupExcel = function () {
   );
 };
 
-// ==========================================================================
-// دالة النقر على بطاقات لوحة التحكم الأخرى مع الطباعة وتحديد التاريخ
-// ==========================================================================
+window.exportStudentsFollowupPDF = function () {
+  directDownloadPDF(
+    "students-followup-table-element",
+    "متابعة_الطلاب",
+    "متابعة الطلاب لليوم",
+  );
+};
+
+// النقر على بطاقات لوحة التحكم
 window.openDashboardDetailsModal = function (type) {
   const titleEl = document.getElementById("dashboard-details-modal-title");
   const thead = document.getElementById("dashboard-details-thead");
@@ -648,9 +844,18 @@ window.exportDashboardDetailsExcel = function () {
   );
 };
 
-// ==========================================================================
-// 1. التنقل بين أقسام إدارة المَجْمَع
-// ==========================================================================
+window.exportDashboardDetailsPDF = function () {
+  const title =
+    document.getElementById("dashboard-details-modal-title")?.textContent ||
+    "لوحة_التحكم";
+  directDownloadPDF(
+    "dashboard-details-table-element",
+    "بيانات_لوحة_التحكم",
+    title,
+  );
+};
+
+// إدارة الحلقات
 window.switchComplexSection = function (section) {
   const btnCircles = document.getElementById("hub-btn-circles");
   const btnTeachers = document.getElementById("hub-btn-teachers");
@@ -711,9 +916,6 @@ window.switchComplexSection = function (section) {
   }
 };
 
-// ==========================================================================
-// 2. إدارة الحلقات
-// ==========================================================================
 window.renderCirclesCards = function () {
   const container = document.getElementById("circles-cards-container");
   if (!container) return;
@@ -1033,9 +1235,7 @@ window.deleteCircle = function (circleId) {
   if (typeof updateCircleDropdowns === "function") updateCircleDropdowns();
 };
 
-// ==========================================================================
-// 3. إدارة المعلمين (إضافة وتعديل والتحضير اليدوي متضمناً المدير وحذف الجوال)
-// ==========================================================================
+// إدارة المعلمين
 window.switchTeacherSubTab = function (tab) {
   const btnList = document.getElementById("tab-btn-teachers-list");
   const btnAtt = document.getElementById("tab-btn-teachers-attendance");
@@ -1228,9 +1428,7 @@ window.handleAddTeacher = function (e) {
 
   if (typeof saveLocalStore === "function") saveLocalStore();
   closeModal("modal-add-teacher");
-  alert(
-    "✅ تم إضافة المعلم وتكليفه بالحلقات بنجاح! (الرقم السري الافتراضي: 1234)",
-  );
+  alert("✅ تم إضافة المعلم بنجاح! (الرقم السري الافتراضي: 1234)");
   renderTeachersTable();
   if (typeof updateCircleDropdowns === "function") updateCircleDropdowns();
 };
@@ -1436,7 +1634,6 @@ window.toggleTeacherStatus = function (teacherId) {
   renderTeachersTable();
 };
 
-// كشف تحضير المعلمين والمدير (بدون عمود الجوال)
 window.renderTeachersAttendanceTable = function () {
   const tbody = document.getElementById("teachers-attendance-table-body");
   const thead = document.querySelector(
@@ -1531,7 +1728,6 @@ window.renderTeachersAttendanceTable = function () {
   tbody.innerHTML = html;
 };
 
-// تسجيل الحضور اليدوي للمعلم أو المدير
 window.setTeacherAttendanceByAdmin = function (teacherId, status) {
   const dateVal =
     document.getElementById("teacher-attendance-date-select")?.value ||
@@ -1589,7 +1785,6 @@ window.updateTeacherAttendanceNotes = function (teacherId, notesVal) {
   }
 };
 
-// تحضير جميع المعلمين والمدير كحاضرين بضغطة زر واحدة
 window.markAllTeachersPresent = function () {
   const dateVal =
     document.getElementById("teacher-attendance-date-select")?.value ||
@@ -1637,9 +1832,7 @@ window.markAllTeachersPresent = function () {
   alert("✅ تم تسجيل حضور المدير وجميع المعلمين بنجاح لهذا اليوم!");
 };
 
-// ==========================================================================
-// 4. إدارة الطلاب (إضافة عمود آخر دخول للنظام وتصحيح استدعاء البيانات)
-// ==========================================================================
+// إدارة الطلاب
 window.switchStudentSubTab = function (tab) {
   const btnActive = document.getElementById("tab-btn-active-students");
   const btnPending = document.getElementById("tab-btn-pending-requests");
@@ -2039,9 +2232,21 @@ window.executeBulkDeleteStudents = function () {
   renderStudentsTable();
 };
 
-// ==========================================================================
-// 5. استيراد الطلاب من Excel
-// ==========================================================================
+window.executeBulkExportStudentsExcel = function () {
+  const table = document.getElementById("students-table-element");
+  if (!table) return;
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة Excel غير متوفرة!");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "الطلاب" });
+  XLSX.writeFile(
+    wb,
+    `كشف_الطلاب_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+};
+
+// استيراد 7 أعمدة Excel
 const STANDARD_7_COLUMNS = [
   { key: "name", label: "1. اسم الطالب" },
   { key: "nationalId", label: "2. رقم الهوية" },
@@ -2177,9 +2382,7 @@ window.executeDynamicExcelImport = function () {
   reader.readAsArrayBuffer(file);
 };
 
-// ==========================================================================
-// 6. شاشة إدارة الحسابات
-// ==========================================================================
+// إدارة الحسابات
 window.renderAccountsTable = function () {
   const tbody = document.getElementById("accounts-table-body");
   if (!tbody) return;
@@ -2353,9 +2556,7 @@ window.toggleUserAccountStatus = function (userId) {
   renderAccountsTable();
 };
 
-// ==========================================================================
-// 7. شاشات التحضير
-// ==========================================================================
+// التحضير
 window.renderAttendanceTable = function () {
   const tbody = document.getElementById("attendance-table-body");
   if (!tbody) return;
@@ -2388,13 +2589,40 @@ window.renderAttendanceTable = function () {
     return;
   }
 
+  const currentUser = window.currentUser;
+  const isTeacher = currentUser && currentUser.role === "teacher";
+  const isWorkday = isOfficialWorkday(dateVal);
+
   let html = "";
   students.forEach((s) => {
     const record =
       (window.appStore?.attendance || []).find(
         (a) => a.studentId === s.id && a.date === dateVal,
       ) || {};
-    const curStatus = record.status || "";
+
+    let effectiveStatus = record.status || "";
+    if (!effectiveStatus && isWorkday) {
+      effectiveStatus = "absent";
+    }
+
+    let selectOptionsHtml = "";
+    if (isTeacher) {
+      selectOptionsHtml = `
+        <option value="" ${effectiveStatus === "" ? "selected" : ""}>— غير محدد —</option>
+        <option value="present" ${effectiveStatus === "present" ? "selected" : ""}>🟢 حاضر</option>
+        <option value="late" ${effectiveStatus === "late" ? "selected" : ""}>🟡 متأخر</option>
+        ${effectiveStatus === "absent" ? '<option value="absent" selected disabled>🔴 غائب (تلقائي)</option>' : ""}
+        ${effectiveStatus === "excused" ? '<option value="excused" selected disabled>🔵 مستأذن (إدارة)</option>' : ""}
+      `;
+    } else {
+      selectOptionsHtml = `
+        <option value="" ${effectiveStatus === "" ? "selected" : ""}>— غير محدد —</option>
+        <option value="present" ${effectiveStatus === "present" ? "selected" : ""}>🟢 حاضر</option>
+        <option value="absent" ${effectiveStatus === "absent" ? "selected" : ""}>🔴 غائب</option>
+        <option value="late" ${effectiveStatus === "late" ? "selected" : ""}>🟡 متأخر</option>
+        <option value="excused" ${effectiveStatus === "excused" ? "selected" : ""}>🔵 مستأذن</option>
+      `;
+    }
 
     html += `
       <tr>
@@ -2402,15 +2630,11 @@ window.renderAttendanceTable = function () {
         <td>${getCircleName(s.circleId)}</td>
         <td>
           <select class="form-control" style="font-weight: 700;" onchange="setStudentAttendance('${s.id}', this.value)">
-            <option value="" ${curStatus === "" ? "selected" : ""}>— غير محدد —</option>
-            <option value="present" ${curStatus === "present" ? "selected" : ""}>🟢 حاضر</option>
-            <option value="absent" ${curStatus === "absent" ? "selected" : ""}>🔴 غائب</option>
-            <option value="late" ${curStatus === "late" ? "selected" : ""}>🟡 متأخر</option>
-            <option value="excused" ${curStatus === "excused" ? "selected" : ""}>🔵 مستأذن</option>
+            ${selectOptionsHtml}
           </select>
         </td>
         <td>
-          <input type="text" class="form-control" placeholder="ملاحظة..." value="${record.notes || ""}" onchange="updateAttendanceNotes('${s.id}', this.value)">
+          <input type="text" class="form-control" placeholder="ملاحظة..." value="${record.notes || ""}" onchange="updateAttendanceNotes('${s.id}', this.value)" ${isTeacher ? 'readonly title="تعديل الملاحظات محصور بالإدارة"' : ""}>
         </td>
       </tr>
     `;
@@ -2423,6 +2647,16 @@ window.setStudentAttendance = function (studentId, status) {
   const dateVal = document.getElementById("attendance-date-select")?.value;
   const circleId = document.getElementById("attendance-circle-select")?.value;
   const recordId = `att_${studentId}_${dateVal}`;
+  const currentUser = window.currentUser;
+  const isTeacher = currentUser && currentUser.role === "teacher";
+
+  if (isTeacher && status !== "present" && status !== "late" && status !== "") {
+    alert(
+      "⚠️ غير مصرح للمعلم باختيار هذه الحالة. التعديلات محصورة بإدارة المَجْمَع.",
+    );
+    renderAttendanceTable();
+    return;
+  }
 
   if (!window.appStore.attendance) window.appStore.attendance = [];
   let record = window.appStore.attendance.find((a) => a.id === recordId);
@@ -2434,20 +2668,49 @@ window.setStudentAttendance = function (studentId, status) {
       circleId: circleId || "",
       date: dateVal,
       status: status,
-      notes: "",
+      notes: isTeacher ? "تحضير معلم" : "تحضير إدارة",
+      updatedBy: isTeacher ? "teacher" : "admin",
+      createdAt: Date.now(),
     };
     window.appStore.attendance.push(record);
   } else {
     record.status = status;
     if (circleId) record.circleId = circleId;
+    record.updatedBy = isTeacher ? "teacher" : "admin";
   }
 
   if (typeof saveToCloud === "function")
     saveToCloud("attendance", record.id, record);
   if (typeof saveLocalStore === "function") saveLocalStore();
+
+  if (isTeacher && typeof window.logTeacherActivity === "function") {
+    const student = (window.appStore?.students || []).find(
+      (s) => s.id === studentId,
+    );
+    const stuName = student ? student.name : "طالب";
+    const statusText =
+      status === "present"
+        ? "حاضر 🟢"
+        : status === "late"
+          ? "متأخر 🟡"
+          : "إلغاء التحضير";
+    window.logTeacherActivity(
+      "تحضير طالب",
+      `رصد حالة الطالب (${stuName}) كـ (${statusText})`,
+      currentUser.name,
+      getCircleName(circleId),
+    );
+  }
 };
 
 window.updateAttendanceNotes = function (studentId, notesVal) {
+  const currentUser = window.currentUser;
+  if (currentUser && currentUser.role === "teacher") {
+    alert("⚠️ تعديل ملاحظات التحضير محصور بمدير المَجْمَع فقط.");
+    renderAttendanceTable();
+    return;
+  }
+
   const dateVal = document.getElementById("attendance-date-select")?.value;
   const recordId = `att_${studentId}_${dateVal}`;
 
@@ -2463,6 +2726,12 @@ window.updateAttendanceNotes = function (studentId, notesVal) {
 };
 
 window.markAllAbsent = function () {
+  const currentUser = window.currentUser;
+  if (currentUser && currentUser.role === "teacher") {
+    alert("⚠️ خاصية تعيين الكل كغائب متاحة لمدير المَجْمَع فقط.");
+    return;
+  }
+
   const circleId = document.getElementById("attendance-circle-select")?.value;
   if (!circleId) {
     alert("⚠️ يرجى اختيار الحلقة أولاً!");
@@ -2476,9 +2745,7 @@ window.markAllAbsent = function () {
   alert("✅ تم تحديد جميع طلاب الحلقة كـ (غائب)!");
 };
 
-// ==========================================================================
-// 8. شاشة ملاحظات المعلمين (المدمجة داخل قسم الإشعارات والرسائل)
-// ==========================================================================
+// ملاحظات المعلمين
 window.renderTeacherNotesTable = function () {
   const tbody = document.getElementById("teacher-notes-table-body");
   if (!tbody) return;
@@ -2551,9 +2818,7 @@ window.renderTeacherNotesTable = function () {
   tbody.innerHTML = html;
 };
 
-// ==========================================================================
-// 9. شاشة الاختبارات
-// ==========================================================================
+// الاختبارات
 window.renderTestsTable = function () {
   const tbody = document.getElementById("tests-table-body");
   if (!tbody) return;
@@ -2706,9 +2971,7 @@ window.deleteTest = function (testId) {
   renderTestsTable();
 };
 
-// ==========================================================================
-// 10. لوحة فرسان التميز الأسبوعي والشاشة التفاعلية المتقلبة الذكية
-// ==========================================================================
+// لوحة التميز والشاشة الذكية
 function getSundayToWednesdayDatesForWeek(weekOption = "current") {
   const now = new Date();
   const dayOfWeek = now.getDay();
@@ -2837,7 +3100,6 @@ window.renderTamayuzBoard = function () {
   tbody.innerHTML = html;
 };
 
-// تشغيل شاشة العرض التفاعلية المتقلبة كل 10 ثوانٍ مع تحديث البيانات كل 5 دقائق
 window.renderScreenView = function () {
   const grid = document.getElementById("mosque-screen-grid");
   const tbody = document.getElementById("screen-manage-table-body");
@@ -3049,9 +3311,7 @@ window.resetScreenStudentOrder = function () {
   alert("✅ تمت إعادة الترتيب التلقائي بنجاح!");
 };
 
-// ==========================================================================
-// 11. إعدادات المَجْمَع والخريطة التفاعلية
-// ==========================================================================
+// الخريطة التفاعلية
 window.openMapPickerModal = function () {
   const currentLoc = (
     document.getElementById("set-org-location")?.value || ""
@@ -3455,9 +3715,6 @@ window.handleSelfRegistration = function (e) {
   alert("✅ تم إرسال طلب الالتحاق بنجاح! سيتم مراجعته من قبل إدارة المَجْمَع.");
 };
 
-// ==========================================================================
-// 12. إدارة إرسال الإشعارات والرسائل وعرض الملاحظات المدمجة
-// ==========================================================================
 window.renderNotificationsView = function () {
   const notifContainer = document.getElementById(
     "unified-notifications-container",
@@ -3601,6 +3858,18 @@ window.handleSendUnifiedMessage = function (e) {
   e.target?.reset();
   alert("✅ تم إرسال الإشعار بنجاح لجميع المستهدفين!");
   if (typeof renderNotificationsView === "function") renderNotificationsView();
+
+  if (
+    currentUser.role === "teacher" &&
+    typeof window.logTeacherActivity === "function"
+  ) {
+    window.logTeacherActivity(
+      "إرسال إشعار",
+      `إشعار: ${title}`,
+      currentUser.name,
+      "—",
+    );
+  }
 };
 
 function getCircleName(circleId) {
