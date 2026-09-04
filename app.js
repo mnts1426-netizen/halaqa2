@@ -231,7 +231,7 @@ window.handleLoginFormSubmit = function (e) {
       return false;
     }
 
-    // تسجيل وتوثيق التاريخ والوقت الدقيق لدخول المعلم ليظهر دائماً عند المدير
+    // تسجيل وتوثيق التاريخ والوقت الدقيق لدخول المعلم
     const now = new Date();
     const formattedDate = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
     const formattedTime = now.toLocaleTimeString("ar-SA", {
@@ -259,7 +259,7 @@ window.handleLoginFormSubmit = function (e) {
     return false;
   }
 
-  // 4. حسابات الطلاب
+  // 4. حسابات الطلاب وتوثيق وقت الدخول الدقيق
   const students = window.appStore?.students || [];
   const foundStudent = students.find(
     (s) =>
@@ -287,6 +287,20 @@ window.handleLoginFormSubmit = function (e) {
       alert("❌ الرقم السري للطالب غير صحيح! (الرقم السري الافتراضي: 1111)");
       return false;
     }
+
+    // توثيق وقت وتاريخ دخول الطالب
+    const now = new Date();
+    const formattedDate = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
+    const formattedTime = now.toLocaleTimeString("ar-SA", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    foundStudent.lastLogin = `${formattedDate} (${formattedTime})`;
+
+    if (typeof saveToCloud === "function") {
+      saveToCloud("students", foundStudent.id, foundStudent);
+    }
+    if (typeof saveLocalStore === "function") saveLocalStore();
 
     const studentSessionUser = {
       id: foundStudent.id,
@@ -324,7 +338,7 @@ window.handleLoginFormSubmit = function (e) {
   return false;
 };
 
-// دالة تسجيل دخول الطالب مع التحقق الصارم من الرقم السري
+// دالة تسجيل دخول الطالب مع التحقق الصارم وتوثيق وقت الدخول
 window.handleStudentLoginFormSubmit = function (e) {
   if (e && e.preventDefault) e.preventDefault();
   const identifier = (
@@ -372,6 +386,20 @@ window.handleStudentLoginFormSubmit = function (e) {
       return false;
     }
 
+    // توثيق وقت وتاريخ دخول الطالب
+    const now = new Date();
+    const formattedDate = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
+    const formattedTime = now.toLocaleTimeString("ar-SA", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    foundStudent.lastLogin = `${formattedDate} (${formattedTime})`;
+
+    if (typeof saveToCloud === "function") {
+      saveToCloud("students", foundStudent.id, foundStudent);
+    }
+    if (typeof saveLocalStore === "function") saveLocalStore();
+
     const studentSessionUser = {
       id: foundStudent.id,
       name: foundStudent.name,
@@ -404,7 +432,7 @@ window.doLogin = function (user, isAutoSession = false) {
     console.warn(e);
   }
 
-  // مؤقت الخروج التلقائي الصارم بعد ساعتين (7200000 مللي ثانية)
+  // مؤقت الخروج التلقائي الصارم بعد ساعتين (7,200,000 مللي ثانية)
   if (window.autoLogoutTimer) clearTimeout(window.autoLogoutTimer);
   const sessionStartTime = parseInt(
     localStorage.getItem("HALAQAT_SESSION_TIME") || Date.now().toString(),
@@ -1501,6 +1529,7 @@ function refreshActiveView(viewId) {
   }
 }
 
+// دالة لوحة التحكم المتوافقة كلياً مع محدد التاريخ
 function renderDashboardView() {
   const user = window.currentUser;
   if (!user) return;
@@ -1510,7 +1539,17 @@ function renderDashboardView() {
   const teacherDashCols = document.getElementById("teacher-dash-columns");
   const tamayuzBoardCard = document.getElementById("tamayuz-board-card");
   const selfAttCard = document.getElementById("teacher-self-attendance-card");
-  const todayStr = new Date().toISOString().split("T")[0];
+
+  // استخراج التاريخ المحدد من الحقل، أو اعتماد تاريخ اليوم تلقائياً
+  const dashDateSelect = document.getElementById("dashboard-date-select");
+  const todayStr =
+    dashDateSelect && dashDateSelect.value
+      ? dashDateSelect.value
+      : new Date().toISOString().split("T")[0];
+
+  if (dashDateSelect && !dashDateSelect.value) {
+    dashDateSelect.value = todayStr;
+  }
 
   if (tamayuzBoardCard) {
     tamayuzBoardCard.style.display = isTeacher ? "none" : "block";
@@ -1530,14 +1569,14 @@ function renderDashboardView() {
 
     if (checkinBadge) {
       if (selfAttRecord && selfAttRecord.status === "present") {
-        checkinBadge.innerHTML = `<span class="badge badge-active">🟢 حاضر اليوم (${selfAttRecord.time || "تم التحضير"})</span>`;
+        checkinBadge.innerHTML = `<span class="badge badge-active">🟢 حاضر (${selfAttRecord.time || "تم التحضير"})</span>`;
         if (checkinBtn) {
-          checkinBtn.textContent = "✅ تم تسجيل حضورك اليوم بنجاح";
+          checkinBtn.textContent = "✅ تم تسجيل الحضور بنجاح";
           checkinBtn.classList.remove("btn-success");
           checkinBtn.classList.add("btn-outline-brown");
         }
       } else {
-        checkinBadge.innerHTML = `<span class="badge" style="background:#fff8e1; color:#b78103;">⏳ بانتظار تأكيد حضورك اليوم بالمسجد</span>`;
+        checkinBadge.innerHTML = `<span class="badge" style="background:#fff8e1; color:#b78103;">⏳ لم يُسجل الحضور لهذا اليوم</span>`;
         if (checkinBtn) {
           checkinBtn.textContent = "✅ تسجيل حضوري اليوم بالمسجد";
           checkinBtn.classList.remove("btn-outline-brown");
@@ -1591,11 +1630,11 @@ function renderDashboardView() {
       el2.textContent = teacherStudents.length;
     }
     if (el3) {
-      document.getElementById("lbl-stat-3").textContent = "غياب اليوم";
+      document.getElementById("lbl-stat-3").textContent = "الغياب";
       el3.textContent = absentCount;
     }
     if (el4) {
-      document.getElementById("lbl-stat-4").textContent = "حاضرون اليوم";
+      document.getElementById("lbl-stat-4").textContent = "الحاضرون";
       el4.textContent = presentCount;
     }
   } else {
@@ -1653,7 +1692,7 @@ function renderDashboardView() {
       el3.textContent = circlesCount;
     }
     if (el4) {
-      document.getElementById("lbl-stat-4").textContent = "حاضرون اليوم";
+      document.getElementById("lbl-stat-4").textContent = "حاضرون";
       el4.textContent = presentCount;
     }
     if (elRecited) elRecited.textContent = recitedCount;
@@ -1669,7 +1708,7 @@ function renderDashboardView() {
   }
 }
 
-// نافذة تفاصيل من سمّع ومن لم يسمّع اليوم
+// نافذة تفاصيل من سمّع ومن لم يسمّع مع قراءة التاريخ المختار من لوحة التحكم
 window.currentTasmeeaModalType = "recited";
 window.openTasmeeaDetailsModal = function (type) {
   window.currentTasmeeaModalType = type;
@@ -1677,7 +1716,12 @@ window.openTasmeeaDetailsModal = function (type) {
   const tbody = document.getElementById("tasmeea-details-tbody");
   if (!tbody) return;
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const dashDateSelect = document.getElementById("dashboard-date-select");
+  const todayStr =
+    dashDateSelect && dashDateSelect.value
+      ? dashDateSelect.value
+      : new Date().toISOString().split("T")[0];
+
   const activeStudents = (window.appStore?.students || []).filter(
     (s) => s.status === "active",
   );
@@ -1691,16 +1735,16 @@ window.openTasmeeaDetailsModal = function (type) {
   let list = [];
   if (type === "recited") {
     if (titleEl)
-      titleEl.textContent = `📖 قائمة الطلاب الذين سمّعوا اليوم (${todayStr})`;
+      titleEl.textContent = `📖 قائمة الطلاب الذين سمّعوا ليوم (${todayStr})`;
     list = activeStudents.filter((s) => tasmeeaMap.has(s.id));
   } else {
     if (titleEl)
-      titleEl.textContent = `⏳ قائمة الطلاب الذين لم يسمّعوا اليوم (${todayStr})`;
+      titleEl.textContent = `⏳ قائمة الطلاب الذين لم يسمّعوا ليوم (${todayStr})`;
     list = activeStudents.filter((s) => !tasmeeaMap.has(s.id));
   }
 
   if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted p-4">لا توجد بيانات لهذه القائمة اليوم</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted p-4">لا توجد بيانات لهذه القائمة في هذا التاريخ</td></tr>`;
   } else {
     let html = "";
     list.forEach((s, idx) => {
@@ -1757,15 +1801,18 @@ window.exportTasmeeaDetailsExcel = function () {
     alert("⚠️ مكتبة Excel غير متوفرة!");
     return;
   }
-  const wb = XLSX.utils.table_to_book(table, { sheet: "تسميع_اليوم" });
+  const dashDateSelect = document.getElementById("dashboard-date-select");
+  const dateStr =
+    dashDateSelect && dashDateSelect.value
+      ? dashDateSelect.value
+      : new Date().toISOString().split("T")[0];
+
+  const wb = XLSX.utils.table_to_book(table, { sheet: "تسميع_الطلاب" });
   const fileName =
     window.currentTasmeeaModalType === "recited"
-      ? "الطلاب_الذين_سمعوا_اليوم"
-      : "الطلاب_الذين_لم_يسمعوا_اليوم";
-  XLSX.writeFile(
-    wb,
-    `${fileName}_${new Date().toISOString().split("T")[0]}.xlsx`,
-  );
+      ? "الطلاب_الذين_سمعوا"
+      : "الطلاب_الذين_لم_يسمعوا";
+  XLSX.writeFile(wb, `${fileName}_${dateStr}.xlsx`);
 };
 
 window.exportTasmeeaDetailsPDF = function () {
@@ -1781,7 +1828,7 @@ window.exportTasmeeaDetailsPDF = function () {
 };
 
 window.printTasmeeaDetails = function () {
-  printTableElement("tasmeea-details-table", "تفاصيل تسميع الطلاب لليوم");
+  printTableElement("tasmeea-details-table", "تفاصيل تسميع الطلاب");
 };
 
 window.handleUserProfileSave = function (e) {
