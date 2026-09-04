@@ -431,6 +431,54 @@
 
         <!-- 1. لوحة التحكم -->
         <section id="view-dashboard" class="content-view active">
+          <!-- شريط اختيار التاريخ لاستعراض أي يوم سابق في لوحة التحكم -->
+          <div
+            class="flex-between mb-3 no-print"
+            style="
+              flex-wrap: wrap;
+              gap: 0.8rem;
+              background: #ffffff;
+              padding: 0.75rem 1rem;
+              border-radius: 8px;
+              border: 1px solid var(--border-color);
+            "
+          >
+            <div class="flex-align-gap">
+              <span
+                style="
+                  font-weight: 800;
+                  color: var(--primary-brown);
+                  font-size: 0.95rem;
+                "
+                >📅 استعراض إحصائيات يوم:</span
+              >
+              <input
+                type="date"
+                id="dashboard-date-select"
+                class="form-control select-input"
+                style="width: auto; font-weight: 700"
+                onchange="
+                  if (typeof renderDashboardView === 'function')
+                    renderDashboardView();
+                "
+              />
+            </div>
+            <div>
+              <button
+                type="button"
+                class="btn btn-outline-brown btn-sm"
+                onclick="
+                  document.getElementById('dashboard-date-select').value =
+                    new Date().toISOString().split('T')[0];
+                  if (typeof renderDashboardView === 'function')
+                    renderDashboardView();
+                "
+              >
+                اليوم الحالي
+              </button>
+            </div>
+          </div>
+
           <div class="stats-grid" id="dashboard-stats-grid">
             <!-- 1. الطلاب -->
             <div
@@ -516,7 +564,7 @@
               class="stat-card"
               style="cursor: pointer"
               onclick="openDashboardDetailsModal('present')"
-              title="انقر لعرض قائمة الحاضرين اليوم وطباعتها"
+              title="انقر لعرض قائمة الحاضرين وطباعتها"
             >
               <div class="stat-icon icon-green">
                 <svg
@@ -534,7 +582,7 @@
                 </svg>
               </div>
               <div class="stat-details">
-                <span class="stat-label" id="lbl-stat-4">حاضرون اليوم</span>
+                <span class="stat-label" id="lbl-stat-4">حاضرون</span>
                 <h3 class="stat-value" id="val-stat-4">0</h3>
               </div>
             </div>
@@ -544,7 +592,7 @@
               class="stat-card nav-admin-only"
               style="cursor: pointer"
               onclick="openTasmeeaDetailsModal('recited')"
-              title="انقر لعرض تفاصيل الطلاب الذين سمّعوا اليوم وطباعتها"
+              title="انقر لعرض تفاصيل الطلاب الذين سمّعوا وطباعتها"
             >
               <div class="stat-icon icon-green">
                 <svg
@@ -561,7 +609,7 @@
               </div>
               <div class="stat-details">
                 <span class="stat-label" id="lbl-stat-recited-today"
-                  >سمّعوا اليوم</span
+                  >سمّعوا</span
                 >
                 <h3 class="stat-value" id="val-stat-recited-today">0</h3>
               </div>
@@ -572,7 +620,7 @@
               class="stat-card nav-admin-only"
               style="cursor: pointer"
               onclick="openTasmeeaDetailsModal('not_recited')"
-              title="انقر لعرض تفاصيل الطلاب الذين لم يسمّعوا اليوم وطباعتها"
+              title="انقر لعرض تفاصيل الطلاب الذين لم يسمّعوا وطباعتها"
             >
               <div class="stat-icon icon-red-soft">
                 <svg
@@ -590,13 +638,13 @@
               </div>
               <div class="stat-details">
                 <span class="stat-label" id="lbl-stat-not-recited-today"
-                  >لم يسمّعوا اليوم</span
+                  >لم يسمّعوا</span
                 >
                 <h3 class="stat-value" id="val-stat-not-recited-today">0</h3>
               </div>
             </div>
 
-            <!-- 7. الأيقونة الجديدة: متابعة الطلاب لليوم -->
+            <!-- 7. الأيقونة: متابعة الطلاب لليوم -->
             <div
               class="stat-card nav-admin-only"
               style="
@@ -605,7 +653,7 @@
                 background: #fdfefe;
               "
               onclick="openStudentsFollowupModal()"
-              title="انقر لعرض جدول متابعة حضور وتسميع الطلاب لليوم وطباعته"
+              title="انقر لعرض جدول متابعة حضور وتسميع الطلاب وطباعته"
             >
               <div
                 class="stat-icon icon-brown"
@@ -629,12 +677,14 @@
                 <span
                   class="stat-label"
                   style="font-weight: 800; color: #0b6b7d"
-                  >متابعة الطلاب لليوم</span
+                  >متابعة الطلاب</span
                 >
                 <h3
                   class="stat-value"
                   style="font-size: 1.15rem; color: #0b6b7d"
-                ></h3>
+                >
+                  عرض المتابعة 📋
+                </h3>
               </div>
             </div>
           </div>
@@ -1149,6 +1199,7 @@
                       <th>صلة القرابة</th>
                       <th>جوال ولي الأمر</th>
                       <th>الحلقة</th>
+                      <th>آخر دخول للنظام</th>
                       <th>الحالة</th>
                       <th>إجراءات</th>
                     </tr>
@@ -1473,7 +1524,7 @@
           </div>
         </section>
 
-        <!-- 8. شاشة التقارير الرسمية -->
+        <!-- 8. شاشة التقارير الرسمية (محدثة بإخفاء الصندوق قبل الاستخراج) -->
         <section id="view-reports" class="content-view">
           <div class="card no-print">
             <div
@@ -1534,7 +1585,15 @@
               </div>
             </div>
             <div class="mt-3 flex-align-gap">
-              <button class="btn btn-primary" onclick="generateReport()">
+              <button
+                class="btn btn-primary"
+                onclick="
+                  document.getElementById(
+                    'report-results-wrapper',
+                  ).style.display = 'block';
+                  generateReport();
+                "
+              >
                 🔍 استخراج التقرير
               </button>
               <button
@@ -1558,7 +1617,11 @@
             </div>
           </div>
 
-          <div class="card mt-3" id="report-results-wrapper">
+          <div
+            class="card mt-3"
+            id="report-results-wrapper"
+            style="display: none"
+          >
             <div class="print-official-header">
               <div class="print-header-center-logos">
                 <img
