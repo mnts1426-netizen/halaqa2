@@ -136,7 +136,9 @@ window.isOfficialWorkday = function (dateStr) {
 };
 
 // التأكد من توفر بطاقة سجل العمليات وبنائها برمجياً دون الحاجة لتعديل index.html
+// (سجل العمليات خاص بالمدير فقط - لا يُنشأ إطلاقاً لغيره)
 function ensureTeacherLogsContainer() {
+  if (!window.currentUser || window.currentUser.role !== "admin") return;
   if (document.getElementById("teacher-logs-card")) return;
 
   const dashboardView = document.getElementById("view-dashboard");
@@ -193,8 +195,9 @@ function ensureTeacherLogsContainer() {
   dashboardView.appendChild(logsCard);
 }
 
-// عرض وتصفية آخر 50 عملية للمعلمين
+// عرض وتصفية آخر 50 عملية للمعلمين (خاص بالمدير فقط)
 window.renderTeacherLogsTable = function () {
+  if (!window.currentUser || window.currentUser.role !== "admin") return;
   ensureTeacherLogsContainer();
   const tbody = document.getElementById("teacher-logs-table-body");
   if (!tbody) return;
@@ -648,7 +651,7 @@ window.exportStudentsFollowupPDF = function () {
   );
 };
 
-// النقر على بطاقات لوحة التحكم
+// النقر على بطاقات لوحة النظام
 window.openDashboardDetailsModal = function (type) {
   const titleEl = document.getElementById("dashboard-details-modal-title");
   const thead = document.getElementById("dashboard-details-thead");
@@ -826,7 +829,7 @@ window.filterDashboardDetailsModal = function () {
 window.printDashboardDetails = function () {
   const title =
     document.getElementById("dashboard-details-modal-title")?.textContent ||
-    "بيانات لوحة التحكم";
+    "بيانات لوحة النظام";
   printTableElement("dashboard-details-table-element", title);
 };
 
@@ -837,20 +840,20 @@ window.exportDashboardDetailsExcel = function () {
     alert("⚠️ مكتبة Excel غير متوفرة!");
     return;
   }
-  const wb = XLSX.utils.table_to_book(table, { sheet: "بيانات_لوحة_التحكم" });
+  const wb = XLSX.utils.table_to_book(table, { sheet: "بيانات_لوحة_النظام" });
   XLSX.writeFile(
     wb,
-    `لوحة_التحكم_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `لوحة_النظام_${new Date().toISOString().split("T")[0]}.xlsx`,
   );
 };
 
 window.exportDashboardDetailsPDF = function () {
   const title =
     document.getElementById("dashboard-details-modal-title")?.textContent ||
-    "لوحة_التحكم";
+    "لوحة_النظام";
   directDownloadPDF(
     "dashboard-details-table-element",
-    "بيانات_لوحة_التحكم",
+    "بيانات_لوحة_النظام",
     title,
   );
 };
@@ -2747,6 +2750,8 @@ window.markAllAbsent = function () {
 
 // ملاحظات المعلمين
 window.renderTeacherNotesTable = function () {
+  // ملاحظات المعلمين للإدارة خاصة بالمدير فقط
+  if (!window.currentUser || window.currentUser.role !== "admin") return;
   const tbody = document.getElementById("teacher-notes-table-body");
   if (!tbody) return;
 
@@ -3727,7 +3732,43 @@ window.renderNotificationsView = function () {
     "unified-notifications-container",
   );
   if (notifContainer) {
-    const allNotifs = window.appStore?.notifications || [];
+    const user = window.currentUser;
+    const isTeacherViewer = user && user.role === "teacher";
+
+    let allNotifs = window.appStore?.notifications || [];
+
+    // المعلم لا يستقبل إلا إشعارات صادرة فعلياً من إدارة المَجْمَع وموجهة له
+    if (isTeacherViewer) {
+      const teacherObj = (window.appStore?.teachers || []).find(
+        (t) =>
+          t.userId === user.id ||
+          t.id === user.teacherId ||
+          t.id === user.id ||
+          t.phone === user.phone,
+      );
+      const teacherId = teacherObj ? teacherObj.id : user.teacherId || user.id;
+      const teacherName = teacherObj ? teacherObj.name : user.name;
+      const teacherPhone = teacherObj ? teacherObj.phone : user.phone;
+
+      allNotifs = allNotifs.filter((n) => {
+        const isFromAdmin =
+          n.senderRole === "admin" || n.sender === "إدارة المَجْمَع";
+        if (!isFromAdmin) return false;
+
+        const rec = String(n.recipient || "").trim();
+        if (rec === "all" || rec === "teachers") return true;
+        if (rec === "specific_teacher") {
+          const tId = String(n.targetId || "").trim();
+          if (!tId) return false;
+          if (tId === String(teacherId) || tId === String(teacherPhone))
+            return true;
+          if (n.targetName && teacherName && n.targetName === teacherName)
+            return true;
+        }
+        return false;
+      });
+    }
+
     if (allNotifs.length === 0) {
       notifContainer.innerHTML = `<div class="empty-state-card p-3"><p class="text-muted">لا توجد إشعارات جديدة حالياً</p></div>`;
     } else {
@@ -3759,6 +3800,12 @@ window.openModalSendUnifiedMessage = function () {
     recipientSelect.value = "all";
     handleRecipientTypeChange(recipientSelect);
   }
+
+  const isTeacherSender =
+    window.currentUser && window.currentUser.role === "teacher";
+  const teacherNote = document.getElementById("msg-teacher-target-note");
+  if (teacherNote) teacherNote.style.display = isTeacherSender ? "block" : "none";
+
   const titleEl = document.getElementById("msg-title");
   const bodyEl = document.getElementById("msg-body");
   if (titleEl) titleEl.value = "";
@@ -3807,14 +3854,26 @@ window.handleRecipientTypeChange = function (selectEl) {
 window.handleSendUnifiedMessage = function (e) {
   if (e && e.preventDefault) e.preventDefault();
 
-  const recipient =
-    document.getElementById("msg-target-recipient")?.value || "all";
+  const currentUser = window.currentUser || {
+    name: "إدارة المَجْمَع",
+    role: "admin",
+  };
+  const isTeacherSender = currentUser.role === "teacher";
+
+  let recipient = document.getElementById("msg-target-recipient")?.value || "all";
   const specificSelect = document.getElementById("msg-specific-select");
-  const targetId = specificSelect?.value || "";
+  let targetId = specificSelect?.value || "";
   const selectedOption = specificSelect?.options[specificSelect.selectedIndex];
-  const targetName = selectedOption
+  let targetName = selectedOption
     ? selectedOption.getAttribute("data-name") || ""
     : "";
+
+  // المعلم يرسل فقط إلى إدارة المَجْمَع بغض النظر عن أي قيمة أخرى بالنموذج
+  if (isTeacherSender) {
+    recipient = "admin";
+    targetId = "";
+    targetName = "";
+  }
 
   const title = (document.getElementById("msg-title")?.value || "").trim();
   const body = (document.getElementById("msg-body")?.value || "").trim();
@@ -3832,10 +3891,6 @@ window.handleSendUnifiedMessage = function (e) {
     return;
   }
 
-  const currentUser = window.currentUser || {
-    name: "إدارة المَجْمَع",
-    role: "admin",
-  };
   const senderName =
     currentUser.role === "admin"
       ? "إدارة المَجْمَع"
@@ -3849,6 +3904,7 @@ window.handleSendUnifiedMessage = function (e) {
     targetId: targetId,
     targetName: targetName,
     sender: senderName,
+    senderRole: currentUser.role,
     date: new Date().toLocaleDateString("ar-SA"),
     createdAt: Date.now(),
   };
@@ -3863,8 +3919,19 @@ window.handleSendUnifiedMessage = function (e) {
 
   closeModal("modal-send-unified-msg");
   e.target?.reset();
-  alert("✅ تم إرسال الإشعار بنجاح لجميع المستهدفين!");
+  alert(
+    isTeacherSender
+      ? "✅ تم إرسال ملاحظتك إلى إدارة المَجْمَع بنجاح!"
+      : "✅ تم إرسال الإشعار بنجاح لجميع المستهدفين!",
+  );
   if (typeof renderNotificationsView === "function") renderNotificationsView();
+
+  if (isTeacherSender && typeof window.sendAdminPushNotification === "function") {
+    window.sendAdminPushNotification(
+      `💬 رسالة من المعلم ${currentUser.name}`,
+      `${title}: ${body}`,
+    );
+  }
 
   if (
     currentUser.role === "teacher" &&
