@@ -284,6 +284,7 @@ window.handleLoginFormSubmit = function (e) {
       phone: foundTeacher.phone,
       role: window.ROLES.TEACHER,
       isFinance: Boolean(foundTeacher.isFinance),
+      photoURL: foundTeacher.photoURL || "",
       createdAt: foundTeacher.createdAt || Date.now(),
     };
     doLogin(teacherSessionUser, false);
@@ -325,6 +326,7 @@ window.handleLoginFormSubmit = function (e) {
       phone: foundStudent.phone,
       role: window.ROLES.STUDENT,
       circleId: foundStudent.circleId,
+      photoURL: foundStudent.photoURL || "",
       createdAt: foundStudent.createdAt || Date.now(),
     };
     doLogin(studentSessionUser, false);
@@ -409,6 +411,7 @@ window.handleStudentLoginFormSubmit = function (e) {
       phone: foundStudent.phone,
       role: window.ROLES.STUDENT,
       circleId: foundStudent.circleId,
+      photoURL: foundStudent.photoURL || "",
       createdAt: foundStudent.createdAt || Date.now(),
     };
     doLogin(studentSessionUser, false);
@@ -419,6 +422,19 @@ window.handleStudentLoginFormSubmit = function (e) {
     "⚠️ رقم الهوية أو الجوال غير مسجل بالنظام. يرجى مراجعة إدارة المَجْمَع.",
   );
   return false;
+};
+
+// عرض صورة الحساب الشخصية في الشريط الجانبي إن وُجدت، وإلا الحرف الأول من الاسم كافتراضي
+window.updateSidebarUserAvatar = function (user) {
+  const avatarEl = document.getElementById("current-user-avatar");
+  if (!avatarEl) return;
+
+  if (user && user.photoURL) {
+    avatarEl.innerHTML = `<img src="${user.photoURL}" alt="صورة الحساب" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+  } else {
+    avatarEl.innerHTML = "";
+    avatarEl.textContent = user && user.name ? user.name.charAt(0) : "ص";
+  }
 };
 
 // دالة اعتماد الجلسة وتوثيق آخر دخول بشكل دائم ومؤقت الخروج بعد ساعتين
@@ -544,7 +560,8 @@ window.doLogin = function (user, isAutoSession = false) {
             ? "التميز الأسبوعي"
             : "طالب";
   }
-  if (avatarEl) avatarEl.textContent = user.name ? user.name.charAt(0) : "ص";
+  if (typeof updateSidebarUserAvatar === "function")
+    updateSidebarUserAvatar(user);
   if (welcomeEl) welcomeEl.textContent = `مرحباً ${user.name || ""}`;
 
   try {
@@ -2046,7 +2063,8 @@ window.handleUserProfileSave = function (e) {
   const avatarEl = document.getElementById("current-user-avatar");
   if (nameEl) nameEl.textContent = newName;
   if (welcomeEl) welcomeEl.textContent = `مرحباً ${newName}`;
-  if (avatarEl) avatarEl.textContent = newName ? newName.charAt(0) : "ص";
+  if (typeof updateSidebarUserAvatar === "function")
+    updateSidebarUserAvatar(user);
 
   alert("✅ تم حفظ وتحديث البيانات الشخصية للمدير بنجاح!");
 };
