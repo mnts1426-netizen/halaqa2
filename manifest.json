@@ -1,0 +1,17 @@
+{
+  "name": "مَجْمَع عبدالله بن مهدي القرآني",
+  "short_name": "حلقات الهدى",
+  "description": "نظام إدارة حلقات تحفيظ القرآن الكريم - مَجْمَع عبدالله بن مهدي القرآني",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8fafc",
+  "theme_color": "#0a5c71",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    { "src": "logo12.jpeg", "sizes": "192x192", "type": "image/jpeg", "purpose": "any" },
+    { "src": "logo12.jpeg", "sizes": "512x512", "type": "image/jpeg", "purpose": "any" }
+  ]
+}
