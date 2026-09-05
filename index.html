@@ -203,13 +203,12 @@
         </div>
 
         <div
-          class="nav-admin-only"
           id="pwa-install-notify-bar"
           style="padding: 0.75rem 1rem 0.25rem 1rem; flex-direction: column"
         >
           <button
             type="button"
-            class="btn btn-primary btn-block btn-sm"
+            class="btn btn-primary btn-block btn-sm js-install-notify-btn"
             id="btn-install-notify"
             onclick="handleInstallAndEnableNotifications()"
             title="تثبيت التطبيق على الجهاز وتفعيل الإشعارات الفورية بضغطة واحدة"
@@ -217,7 +216,7 @@
             📲 تثبيت التطبيق + تفعيل الإشعارات
           </button>
           <small
-            class="text-muted"
+            class="text-muted js-install-notify-status"
             id="install-notify-status"
             style="display: block; text-align: center; margin-top: 4px; font-size: 0.72rem"
           ></small>
@@ -239,7 +238,7 @@
                 <rect x="14" y="14" width="7" height="7" />
                 <rect x="3" y="14" width="7" height="7" />
               </svg>
-              <span>لوحة التحكم</span>
+              <span>لوحة النظام</span>
             </a>
             <a
               href="#"
@@ -459,9 +458,9 @@
           </div>
         </header>
 
-        <!-- 1. لوحة التحكم -->
+        <!-- 1. لوحة النظام -->
         <section id="view-dashboard" class="content-view active">
-          <!-- شريط اختيار التاريخ لاستعراض أي يوم سابق في لوحة التحكم -->
+          <!-- شريط اختيار التاريخ لاستعراض أي يوم سابق في لوحة النظام -->
           <div
             class="flex-between mb-3 no-print"
             style="
@@ -619,7 +618,7 @@
 
             <!-- 5. سمّعوا اليوم -->
             <div
-              class="stat-card nav-admin-only"
+              class="stat-card"
               style="cursor: pointer"
               onclick="openTasmeeaDetailsModal('recited')"
               title="انقر لعرض تفاصيل الطلاب الذين سمّعوا وطباعتها"
@@ -647,7 +646,7 @@
 
             <!-- 6. لم يسمّعوا اليوم -->
             <div
-              class="stat-card nav-admin-only"
+              class="stat-card"
               style="cursor: pointer"
               onclick="openTasmeeaDetailsModal('not_recited')"
               title="انقر لعرض تفاصيل الطلاب الذين لم يسمّعوا وطباعتها"
@@ -1736,8 +1735,8 @@
             </div>
           </div>
 
-          <!-- البطاقة المدمجة: ملاحظات وتوجيهات المعلمين للإدارة -->
-          <div class="card mt-3">
+          <!-- البطاقة المدمجة: ملاحظات وتوجيهات المعلمين للإدارة (خاصة بالمدير فقط) -->
+          <div class="card mt-3 nav-admin-only">
             <div class="card-header flex-between">
               <div>
                 <h3
@@ -2026,12 +2025,12 @@
               onclick="closeModal('modal-students-followup')"
               style="padding: 0.35rem 0.95rem; font-weight: 800"
             >
-              🚪 خروج للوحة التحكم
+              🚪 خروج للوحة النظام
             </button>
             <button
               class="modal-close"
               onclick="closeModal('modal-students-followup')"
-              title="إغلاق والعودة للوحة التحكم"
+              title="إغلاق والعودة للوحة النظام"
             >
               &times;
             </button>
@@ -2099,7 +2098,7 @@
       </div>
     </div>
 
-    <!-- نافذة تفاصيل إحصائيات لوحة التحكم والطباعة -->
+    <!-- نافذة تفاصيل إحصائيات لوحة النظام والطباعة -->
     <div id="modal-dashboard-details" class="modal-overlay">
       <div class="modal-card modal-lg">
         <div class="modal-header">
@@ -2998,6 +2997,25 @@
                 <option value="specific_teacher">معلم محدد</option>
                 <option value="specific_student">طالب محدد</option>
               </select>
+            </div>
+            <div
+              class="form-group"
+              id="msg-teacher-target-note"
+              style="display: none"
+            >
+              <div
+                style="
+                  background: var(--primary-teal-light);
+                  border: 1px solid var(--border-color);
+                  border-radius: 8px;
+                  padding: 0.75rem 1rem;
+                  font-weight: 700;
+                  color: var(--primary-teal-dark);
+                  font-size: 0.88rem;
+                "
+              >
+                📩 سيتم إرسال هذا التنبيه مباشرة إلى إدارة المَجْمَع فقط.
+              </div>
             </div>
             <div
               id="msg-specific-recipient-group"
