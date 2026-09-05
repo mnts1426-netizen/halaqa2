@@ -348,6 +348,8 @@ async function syncAndPurgeDataFromCloud() {
           window.appStore.settings = cloudItems[0] || SAFE_DEFAULT_SETTINGS;
         } else if (col === "screenOrder") {
           window.appStore.screenOrder = cloudItems[0]?.order || [];
+          window.appStore.trophyStudentId =
+            cloudItems[0]?.trophyStudentId || null;
         } else {
           // دمج البيانات السحابية مع المحلية بالمعرف (ID) لمنع ضياع أي سجل غير مرفوع
           const localItems = Array.isArray(window.appStore[col])
@@ -390,7 +392,13 @@ async function saveToCloud(collectionName, docId, data, isDelete = false) {
   const validDocId = String(docId);
 
   // تحديث المخزن المحلي فوراً
-  if (Array.isArray(window.appStore[collectionName])) {
+  // ملاحظة: "screenOrder" ليست مصفوفة سجلات {id,...} كباقي المجموعات، بل مصفوفة
+  // معرّفات نصية بسيطة (ويُدار محتواها يدوياً بدوال ترتيب الشاشة) لذا تُستثنى هنا
+  // لمنع تلف بنيتها أو حدوث دائرية عند تمرير المصفوفة نفسها ضمن بيانات الحفظ
+  if (
+    collectionName !== "screenOrder" &&
+    Array.isArray(window.appStore[collectionName])
+  ) {
     if (isDelete) {
       window.appStore[collectionName] = window.appStore[collectionName].filter(
         (item) => String(item.id) !== validDocId,
