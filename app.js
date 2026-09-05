@@ -1045,20 +1045,10 @@ window.handleTeacherSelfCheckIn = function () {
       { enableHighAccuracy: true, timeout: 10000 },
     );
   } else {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const coords = `إحداثيات: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
-          performCheckIn(coords);
-        },
-        () => {
-          performCheckIn();
-        },
-        { timeout: 5000 },
-      );
-    } else {
-      performCheckIn();
-    }
+    // لا يوجد موقع جغرافي معتمد للمَجْمَع بعد - يُمنع التحضير الذاتي منعاً للتحضير من أي مكان بعيد
+    alert(
+      "⚠️ لم يتم اعتماد الموقع الجغرافي للمَجْمَع بعد من قبل الإدارة.\nيرجى مراجعة (الإعدادات) وتحديد موقع الجامع على الخريطة أولاً، حتى يمكن تفعيل تسجيل الحضور الذاتي بدقة.",
+    );
   }
 };
 
@@ -1238,6 +1228,21 @@ function renderStudentData() {
     </div>
   `;
 
+  const latestTest = studentTests[0];
+  const testCongratsBoxHtml =
+    hasTests && latestTest
+      ? `
+    <div class="card" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border: 2px solid #2e7d32; border-radius: 10px; padding: 1.15rem; text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center; margin-bottom: 0;">
+      <h3 style="color: #2e7d32; font-weight: 900; font-size: 1.15rem; margin-bottom: 4px;">
+        🎉 مبارك حصولك على الدرجة (${latestTest.score || "0"}/100) 🌟
+      </h3>
+      <p style="color: #33691e; font-size: 0.85rem; margin: 0; font-weight: 700;">
+        في اختبار (${latestTest.type || "اختبار مرحلي"}) بتاريخ ${latestTest.date || "—"}
+      </p>
+    </div>
+  `
+      : "";
+
   const testsBoxHtml = `
     <div class="card" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0; padding: 1rem 1.25rem;">
       <div class="card-header flex-between" style="padding-bottom: 0.4rem; margin-bottom: 0.5rem;">
@@ -1282,13 +1287,13 @@ function renderStudentData() {
     row1ConditionalHtml = `
       <div class="mb-3" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; align-items: stretch;">
         <div>${tamayuzBoxHtml}</div>
-        <div>${testsBoxHtml}</div>
+        <div>${testCongratsBoxHtml}</div>
       </div>
     `;
   } else if (hasTamayuz) {
     row1ConditionalHtml = `<div class="mb-3">${tamayuzBoxHtml}</div>`;
   } else if (hasTests) {
-    row1ConditionalHtml = `<div class="mb-3">${testsBoxHtml}</div>`;
+    row1ConditionalHtml = `<div class="mb-3">${testCongratsBoxHtml}</div>`;
   }
 
   container.innerHTML = `
@@ -1485,6 +1490,9 @@ function renderStudentData() {
         </div>
       </div>
     </div>
+
+    <!-- 6. الصف السادس: سجل نتائج الاختبارات كاملاً -->
+    ${hasTests ? testsBoxHtml : ""}
   `;
 }
 
