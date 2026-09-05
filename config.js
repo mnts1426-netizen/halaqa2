@@ -161,3 +161,10 @@ const QURAN_SURAHS = [
 
 // 6. مفتاح التخزين المحلي
 const LOCAL_STORAGE_KEY = "HALAQAT_ALHUDA_DB_V1";
+
+// 7. إعدادات OneSignal لتفعيل إشعارات Push الفورية للمدير
+// احصل على القيمتين من: OneSignal Dashboard > Settings > Keys & IDs
+// ONESIGNAL_APP_ID: قيمة "OneSignal App ID"
+// ONESIGNAL_REST_API_KEY: قيمة "REST API Key"
+window.ONESIGNAL_APP_ID = "";
+window.ONESIGNAL_REST_API_KEY = "";
