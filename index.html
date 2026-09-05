@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap"
       rel="stylesheet"
     />
     <!-- مكتبة الخرائط التفاعلية Leaflet -->
@@ -29,6 +29,15 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+    <!-- إعدادات تثبيت التطبيق (PWA) -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#0a5c71" />
+    <link rel="apple-touch-icon" href="logo12.jpeg" />
+    <!-- مكتبة إشعارات Push الفورية (OneSignal) -->
+    <script
+      src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
+      defer
+    ></script>
     <!-- ملف التنسيقات -->
     <link rel="stylesheet" href="style.css" />
   </head>
@@ -191,6 +200,27 @@
               <p id="sidebar-mosque-name">جامع الهدى</p>
             </div>
           </div>
+        </div>
+
+        <div
+          class="nav-admin-only"
+          id="pwa-install-notify-bar"
+          style="padding: 0.75rem 1rem 0.25rem 1rem; flex-direction: column"
+        >
+          <button
+            type="button"
+            class="btn btn-primary btn-block btn-sm"
+            id="btn-install-notify"
+            onclick="handleInstallAndEnableNotifications()"
+            title="تثبيت التطبيق على الجهاز وتفعيل الإشعارات الفورية بضغطة واحدة"
+          >
+            📲 تثبيت التطبيق + تفعيل الإشعارات
+          </button>
+          <small
+            class="text-muted"
+            id="install-notify-status"
+            style="display: block; text-align: center; margin-top: 4px; font-size: 0.72rem"
+          ></small>
         </div>
 
         <nav class="sidebar-nav">
@@ -644,21 +674,14 @@
               </div>
             </div>
 
-            <!-- 7. الأيقونة: متابعة الطلاب لليوم -->
+            <!-- 7. الأيقونة: متابعة الطلاب لليوم (موحدة تماماً بنفس شكل باقي البطاقات) -->
             <div
               class="stat-card nav-admin-only"
-              style="
-                cursor: pointer;
-                border: 1.5px solid #0b6b7d;
-                background: #fdfefe;
-              "
+              style="cursor: pointer"
               onclick="openStudentsFollowupModal()"
               title="انقر لعرض جدول متابعة حضور وتسميع الطلاب وطباعته"
             >
-              <div
-                class="stat-icon icon-brown"
-                style="background: #e8f4f6; color: #0b6b7d"
-              >
+              <div class="stat-icon icon-brown">
                 <svg
                   width="24"
                   height="24"
@@ -674,16 +697,9 @@
                 </svg>
               </div>
               <div class="stat-details">
-                <span
-                  class="stat-label"
-                  style="font-weight: 800; color: #0b6b7d"
-                  >متابعة الطلاب</span
-                >
-                <h3
-                  class="stat-value"
-                  style="font-size: 1.15rem; color: #0b6b7d"
-                >
-                  عرض المتابعة 📋
+                <span class="stat-label">متابعة الطلاب</span>
+                <h3 class="stat-value" style="font-size: 1.25rem">
+                  عرض الكشف 📋
                 </h3>
               </div>
             </div>
@@ -1524,7 +1540,7 @@
           </div>
         </section>
 
-        <!-- 8. شاشة التقارير الرسمية (محدثة بإخفاء الصندوق قبل الاستخراج) -->
+        <!-- 8. شاشة التقارير الرسمية -->
         <section id="view-reports" class="content-view">
           <div class="card no-print">
             <div
@@ -1987,24 +2003,50 @@
 
     <!-- MODALS: النوافذ المنبثقة -->
 
-    <!-- نافذة متابعة الطلاب لليوم (متضمنة عمود الحلقة الرباعي والطباعة) -->
-    <div id="modal-students-followup" class="modal-overlay">
-      <div class="modal-card modal-lg">
-        <div class="modal-header">
-          <h3 id="students-followup-modal-title">📋 متابعة الطلاب لليوم</h3>
-          <button
-            class="modal-close"
-            onclick="closeModal('modal-students-followup')"
-          >
-            &times;
-          </button>
+    <!-- نافذة متابعة الطلاب لليوم (موسعة كصفحة مستقلة وشاشة كاملة مع زر خروج وإغلاق بارز) -->
+    <div
+      id="modal-students-followup"
+      class="modal-overlay modal-fullscreen-overlay"
+    >
+      <div class="modal-card modal-fullscreen">
+        <div class="modal-header flex-between">
+          <div class="flex-align-gap">
+            <span style="font-size: 1.4rem">📋</span>
+            <h3
+              id="students-followup-modal-title"
+              style="margin: 0; font-size: 1.25rem"
+            >
+              متابعة الطلاب لليوم
+            </h3>
+          </div>
+          <div class="flex-align-gap">
+            <button
+              type="button"
+              class="btn btn-outline-brown btn-sm no-print"
+              onclick="closeModal('modal-students-followup')"
+              style="padding: 0.35rem 0.95rem; font-weight: 800"
+            >
+              🚪 خروج للوحة التحكم
+            </button>
+            <button
+              class="modal-close"
+              onclick="closeModal('modal-students-followup')"
+              title="إغلاق والعودة للوحة التحكم"
+            >
+              &times;
+            </button>
+          </div>
         </div>
         <div class="modal-body">
-          <div class="flex-between mb-2 no-print">
+          <div
+            class="flex-between mb-3 no-print"
+            style="flex-wrap: wrap; gap: 0.8rem"
+          >
             <input
               type="text"
               id="search-modal-students-followup"
               class="form-control search-input"
+              style="max-width: 320px"
               placeholder="🔍 ابحث باسم الطالب..."
               oninput="filterStudentsFollowupModal()"
             />
@@ -3506,5 +3548,6 @@
     <script src="admin.js"></script>
     <script src="reports.js"></script>
     <script src="app.js"></script>
+    <script src="pwa-notifications.js"></script>
   </body>
 </html>
