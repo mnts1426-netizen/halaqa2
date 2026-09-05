@@ -454,6 +454,10 @@ function saveStudentTasmeea(e, studentId) {
   const existingIndex = window.appStore.tasmeea.findIndex(
     (t) => t.id === tasmeeaData.id,
   );
+  const previousAdminNotes =
+    existingIndex > -1
+      ? window.appStore.tasmeea[existingIndex].adminNotes || ""
+      : "";
 
   if (existingIndex > -1) {
     window.appStore.tasmeea[existingIndex] = tasmeeaData;
@@ -479,6 +483,21 @@ function saveStudentTasmeea(e, studentId) {
       `رصد وتحديث مقرر الطالب (${stuName}) - حفظ: ${tasmeeaData.hifzSurah || "—"} (${tasmeeaData.hifzRating || "—"}) | مراجعة: ${tasmeeaData.murajaaSurah || "—"} | تلاوة: ${tasmeeaData.tilawaSurah || "—"}`,
       user.name,
       getCircleNameTasmeea(circleId),
+    );
+  }
+
+  if (
+    tasmeeaData.adminNotes &&
+    tasmeeaData.adminNotes !== previousAdminNotes &&
+    typeof window.sendAdminPushNotification === "function"
+  ) {
+    const student = (window.appStore?.students || []).find(
+      (s) => s.id === studentId,
+    );
+    const stuName = student ? student.name : "طالب";
+    window.sendAdminPushNotification(
+      "📝 ملاحظة معلم جديدة",
+      `ملاحظة من المعلم بخصوص الطالب (${stuName}): ${tasmeeaData.adminNotes}`,
     );
   }
 
