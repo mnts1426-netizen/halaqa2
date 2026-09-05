@@ -166,5 +166,5 @@ const LOCAL_STORAGE_KEY = "HALAQAT_ALHUDA_DB_V1";
 // احصل على القيمتين من: OneSignal Dashboard > Settings > Keys & IDs
 // ONESIGNAL_APP_ID: قيمة "OneSignal App ID"
 // ONESIGNAL_REST_API_KEY: قيمة "REST API Key"
-window.ONESIGNAL_APP_ID = "";
-window.ONESIGNAL_REST_API_KEY = "";
+window.ONESIGNAL_APP_ID = "6496e020-94c9-477d-bd15-d5f02531d9c5";
+window.ONESIGNAL_REST_API_KEY = "os_v2_app_msloaieuzfdx3piv2xyckmozyvsgj3mb54du7f47gpwl3bbvtqv2jcokmxbshtdlp72ggvzqfljpchilweeotojzx7ggqivggvv65cq";
