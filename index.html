@@ -1442,6 +1442,13 @@
               </div>
               <div class="flex-align-gap">
                 <button
+                  class="btn btn-primary btn-sm"
+                  id="btn-screen-fullscreen"
+                  onclick="toggleScreenFullscreen()"
+                >
+                  🖥️ ملء الشاشة
+                </button>
+                <button
                   class="btn btn-outline-brown btn-sm"
                   onclick="resetScreenStudentOrder()"
                 >
@@ -1470,6 +1477,7 @@
                 <thead>
                   <tr>
                     <th style="width: 70px; text-align: center">المركز</th>
+                    <th style="width: 70px; text-align: center">🏆 الكأس</th>
                     <th>اسم الطالب المتميز</th>
                     <th>الحلقة</th>
                     <th>الحالة</th>
@@ -2868,6 +2876,59 @@
         >
           <input type="hidden" id="edit-account-user-id" value="" />
           <div class="modal-body">
+            <div class="form-group">
+              <label>صورة الحساب</label>
+              <div style="display: flex; align-items: center; gap: 1rem">
+                <div
+                  id="edit-account-photo-circle"
+                  style="
+                    width: 64px;
+                    height: 64px;
+                    border-radius: 50%;
+                    overflow: hidden;
+                    background: linear-gradient(135deg, var(--accent-gold) 0%, var(--wood-brown) 100%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #fff;
+                    font-weight: 900;
+                    font-size: 1.5rem;
+                    flex-shrink: 0;
+                  "
+                >
+                  <span id="edit-account-photo-letter">ص</span>
+                  <img
+                    id="edit-account-photo-preview"
+                    src=""
+                    alt="صورة الحساب"
+                    style="
+                      display: none;
+                      width: 100%;
+                      height: 100%;
+                      object-fit: cover;
+                    "
+                  />
+                </div>
+                <div style="flex: 1">
+                  <input
+                    type="file"
+                    id="edit-account-photo-file"
+                    accept="image/*"
+                    class="form-control"
+                    onchange="previewAccountPhotoFile(event)"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-outline-brown btn-sm mt-1"
+                    id="btn-remove-account-photo"
+                    onclick="removeAccountPhoto()"
+                    style="display: none"
+                  >
+                    🗑️ إزالة الصورة (الرجوع للحرف الافتراضي)
+                  </button>
+                </div>
+              </div>
+            </div>
             <div class="form-group">
               <label>الاسم الكامل</label
               ><input
