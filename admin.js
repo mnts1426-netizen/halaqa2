@@ -2455,6 +2455,84 @@ window.renderAccountsTable = function () {
   tbody.innerHTML = html;
 };
 
+// تصغير الصورة المرفوعة إلى مربع صغير (200×200) وتحويلها لنص Base64 مباشرة
+// (بدلاً من رفعها لـ Firebase Storage) لضمان حفظها بنفس آلية Firestore الموثوقة
+// أصلاً بهذا النظام، وتفادي أي مشاكل صلاحيات محتملة في تخزين الصور
+function resizeImageFileToDataUrl(file, maxSize, quality) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("تعذر قراءة الملف"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("تعذر تحميل الصورة"));
+      img.onload = () => {
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2;
+        const sy = (img.height - side) / 2;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = maxSize;
+        canvas.height = maxSize;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, maxSize, maxSize);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+window._pendingAccountPhotoDataUrl = null;
+window._pendingAccountPhotoRemoved = false;
+
+window.previewAccountPhotoFile = async function (event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    alert("⚠️ يرجى اختيار ملف صورة صالح.");
+    event.target.value = "";
+    return;
+  }
+
+  try {
+    const dataUrl = await resizeImageFileToDataUrl(file, 200, 0.75);
+    window._pendingAccountPhotoDataUrl = dataUrl;
+    window._pendingAccountPhotoRemoved = false;
+
+    const preview = document.getElementById("edit-account-photo-preview");
+    const letter = document.getElementById("edit-account-photo-letter");
+    const removeBtn = document.getElementById("btn-remove-account-photo");
+    if (preview) {
+      preview.src = dataUrl;
+      preview.style.display = "block";
+    }
+    if (letter) letter.style.display = "none";
+    if (removeBtn) removeBtn.style.display = "inline-flex";
+  } catch (e) {
+    console.error("تعذر معالجة الصورة:", e);
+    alert("⚠️ تعذر معالجة الصورة المختارة، يرجى تجربة صورة أخرى.");
+  }
+};
+
+window.removeAccountPhoto = function () {
+  window._pendingAccountPhotoDataUrl = null;
+  window._pendingAccountPhotoRemoved = true;
+
+  const fileInput = document.getElementById("edit-account-photo-file");
+  const preview = document.getElementById("edit-account-photo-preview");
+  const letter = document.getElementById("edit-account-photo-letter");
+  const removeBtn = document.getElementById("btn-remove-account-photo");
+  if (fileInput) fileInput.value = "";
+  if (preview) {
+    preview.src = "";
+    preview.style.display = "none";
+  }
+  if (letter) letter.style.display = "flex";
+  if (removeBtn) removeBtn.style.display = "none";
+};
+
 window.openModalEditUserAccount = function (userId) {
   const user = (window.appStore?.users || []).find((u) => u.id === userId);
   if (!user) return;
@@ -2471,6 +2549,33 @@ window.openModalEditUserAccount = function (userId) {
     "edit-account-password",
     user.pass || (user.role === "student" ? "1111" : "1234"),
   );
+
+  window._pendingAccountPhotoDataUrl = null;
+  window._pendingAccountPhotoRemoved = false;
+  const fileInput = document.getElementById("edit-account-photo-file");
+  const preview = document.getElementById("edit-account-photo-preview");
+  const letter = document.getElementById("edit-account-photo-letter");
+  const removeBtn = document.getElementById("btn-remove-account-photo");
+  if (fileInput) fileInput.value = "";
+
+  if (user.photoURL) {
+    if (preview) {
+      preview.src = user.photoURL;
+      preview.style.display = "block";
+    }
+    if (letter) letter.style.display = "none";
+    if (removeBtn) removeBtn.style.display = "inline-flex";
+  } else {
+    if (preview) {
+      preview.src = "";
+      preview.style.display = "none";
+    }
+    if (letter) {
+      letter.style.display = "flex";
+      letter.textContent = user.name ? user.name.charAt(0) : "؟";
+    }
+    if (removeBtn) removeBtn.style.display = "none";
+  }
 
   openModal("modal-edit-user-account");
 };
@@ -2494,10 +2599,17 @@ window.handleSaveUserAccount = function (e) {
   ).trim();
   if (newPass) user.pass = newPass;
 
+  if (window._pendingAccountPhotoDataUrl) {
+    user.photoURL = window._pendingAccountPhotoDataUrl;
+  } else if (window._pendingAccountPhotoRemoved) {
+    user.photoURL = null;
+  }
+
   if (user.role === "student") {
     const stu = (window.appStore?.students || []).find((s) => s.id === user.id);
     if (stu) {
       stu.name = user.name;
+      stu.photoURL = user.photoURL || null;
       if (typeof saveToCloud === "function")
         saveToCloud("students", stu.id, stu);
     }
@@ -2508,6 +2620,7 @@ window.handleSaveUserAccount = function (e) {
     if (teach) {
       teach.name = user.name;
       teach.phone = user.username;
+      teach.photoURL = user.photoURL || null;
       if (typeof saveToCloud === "function")
         saveToCloud("teachers", teach.id, teach);
     }
@@ -2515,6 +2628,17 @@ window.handleSaveUserAccount = function (e) {
 
   if (typeof saveToCloud === "function") saveToCloud("users", user.id, user);
   if (typeof saveLocalStore === "function") saveLocalStore();
+
+  // تحديث صورة/اسم الشريط الجانبي فوراً لو كان الحساب المعدَّل هو المستخدم الحالي نفسه
+  if (window.currentUser && window.currentUser.id === user.id) {
+    window.currentUser.name = user.name;
+    window.currentUser.photoURL = user.photoURL;
+    if (typeof updateSidebarUserAvatar === "function")
+      updateSidebarUserAvatar(window.currentUser);
+  }
+
+  window._pendingAccountPhotoDataUrl = null;
+  window._pendingAccountPhotoRemoved = false;
 
   closeModal("modal-edit-user-account");
   alert("✅ تم حفظ وتأكيد تعديلات الحساب بنجاح!");
@@ -3089,21 +3213,68 @@ window.renderTamayuzBoard = function () {
       (c) => c.id === stu.circleId,
     );
     const circleName = circle ? circle.name : "جامع الهدى";
-    const isFirst = idx === 0;
+    const isTrophyWinner = stu.id === window.appStore?.trophyStudentId;
 
     html += `
       <tr>
-        <td style="font-weight: 800;">${isFirst ? "🏆 " : "⭐ "}${stu.name}</td>
+        <td style="font-weight: 800;">${isTrophyWinner ? "🏆 " : "⭐ "}${stu.name}</td>
         <td><span style="font-weight: 600; color: var(--text-dark);">${circleName}</span></td>
         <td><span class="badge badge-active">100% (حضور 4 / 4 أيام)</span></td>
         <td><span class="badge badge-active">متقن (ممتاز)</span></td>
-        <td><span class="badge" style="background:#805333; color:#fff;">${isFirst ? "المركز الأول 🏆" : `متميز #${idx + 1}`}</span></td>
+        <td><span class="badge" style="background:#805333; color:#fff;">${isTrophyWinner ? "الكأس 🏆" : `متميز #${idx + 1}`}</span></td>
       </tr>
     `;
   });
 
   tbody.innerHTML = html;
 };
+
+// تفعيل/إلغاء وضع ملء الشاشة للوحة العرض المتحركة فقط (بدون أي عناصر أخرى من الصفحة)
+function exitScreenFullscreenIfActive() {
+  const exit =
+    document.exitFullscreen ||
+    document.webkitExitFullscreen ||
+    document.msExitFullscreen;
+  if (exit) exit.call(document);
+}
+
+window.toggleScreenFullscreen = function () {
+  const target = document.getElementById("mosque-screen-grid");
+  if (!target) return;
+
+  if (!document.fullscreenElement) {
+    const request =
+      target.requestFullscreen ||
+      target.webkitRequestFullscreen ||
+      target.msRequestFullscreen;
+    if (request) {
+      request.call(target).catch((e) => {
+        console.warn("تعذر تفعيل وضع ملء الشاشة:", e);
+        alert("⚠️ تعذر تفعيل وضع ملء الشاشة على هذا الجهاز/المتصفح.");
+      });
+    }
+  } else {
+    exitScreenFullscreenIfActive();
+  }
+};
+
+// الضغط في أي مكان على اللوحة نفسها أثناء ملء الشاشة يخرج منها مباشرة
+document.addEventListener("click", () => {
+  if (
+    document.fullscreenElement &&
+    document.fullscreenElement.id === "mosque-screen-grid"
+  ) {
+    exitScreenFullscreenIfActive();
+  }
+});
+
+document.addEventListener("fullscreenchange", () => {
+  const btn = document.getElementById("btn-screen-fullscreen");
+  if (!btn) return;
+  btn.textContent = document.fullscreenElement
+    ? "⤢ الخروج من ملء الشاشة"
+    : "🖥️ ملء الشاشة";
+});
 
 window.renderScreenView = function () {
   const grid = document.getElementById("mosque-screen-grid");
@@ -3136,12 +3307,12 @@ window.renderScreenView = function () {
             (c) => c.id === stu.circleId,
           );
           const circleName = circle ? circle.name : "جامع الهدى";
-          const isFirst = idx === 0;
+          const isTrophyWinner = stu.id === window.appStore?.trophyStudentId;
 
           cardsHtml += `
-            <div class="card" style="text-align: center; border: ${isFirst ? "2.5px solid var(--primary-brown)" : "1.5px solid var(--border-color)"}; background: ${isFirst ? "#faf3eb" : "#ffffff"}; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.06); transition: all 0.3s ease;">
+            <div class="card" style="text-align: center; border: ${isTrophyWinner ? "2.5px solid var(--primary-brown)" : "1.5px solid var(--border-color)"}; background: ${isTrophyWinner ? "#faf3eb" : "#ffffff"}; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.06); transition: all 0.3s ease;">
               <div style="font-size: 2rem; font-weight: 900; color: var(--primary-brown); margin-bottom: 0.4rem;">
-                #${idx + 1} ${isFirst ? "🏆" : "⭐"}
+                #${idx + 1} ${isTrophyWinner ? "🏆" : "⭐"}
               </div>
               <h3 style="font-size: 1.3rem; font-weight: 900; color: var(--text-dark); margin-bottom: 6px;">${stu.name}</h3>
               <p class="text-muted" style="font-size: 0.95rem; font-weight: 700; margin-bottom: 12px;">🕌 حلقة: ${circleName}</p>
@@ -3158,20 +3329,26 @@ window.renderScreenView = function () {
       const todayStr =
         document.getElementById("dashboard-date-select")?.value ||
         new Date().toISOString().split("T")[0];
+      const isWorkday =
+        typeof isOfficialWorkday === "function"
+          ? isOfficialWorkday(todayStr)
+          : new Date(todayStr).getDay() >= 0 && new Date(todayStr).getDay() <= 3;
 
       const activeStudents = (window.appStore?.students || []).filter(
         (s) => s.status === "active",
       );
-      const teachersCount = (window.appStore?.teachers || []).filter(
-        (t) => t.status === "active",
-      ).length;
-      const circlesCount = (window.appStore?.circles || []).length;
       const todayAtt = (window.appStore?.attendance || []).filter(
         (a) => a.date === todayStr,
       );
       const presentCount = todayAtt.filter(
         (a) => a.status === "present" || a.status === "late",
       ).length;
+
+      let absentCount = todayAtt.filter((a) => a.status === "absent").length;
+      if (isWorkday) {
+        absentCount = Math.max(0, activeStudents.length - presentCount);
+      }
+
       const todayTasmeea = (window.appStore?.tasmeea || []).filter(
         (t) => t.date === todayStr,
       );
@@ -3181,74 +3358,137 @@ window.renderScreenView = function () {
           .map((t) => t.studentId),
       ).size;
 
+      // بناء جدول أول 10 طلاب أتموا قسماً معيناً اليوم (الأقدم توثيقاً أولاً)
+      const buildTopCompletedRows = (fieldName, ratingFieldName) => {
+        const rows = todayTasmeea
+          .filter((t) => t[fieldName] && String(t[fieldName]).trim() !== "")
+          .sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0))
+          .slice(0, 10);
+
+        if (rows.length === 0) {
+          return '<tr><td colspan="3" class="text-center text-muted p-2" style="font-size:0.85rem;">لا يوجد بعد</td></tr>';
+        }
+
+        return rows
+          .map((t, idx) => {
+            const student = (window.appStore?.students || []).find(
+              (s) => s.id === t.studentId,
+            );
+            const circle = (window.appStore?.circles || []).find(
+              (c) => c.id === t.circleId,
+            );
+            return `
+              <tr>
+                <td style="text-align:center; font-weight:800;">${idx + 1}</td>
+                <td style="font-weight:700;">${student ? student.name : "—"}</td>
+                <td>${circle ? circle.name : "—"}</td>
+              </tr>
+            `;
+          })
+          .join("");
+      };
+
       grid.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; margin-bottom: 0.8rem;">
-          <h2 style="font-size: 1.8rem; font-weight: 900; color: var(--primary-brown); margin: 0;">
+        <div style="grid-column: 1 / -1; text-align: center; margin-bottom: 0.4rem;">
+          <h2 style="font-size: 1.3rem; font-weight: 900; color: var(--primary-brown); margin: 0;">
             📊 لوحة الإحصائيات الحية لمَجْمَع عبدالله بن مهدي القرآني
           </h2>
-          <p class="text-muted" style="font-size: 0.95rem; margin: 4px 0 0 0;">جامع الهدى — تقرير المتابعة والإنجاز لليوم</p>
+          <p class="text-muted" style="font-size: 0.8rem; margin: 2px 0 0 0;">جامع الهدى — تقرير المتابعة والإنجاز لليوم</p>
         </div>
 
-        <div class="card" style="text-align: center; border: 1.5px solid var(--border-color); border-radius: 12px; padding: 1.5rem; background: #ffffff;">
-          <div style="font-size: 2.2rem; margin-bottom: 4px;">👨‍🎓</div>
-          <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted);">إجمالي الطلاب المسجلين</span>
-          <h3 style="font-size: 2.2rem; font-weight: 900; color: var(--primary-brown); margin: 6px 0 0 0;">${activeStudents.length}</h3>
+        <div style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem;">
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.6rem;">👨‍🎓</div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">إجمالي المسجلين</div>
+              <div style="font-size: 1.4rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${activeStudents.length}</div>
+            </div>
+          </div>
+
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.6rem;">🟢</div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">حاضرون اليوم</div>
+              <div style="font-size: 1.4rem; font-weight: 900; color: #2e7d32; line-height: 1;">${presentCount}</div>
+            </div>
+          </div>
+
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.6rem;">🔴</div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">غياب اليوم</div>
+              <div style="font-size: 1.4rem; font-weight: 900; color: #c62828; line-height: 1;">${absentCount}</div>
+            </div>
+          </div>
+
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.6rem;">📖</div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">سمّعوا اليوم</div>
+              <div style="font-size: 1.4rem; font-weight: 900; color: #0b6b7d; line-height: 1;">${recitedCount}</div>
+            </div>
+          </div>
         </div>
 
-        <div class="card" style="text-align: center; border: 1.5px solid var(--border-color); border-radius: 12px; padding: 1.5rem; background: #ffffff;">
-          <div style="font-size: 2.2rem; margin-bottom: 4px;">🟢</div>
-          <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted);">حاضرون اليوم بالمسجد</span>
-          <h3 style="font-size: 2.2rem; font-weight: 900; color: #2e7d32; margin: 6px 0 0 0;">${presentCount}</h3>
-        </div>
-
-        <div class="card" style="text-align: center; border: 1.5px solid var(--border-color); border-radius: 12px; padding: 1.5rem; background: #ffffff;">
-          <div style="font-size: 2.2rem; margin-bottom: 4px;">📖</div>
-          <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted);">سمّعوا مقررهم اليوم</span>
-          <h3 style="font-size: 2.2rem; font-weight: 900; color: #0b6b7d; margin: 6px 0 0 0;">${recitedCount}</h3>
-        </div>
-
-        <div class="card" style="text-align: center; border: 1.5px solid var(--border-color); border-radius: 12px; padding: 1.5rem; background: #ffffff;">
-          <div style="font-size: 2.2rem; margin-bottom: 4px;">🏛️</div>
-          <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted);">عدد الحلقات القرآنية</span>
-          <h3 style="font-size: 2.2rem; font-weight: 900; color: var(--primary-brown); margin: 6px 0 0 0;">${circlesCount}</h3>
-        </div>
-
-        <div class="card" style="text-align: center; border: 1.5px solid var(--border-color); border-radius: 12px; padding: 1.5rem; background: #ffffff;">
-          <div style="font-size: 2.2rem; margin-bottom: 4px;">👨‍🏫</div>
-          <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted);">المعلمون والمقرئون</span>
-          <h3 style="font-size: 2.2rem; font-weight: 900; color: var(--primary-brown); margin: 6px 0 0 0;">${teachersCount}</h3>
-        </div>
-
-        <div class="card" style="text-align: center; border: 1.5px solid var(--border-color); border-radius: 12px; padding: 1.5rem; background: #ffffff;">
-          <div style="font-size: 2.2rem; margin-bottom: 4px;">🏆</div>
-          <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted);">فرسان التميز لهذا الأسبوع</span>
-          <h3 style="font-size: 2.2rem; font-weight: 900; color: #b78103; margin: 6px 0 0 0;">${qualifyingStudents.length}</h3>
+        <div style="grid-column: 1 / -1; margin-top: 0.5rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+          <div class="card" style="padding: 0.75rem; margin-bottom: 0;">
+            <h3 style="font-size: 0.95rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0.4rem; text-align:center;">📖 أول 10 أتموا الحفظ الجديد اليوم</h3>
+            <table class="data-table mini-report-table">
+              <thead><tr><th style="width:35px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
+              <tbody>${buildTopCompletedRows("hifzSurah", "hifzRating")}</tbody>
+            </table>
+          </div>
+          <div class="card" style="padding: 0.75rem; margin-bottom: 0;">
+            <h3 style="font-size: 0.95rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0.4rem; text-align:center;">🔄 أول 10 أتموا المراجعة اليوم</h3>
+            <table class="data-table mini-report-table">
+              <thead><tr><th style="width:35px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
+              <tbody>${buildTopCompletedRows("murajaaSurah", "murajaaRating")}</tbody>
+            </table>
+          </div>
+          <div class="card" style="padding: 0.75rem; margin-bottom: 0;">
+            <h3 style="font-size: 0.95rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0.4rem; text-align:center;">🎧 أول 10 أتموا التلاوة اليوم</h3>
+            <table class="data-table mini-report-table">
+              <thead><tr><th style="width:35px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
+              <tbody>${buildTopCompletedRows("tilawaSurah", "tilawaRating")}</tbody>
+            </table>
+          </div>
         </div>
       `;
     }
   };
 
+  // التبديل بين لوحة التميز ولوحة الإحصائيات يتم فقط عند وجود طلاب متميزين لهذا الأسبوع
+  // وإلا تبقى شاشة الإحصائيات ظاهرة دائماً بدون تبديل لعدم إضاعة وقت العرض على لوحة فارغة
+  const hasTamayuzThisWeek = qualifyingStudents.length > 0;
+  if (!hasTamayuzThisWeek) {
+    window.screenCurrentSlide = "stats";
+  }
+
   displayCurrentSlide();
 
   if (window.screenFlipTimer) clearInterval(window.screenFlipTimer);
-  window.screenFlipTimer = setInterval(() => {
-    window.screenCurrentSlide =
-      window.screenCurrentSlide === "tamayuz" ? "stats" : "tamayuz";
-    displayCurrentSlide();
-  }, 10000);
+  if (hasTamayuzThisWeek) {
+    window.screenFlipTimer = setInterval(() => {
+      window.screenCurrentSlide =
+        window.screenCurrentSlide === "tamayuz" ? "stats" : "tamayuz";
+      displayCurrentSlide();
+    }, 30000);
+  }
 
+  // تحديث بيانات الشاشة دورياً كل 5 دقائق (كانت الدالة المستدعاة سابقاً غير معرّفة فعلياً)
   if (window.screenDataRefreshTimer)
     clearInterval(window.screenDataRefreshTimer);
-  window.screenDataRefreshTimer = setInterval(() => {
-    if (typeof syncDataFromCloud === "function") {
-      syncDataFromCloud();
+  window.screenDataRefreshTimer = setInterval(async () => {
+    if (typeof syncAndPurgeDataFromCloud === "function") {
+      await syncAndPurgeDataFromCloud();
     }
+    renderScreenView();
   }, 300000);
 
   if (tbody) {
     if (qualifyingStudents.length === 0) {
       tbody.innerHTML =
-        '<tr><td colspan="5" class="text-center text-muted p-3">لا يوجد طلاب متميزون حالياً للترتيب</td></tr>';
+        '<tr><td colspan="6" class="text-center text-muted p-3">لا يوجد طلاب متميزون حالياً للترتيب</td></tr>';
     } else {
       let tbodyHtml = "";
       qualifyingStudents.forEach((stu, idx) => {
@@ -3256,10 +3496,14 @@ window.renderScreenView = function () {
           (c) => c.id === stu.circleId,
         );
         const circleName = circle ? circle.name : "جامع الهدى";
+        const isTrophyWinner = stu.id === window.appStore?.trophyStudentId;
 
         tbodyHtml += `
           <tr>
-            <td style="text-align: center; font-weight: 800;">${idx + 1} ${idx === 0 ? "🏆" : ""}</td>
+            <td style="text-align: center; font-weight: 800;">${idx + 1} ${isTrophyWinner ? "🏆" : ""}</td>
+            <td style="text-align: center;">
+              <input type="checkbox" title="منح الكأس لهذا الطالب" ${isTrophyWinner ? "checked" : ""} onchange="setTrophyStudent('${stu.id}')" style="width: 18px; height: 18px; cursor: pointer;">
+            </td>
             <td style="font-weight: 700;">${stu.name}</td>
             <td>${circleName}</td>
             <td><span class="badge badge-active">متميز (حضور 100% وممتاز)</span></td>
@@ -3310,10 +3554,29 @@ window.moveScreenStudentDown = function (index) {
 window.resetScreenStudentOrder = function () {
   window.appStore.screenOrder = [];
   if (typeof saveToCloud === "function")
-    saveToCloud("screenOrder", "current_order", { order: [] });
+    saveToCloud("screenOrder", "current_order", {
+      order: [],
+      trophyStudentId: window.appStore.trophyStudentId || null,
+    });
   if (typeof saveLocalStore === "function") saveLocalStore();
   renderScreenView();
   alert("✅ تمت إعادة الترتيب التلقائي بنجاح!");
+};
+
+// تحديد/إلغاء الطالب الحاصل على كأس التميز لهذا الأسبوع (باختيار المدير فقط)
+window.setTrophyStudent = function (studentId) {
+  const newTrophyId =
+    window.appStore.trophyStudentId === studentId ? null : studentId;
+  window.appStore.trophyStudentId = newTrophyId;
+
+  if (typeof saveToCloud === "function") {
+    saveToCloud("screenOrder", "current_order", {
+      order: [...(window.appStore.screenOrder || [])],
+      trophyStudentId: newTrophyId,
+    });
+  }
+  if (typeof saveLocalStore === "function") saveLocalStore();
+  renderScreenView();
 };
 
 // الخريطة التفاعلية
