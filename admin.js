@@ -3713,6 +3713,13 @@ window.handleSelfRegistration = function (e) {
   closeModal("modal-self-register");
   e.target?.reset();
   alert("✅ تم إرسال طلب الالتحاق بنجاح! سيتم مراجعته من قبل إدارة المَجْمَع.");
+
+  if (typeof window.sendAdminPushNotification === "function") {
+    window.sendAdminPushNotification(
+      "📥 طلب التحاق جديد",
+      `تقدّم الطالب (${name}) بطلب التحاق جديد بالمَجْمَع.`,
+    );
+  }
 };
 
 window.renderNotificationsView = function () {
