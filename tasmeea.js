@@ -242,10 +242,11 @@ function buildStudentAccordionCard(
                 <label style="font-size: 0.82rem;">المقرر الحالي</label>
                 <input type="text" class="form-control" name="hifz_surah" value="${initialHifz}" placeholder="مثال: البقرة (1-15)">
               </div>
-              <div class="form-group mb-0">
+              <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">التقدير</label>
                 ${buildRatingSelect(record.hifzRating, "hifz_rating")}
               </div>
+              <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'hifz')">✅ اعتماد الحفظ الجديد</button>
             </div>
 
             <!-- 2. المراجعة -->
@@ -255,10 +256,11 @@ function buildStudentAccordionCard(
                 <label style="font-size: 0.82rem;">المقرر الحالي</label>
                 <input type="text" class="form-control" name="murajaa_surah" value="${initialMurajaa}" placeholder="مثال: سورة يس كاملة">
               </div>
-              <div class="form-group mb-0">
+              <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">التقدير</label>
                 ${buildRatingSelect(record.murajaaRating, "murajaa_rating")}
               </div>
+              <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'murajaa')">✅ اعتماد المراجعة</button>
             </div>
 
             <!-- 3. التلاوة -->
@@ -268,10 +270,11 @@ function buildStudentAccordionCard(
                 <label style="font-size: 0.82rem;">المقرر الحالي</label>
                 <input type="text" class="form-control" name="tilawa_surah" value="${initialTilawa}" placeholder="مثال: آل عمران (1-20)">
               </div>
-              <div class="form-group mb-0">
+              <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">التقدير</label>
                 ${buildRatingSelect(record.tilawaRating, "tilawa_rating")}
               </div>
+              <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'tilawa')">✅ اعتماد التلاوة</button>
             </div>
 
           </div>
@@ -309,9 +312,9 @@ function buildStudentAccordionCard(
             </div>
           </div>
 
-          <!-- زر الحفظ والاعتماد -->
+          <!-- زر الحفظ والاعتماد الشامل (يحفظ كل الأقسام والملاحظات وخطة الغد دفعة واحدة) -->
           <div class="mt-3 text-left" style="display: flex; justify-content: flex-end;">
-            <button type="submit" class="btn btn-primary">💾 حفظ واعتماد المقررات والتسميع</button>
+            <button type="submit" class="btn btn-primary">💾 حفظ جميع الأقسام والملاحظات وخطة الغد دفعة واحدة</button>
           </div>
         </form>
       </div>
@@ -406,6 +409,96 @@ function saveQuickAttendance(studentId, status) {
       getCircleNameTasmeea(circleId),
     );
   }
+}
+
+// اعتماد قسم واحد فقط (الحفظ الجديد / المراجعة / التلاوة) بشكل مستقل دون التأثير على باقي الأقسام
+function saveTasmeeaSection(studentId, section) {
+  const dateVal = document.getElementById("tasmeea-date-select")?.value;
+  const circleId = document.getElementById("tasmeea-circle-select")?.value;
+
+  if (!dateVal || !circleId) {
+    alert("⚠️ يرجى التأكد من اختيار الحلقة والتاريخ أولاً.");
+    return;
+  }
+
+  const detailsEl = document.getElementById(`tasmeea-details-${studentId}`);
+  if (!detailsEl) return;
+
+  const fieldMap = {
+    hifz: { surahField: "hifz_surah", ratingField: "hifz_rating", recordSurah: "hifzSurah", recordRating: "hifzRating", label: "الحفظ الجديد" },
+    murajaa: { surahField: "murajaa_surah", ratingField: "murajaa_rating", recordSurah: "murajaaSurah", recordRating: "murajaaRating", label: "المراجعة" },
+    tilawa: { surahField: "tilawa_surah", ratingField: "tilawa_rating", recordSurah: "tilawaSurah", recordRating: "tilawaRating", label: "التلاوة" },
+  };
+  const cfg = fieldMap[section];
+  if (!cfg) return;
+
+  const surahVal = (
+    detailsEl.querySelector(`[name="${cfg.surahField}"]`)?.value || ""
+  ).trim();
+  const ratingVal =
+    detailsEl.querySelector(`[name="${cfg.ratingField}"]`)?.value || "";
+
+  if (!surahVal && !ratingVal) {
+    alert(`⚠️ يرجى تعبئة المقرر أو التقدير الخاص بـ (${cfg.label}) قبل الاعتماد.`);
+    return;
+  }
+
+  const user = window.currentUser;
+  const isAdmin = user && user.role === "admin";
+  const recordId = `tasm_${studentId}_${dateVal}`;
+
+  if (!window.appStore.tasmeea) window.appStore.tasmeea = [];
+  let record = window.appStore.tasmeea.find((t) => t.id === recordId);
+  if (!record) {
+    record = {
+      id: recordId,
+      studentId: studentId,
+      circleId: circleId,
+      date: dateVal,
+      hifzSurah: "",
+      hifzRating: "",
+      murajaaSurah: "",
+      murajaaRating: "",
+      tilawaSurah: "",
+      tilawaRating: "",
+      rating: "",
+      studentNotes: "",
+      adminNotes: "",
+      nextHifz: "",
+      nextMurajaa: "",
+      nextTilawa: "",
+    };
+    window.appStore.tasmeea.push(record);
+  }
+
+  record[cfg.recordSurah] = surahVal;
+  record[cfg.recordRating] = ratingVal;
+  record.rating =
+    record.hifzRating || record.murajaaRating || record.tilawaRating || "ممتاز";
+  record.updatedBy = isAdmin ? "admin" : "teacher";
+  record.updatedAt = Date.now();
+
+  if (typeof saveToCloud === "function") {
+    saveToCloud("tasmeea", record.id, record);
+  }
+  if (typeof saveLocalStore === "function") saveLocalStore();
+
+  if (typeof window.logTeacherActivity === "function") {
+    const student = (window.appStore?.students || []).find(
+      (s) => s.id === studentId,
+    );
+    const stuName = student ? student.name : "طالب";
+    const actorTitle = isAdmin ? "المدير" : "المعلم";
+    window.logTeacherActivity(
+      `اعتماد ${cfg.label}`,
+      `تم اعتماد (${cfg.label}) للطالب (${stuName}): ${surahVal || "—"} (${ratingVal || "—"}) بواسطة (${actorTitle})`,
+      user.name,
+      getCircleNameTasmeea(circleId),
+    );
+  }
+
+  alert(`✅ تم اعتماد (${cfg.label}) بنجاح!`);
+  renderTasmeeaStudents();
 }
 
 // حفظ واعتماد التسميع وترحيل المقررات مع توثيق العملية
