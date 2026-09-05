@@ -174,20 +174,27 @@ function generateReport() {
 
   let headHtml = "";
   let bodyHtml = "";
+  let studentDailyHeaderInfo = null;
 
-  // 1. تقرير إنجاز ومتابعة الطالب
+  // 1. تقرير إنجاز الطالب اليومي
   if (reportType === "student_achievement" || reportType === "tasmeea") {
     const targetDateLabel =
       dateTo || dateFrom || new Date().toISOString().split("T")[0];
+    const targetDateObj = new Date(targetDateLabel + "T00:00:00");
+    const targetDayName = targetDateObj.toLocaleDateString("ar-SA", {
+      weekday: "long",
+    });
+    const targetDateDisplay = targetDateObj.toLocaleDateString("ar-SA", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    studentDailyHeaderInfo = { targetDayName, targetDateDisplay };
 
-    if (printTitle)
-      printTitle.textContent = `تقرير الإنجاز والمتابعة (يوم: ${targetDateLabel})`;
+    if (printTitle) printTitle.textContent = "إنجاز الطالب اليومي";
     if (printPeriod) {
-      printPeriod.textContent =
-        dateFrom && dateTo
-          ? `الفترة من ${dateFrom} إلى ${dateTo}`
-          : `تاريخ التقرير: ${targetDateLabel}`;
-      printPeriod.style.display = "block";
+      printPeriod.textContent = "";
+      printPeriod.style.display = "none";
     }
 
     headHtml = `
@@ -195,10 +202,9 @@ function generateReport() {
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">الطالب</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">الحلقة</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">الحضور</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">أيام الحضور</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">ما تم إنجازه اليوم</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">إجمالي الحفظ والمقرر</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">ملاحظات</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">مقرر الدرس</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">مقرر المراجعة</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">مقرر التلاوة</th>
       </tr>
     `;
 
@@ -215,7 +221,7 @@ function generateReport() {
 
     if (students.length === 0) {
       bodyHtml =
-        '<tr><td colspan="7" class="text-center text-muted p-4">لا توجد بيانات مطابقة للطلاب</td></tr>';
+        '<tr><td colspan="6" class="text-center text-muted p-4">لا توجد بيانات مطابقة للطلاب</td></tr>';
     } else {
       students.forEach((s) => {
         const circle = (window.appStore.circles || []).find(
@@ -226,9 +232,6 @@ function generateReport() {
         const allAtt = (window.appStore.attendance || []).filter(
           (a) => a.studentId === s.id,
         );
-        const presentDaysCount = allAtt.filter(
-          (a) => a.status === "present" || a.status === "late",
-        ).length;
         const todayAttRec = allAtt.find((a) => a.date === targetDateLabel);
 
         let attStatusText = '<span style="color:#777;">غير مسجل</span>';
@@ -252,37 +255,27 @@ function generateReport() {
         );
         const todayTasm = allTasm.find((t) => t.date === targetDateLabel);
 
-        let todayAchievementText = "لا يوجد إنجاز جديد";
-        let todayNotes = "—";
-        if (todayTasm) {
-          const parts = [];
-          if (todayTasm.hifzSurah)
-            parts.push(
-              `حفظ: ${todayTasm.hifzSurah} (${todayTasm.hifzRating || "ممتاز"})`,
-            );
-          if (todayTasm.murajaaSurah)
-            parts.push(`مراجعة: ${todayTasm.murajaaSurah}`);
-          if (todayTasm.tilawaSurah)
-            parts.push(`تلاوة: ${todayTasm.tilawaSurah}`);
-          if (parts.length > 0) todayAchievementText = parts.join(" | ");
-          todayNotes = todayTasm.studentNotes || todayTasm.adminNotes || "—";
-        }
-
-        const completedHifzCount = allTasm.filter((t) => t.hifzSurah).length;
-        const totalHifzDisplay =
-          completedHifzCount > 0
-            ? `${completedHifzCount} مقررات منجزة`
-            : s.hifzAmount || "مستمر في المقرر";
+        const hifzDisplay =
+          todayTasm && todayTasm.hifzSurah
+            ? `${todayTasm.hifzSurah} (${todayTasm.hifzRating || "—"})`
+            : "—";
+        const murajaaDisplay =
+          todayTasm && todayTasm.murajaaSurah
+            ? `${todayTasm.murajaaSurah} (${todayTasm.murajaaRating || "—"})`
+            : "—";
+        const tilawaDisplay =
+          todayTasm && todayTasm.tilawaSurah
+            ? `${todayTasm.tilawaSurah} (${todayTasm.tilawaRating || "—"})`
+            : "—";
 
         bodyHtml += `
           <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.88rem;">
             <td style="padding: 8px; font-weight: 800; color: #1e293b; text-align: right;">${s.name}</td>
             <td style="padding: 8px; color: #334155;">${circleName}</td>
             <td style="padding: 8px;">${attStatusText}</td>
-            <td style="padding: 8px; font-weight: 800; color: #1e293b;">${presentDaysCount}</td>
-            <td style="padding: 8px; color: #334155; line-height: 1.4;">${todayAchievementText}</td>
-            <td style="padding: 8px; font-weight: 700; color: #0b6b7d;">${totalHifzDisplay}</td>
-            <td style="padding: 8px; color: #475569;">${todayNotes}</td>
+            <td style="padding: 8px; color: #334155;">${hifzDisplay}</td>
+            <td style="padding: 8px; color: #334155;">${murajaaDisplay}</td>
+            <td style="padding: 8px; color: #334155;">${tilawaDisplay}</td>
           </tr>
         `;
       });
@@ -512,10 +505,56 @@ function generateReport() {
   // إظهار الصندوق وتطبيق الهيكل الملكي الفاخر كاملاً
   if (wrapper) {
     wrapper.style.display = "block";
-    wrapper.innerHTML = `
-      <div style="border: 2.5px double #1a365d; border-radius: 8px; padding: 1.5rem; background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-top: 1rem;">
-        
-        <!-- الترويسة الملكية الرسمية -->
+
+    let headerSectionHtml = "";
+    let footerSectionHtml = "";
+
+    if (studentDailyHeaderInfo) {
+      // ترويسة وتذييل خاصان بتقرير (إنجاز الطالب اليومي) فقط - دون التأثير على باقي التقارير
+      headerSectionHtml = `
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1a365d; padding-bottom: 0.8rem; margin-bottom: 1rem;">
+          <div style="width: 100px; text-align: right;">
+            <img src="report_logo_right.png" alt="شعار المَجْمَع" style="height: 65px; width: auto; object-fit: contain;" />
+          </div>
+          <div style="text-align: center; flex: 1;">
+            <h2 style="margin: 3px 0; font-size: 1.35rem; font-weight: 900; color: #1a365d;">مَجْمَع عبدالله بن مهدي القرآني</h2>
+            <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #334155;">جامع الهدى</h4>
+          </div>
+          <div style="width: 100px; text-align: left;">
+            <img src="report_logo_left.png" alt="شعار المَجْمَع" style="height: 60px; width: auto; object-fit: contain;" />
+          </div>
+        </div>
+
+        <!-- صندوق العنوان: اليوم يمين، العنوان بالمنتصف، التاريخ يسار -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+          <div style="width: 100px; text-align: right; font-weight: 800; color: #1a365d; font-size: 0.95rem;">
+            ${studentDailyHeaderInfo.targetDayName}
+          </div>
+          <div style="display: inline-block; border: 2px solid #1a365d; border-radius: 6px; padding: 0.4rem 1.8rem; background: #f8fafc;">
+            <h3 id="print-report-title" style="margin: 0; font-size: 1.15rem; font-weight: 900; color: #1a365d;">
+              ${printTitle ? printTitle.textContent : "إنجاز الطالب اليومي"}
+            </h3>
+          </div>
+          <div style="width: 100px; text-align: left; font-weight: 800; color: #1a365d; font-size: 0.95rem;">
+            ${studentDailyHeaderInfo.targetDateDisplay}
+          </div>
+        </div>
+      `;
+
+      footerSectionHtml = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px solid #cbd5e1; padding-top: 1rem; margin-top: 1.5rem; font-size: 0.9rem;">
+          <div style="text-align: right;">
+            <strong style="color: #1a365d;">المنصّة الإلكترونيّة للمَجْمَع القرآنيّ</strong>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-weight: 800; color: #1a365d;">مدير المَجْمَع القرآنيّ</div>
+            <div style="font-weight: 900; color: #334155;">أحمد بن عبدالله ال مهدي</div>
+          </div>
+        </div>
+      `;
+    } else {
+      // الترويسة والتذييل الأصليان (بدون أي تغيير) لباقي أنواع التقارير
+      headerSectionHtml = `
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1a365d; padding-bottom: 0.8rem; margin-bottom: 1rem;">
           <div style="width: 100px; text-align: right;">
             <img src="logo12.jpeg" alt="شعار المَجْمَع" style="height: 65px; width: auto; object-fit: contain;" />
@@ -544,16 +583,9 @@ function generateReport() {
             </p>
           </div>
         </div>
+      `;
 
-        <!-- جدول البيانات المؤطر الفخم -->
-        <div class="table-responsive" style="margin-bottom: 1.5rem;">
-          <table class="data-table" id="report-results-table" style="width: 100%; border-collapse: collapse; border: 1.5px solid #1a365d;">
-            <thead id="report-thead">${headHtml}</thead>
-            <tbody id="report-tbody">${bodyHtml}</tbody>
-          </table>
-        </div>
-
-        <!-- تذييل الاعتماد والختم الرسمي -->
+      footerSectionHtml = `
         <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px solid #cbd5e1; padding-top: 1rem; margin-top: 1.5rem; font-size: 0.9rem;">
           <div style="text-align: right;">
             <strong style="color: #1a365d;">نظام إدارة الحلقات القرآني</strong>
@@ -565,6 +597,23 @@ function generateReport() {
             <div style="font-weight: 900; color: #334155;">احمد بن عبدالله ال مهدي</div>
           </div>
         </div>
+      `;
+    }
+
+    wrapper.innerHTML = `
+      <div style="border: 2.5px double #1a365d; border-radius: 8px; padding: 1.5rem; background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-top: 1rem;">
+
+        ${headerSectionHtml}
+
+        <!-- جدول البيانات المؤطر الفخم -->
+        <div class="table-responsive" style="margin-bottom: 1.5rem;">
+          <table class="data-table" id="report-results-table" style="width: 100%; border-collapse: collapse; border: 1.5px solid #1a365d;">
+            <thead id="report-thead">${headHtml}</thead>
+            <tbody id="report-tbody">${bodyHtml}</tbody>
+          </table>
+        </div>
+
+        ${footerSectionHtml}
 
       </div>
     `;
