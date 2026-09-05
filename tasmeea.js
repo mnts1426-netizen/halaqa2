@@ -235,46 +235,58 @@ function buildStudentAccordionCard(
         <form onsubmit="saveStudentTasmeea(event, '${student.id}')">
           <div class="tasmeea-sections-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
             
-            <!-- 1. الحفظ الجديد -->
+            <!-- 1. الحفظ الجديد (اليوم وغداً معاً كعمود واحد مستقل) -->
             <div class="tasmeea-section-box p-3" style="background: #faf8f5; border: 1px solid var(--border-color); border-radius: 8px;">
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">📖 الحفظ الجديد</h4>
               <div class="form-group mb-2">
-                <label style="font-size: 0.82rem;">المقرر الحالي</label>
+                <label style="font-size: 0.82rem;">مقرر اليوم</label>
                 <input type="text" class="form-control" name="hifz_surah" value="${initialHifz}" placeholder="مثال: البقرة (1-15)">
               </div>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">التقدير</label>
                 ${buildRatingSelect(record.hifzRating, "hifz_rating")}
               </div>
-              <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'hifz')">✅ اعتماد الحفظ الجديد</button>
+              <div class="form-group mb-2" style="border-top: 2px dashed #ef6c00; background: linear-gradient(135deg, #fff3e0 0%, #ffebee 100%); border-radius: 6px; padding: 0.5rem 0.6rem; margin-top: 0.5rem;">
+                <label style="font-size: 0.82rem; color: #d84315; font-weight: 800;">📌 مقرر الغد</label>
+                <input type="text" class="form-control" name="next_hifz" value="${record.nextHifz || ""}" placeholder="مثال: سورة البقرة (16-30)">
+              </div>
+              <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'hifz')">✅ اعتماد الحفظ الجديد (اليوم والغد)</button>
             </div>
 
-            <!-- 2. المراجعة -->
+            <!-- 2. المراجعة (اليوم وغداً معاً كعمود واحد مستقل) -->
             <div class="tasmeea-section-box p-3" style="background: #faf8f5; border: 1px solid var(--border-color); border-radius: 8px;">
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">🔄 المراجعة</h4>
               <div class="form-group mb-2">
-                <label style="font-size: 0.82rem;">المقرر الحالي</label>
+                <label style="font-size: 0.82rem;">مقرر اليوم</label>
                 <input type="text" class="form-control" name="murajaa_surah" value="${initialMurajaa}" placeholder="مثال: سورة يس كاملة">
               </div>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">التقدير</label>
                 ${buildRatingSelect(record.murajaaRating, "murajaa_rating")}
               </div>
-              <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'murajaa')">✅ اعتماد المراجعة</button>
+              <div class="form-group mb-2" style="border-top: 2px dashed #ef6c00; background: linear-gradient(135deg, #fff3e0 0%, #ffebee 100%); border-radius: 6px; padding: 0.5rem 0.6rem; margin-top: 0.5rem;">
+                <label style="font-size: 0.82rem; color: #d84315; font-weight: 800;">📌 مقرر الغد</label>
+                <input type="text" class="form-control" name="next_murajaa" value="${record.nextMurajaa || ""}" placeholder="مثال: سورة الكهف كاملة">
+              </div>
+              <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'murajaa')">✅ اعتماد المراجعة (اليوم والغد)</button>
             </div>
 
-            <!-- 3. التلاوة -->
+            <!-- 3. التلاوة (اليوم وغداً معاً كعمود واحد مستقل) -->
             <div class="tasmeea-section-box p-3" style="background: #faf8f5; border: 1px solid var(--border-color); border-radius: 8px;">
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">🎧 التلاوة</h4>
               <div class="form-group mb-2">
-                <label style="font-size: 0.82rem;">المقرر الحالي</label>
+                <label style="font-size: 0.82rem;">مقرر اليوم</label>
                 <input type="text" class="form-control" name="tilawa_surah" value="${initialTilawa}" placeholder="مثال: آل عمران (1-20)">
               </div>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">التقدير</label>
                 ${buildRatingSelect(record.tilawaRating, "tilawa_rating")}
               </div>
-              <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'tilawa')">✅ اعتماد التلاوة</button>
+              <div class="form-group mb-2" style="border-top: 2px dashed #ef6c00; background: linear-gradient(135deg, #fff3e0 0%, #ffebee 100%); border-radius: 6px; padding: 0.5rem 0.6rem; margin-top: 0.5rem;">
+                <label style="font-size: 0.82rem; color: #d84315; font-weight: 800;">📌 مقرر الغد</label>
+                <input type="text" class="form-control" name="next_tilawa" value="${record.nextTilawa || ""}" placeholder="مثال: سورة النساء (1-10)">
+              </div>
+              <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'tilawa')">✅ اعتماد التلاوة (اليوم والغد)</button>
             </div>
 
           </div>
@@ -288,27 +300,6 @@ function buildStudentAccordionCard(
             <div class="form-group flex-1">
               <label style="font-size: 0.85rem; font-weight: 700; color: var(--primary-brown);">📝 ملاحظة موجهة للإدارة:</label>
               <input type="text" class="form-control" name="admin_notes" value="${record.adminNotes || ""}" placeholder="اكتب ملاحظة خاصة موجهة للمدير بخصوص الطالب...">
-            </div>
-          </div>
-
-          <!-- خطة درس الغد -->
-          <div class="mt-3 p-3" style="background: #f7f1eb; border: 1px dashed var(--primary-brown); border-radius: 8px;">
-            <h4 style="color: var(--primary-brown); font-weight: 800; font-size: 0.95rem; margin-bottom: 0.6rem;">
-              📌 تحديد وتعديل خطة درس الغد (المقرر المطلوب لليوم التالي)
-            </h4>
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label style="font-size: 0.8rem; font-weight: 700;">حفظ الغد</label>
-                <input type="text" class="form-control" name="next_hifz" value="${record.nextHifz || ""}" placeholder="مثال: سورة البقرة (16-30)">
-              </div>
-              <div class="form-group flex-1">
-                <label style="font-size: 0.8rem; font-weight: 700;">مراجعة الغد</label>
-                <input type="text" class="form-control" name="next_murajaa" value="${record.nextMurajaa || ""}" placeholder="مثال: سورة الكهف كاملة">
-              </div>
-              <div class="form-group flex-1">
-                <label style="font-size: 0.8rem; font-weight: 700;">تلاوة الغد</label>
-                <input type="text" class="form-control" name="next_tilawa" value="${record.nextTilawa || ""}" placeholder="مثال: سورة النساء (1-10)">
-              </div>
             </div>
           </div>
 
@@ -425,9 +416,9 @@ function saveTasmeeaSection(studentId, section) {
   if (!detailsEl) return;
 
   const fieldMap = {
-    hifz: { surahField: "hifz_surah", ratingField: "hifz_rating", recordSurah: "hifzSurah", recordRating: "hifzRating", label: "الحفظ الجديد" },
-    murajaa: { surahField: "murajaa_surah", ratingField: "murajaa_rating", recordSurah: "murajaaSurah", recordRating: "murajaaRating", label: "المراجعة" },
-    tilawa: { surahField: "tilawa_surah", ratingField: "tilawa_rating", recordSurah: "tilawaSurah", recordRating: "tilawaRating", label: "التلاوة" },
+    hifz: { surahField: "hifz_surah", ratingField: "hifz_rating", nextField: "next_hifz", recordSurah: "hifzSurah", recordRating: "hifzRating", recordNext: "nextHifz", label: "الحفظ الجديد" },
+    murajaa: { surahField: "murajaa_surah", ratingField: "murajaa_rating", nextField: "next_murajaa", recordSurah: "murajaaSurah", recordRating: "murajaaRating", recordNext: "nextMurajaa", label: "المراجعة" },
+    tilawa: { surahField: "tilawa_surah", ratingField: "tilawa_rating", nextField: "next_tilawa", recordSurah: "tilawaSurah", recordRating: "tilawaRating", recordNext: "nextTilawa", label: "التلاوة" },
   };
   const cfg = fieldMap[section];
   if (!cfg) return;
@@ -437,9 +428,12 @@ function saveTasmeeaSection(studentId, section) {
   ).trim();
   const ratingVal =
     detailsEl.querySelector(`[name="${cfg.ratingField}"]`)?.value || "";
+  const nextVal = (
+    detailsEl.querySelector(`[name="${cfg.nextField}"]`)?.value || ""
+  ).trim();
 
-  if (!surahVal && !ratingVal) {
-    alert(`⚠️ يرجى تعبئة المقرر أو التقدير الخاص بـ (${cfg.label}) قبل الاعتماد.`);
+  if (!surahVal && !ratingVal && !nextVal) {
+    alert(`⚠️ يرجى تعبئة مقرر اليوم أو الغد الخاص بـ (${cfg.label}) قبل الاعتماد.`);
     return;
   }
 
@@ -473,6 +467,7 @@ function saveTasmeeaSection(studentId, section) {
 
   record[cfg.recordSurah] = surahVal;
   record[cfg.recordRating] = ratingVal;
+  record[cfg.recordNext] = nextVal;
   record.rating =
     record.hifzRating || record.murajaaRating || record.tilawaRating || "ممتاز";
   record.updatedBy = isAdmin ? "admin" : "teacher";
@@ -491,13 +486,13 @@ function saveTasmeeaSection(studentId, section) {
     const actorTitle = isAdmin ? "المدير" : "المعلم";
     window.logTeacherActivity(
       `اعتماد ${cfg.label}`,
-      `تم اعتماد (${cfg.label}) للطالب (${stuName}): ${surahVal || "—"} (${ratingVal || "—"}) بواسطة (${actorTitle})`,
+      `تم اعتماد (${cfg.label}) للطالب (${stuName}) - اليوم: ${surahVal || "—"} (${ratingVal || "—"}) | الغد: ${nextVal || "—"} بواسطة (${actorTitle})`,
       user.name,
       getCircleNameTasmeea(circleId),
     );
   }
 
-  alert(`✅ تم اعتماد (${cfg.label}) بنجاح!`);
+  alert(`✅ تم اعتماد (${cfg.label}) لليوم والغد بنجاح!`);
   renderTasmeeaStudents();
 }
 
