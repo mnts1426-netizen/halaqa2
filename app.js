@@ -573,6 +573,9 @@ function adjustSidebarAndViewsForRole(role) {
     if (mainContent) mainContent.style.marginRight = "";
     if (topHeader) topHeader.style.display = "flex";
 
+    const pwaBarScreen = document.getElementById("pwa-install-notify-bar");
+    if (pwaBarScreen) pwaBarScreen.style.display = "none";
+
     navigateTo("view-screen");
     try {
       if (typeof renderScreenView === "function") renderScreenView();
@@ -598,6 +601,9 @@ function adjustSidebarAndViewsForRole(role) {
     if (studentNav) studentNav.style.display = "none";
     if (adminNav) adminNav.style.display = "block";
 
+    const pwaBar = document.getElementById("pwa-install-notify-bar");
+    if (pwaBar) pwaBar.style.display = "flex";
+
     const user = window.currentUser;
     const isFinancialTeacher =
       user &&
@@ -612,12 +618,18 @@ function adjustSidebarAndViewsForRole(role) {
         ));
 
     if (role === window.ROLES.TEACHER) {
-      document.querySelectorAll(".sidebar .nav-admin-only").forEach((el) => {
+      // إخفاء كل عناصر (نav-admin-only) في كامل الصفحة وليس فقط الشريط الجانبي
+      // (تشمل: سجل عمليات المعلمين، بطاقات لوحة تحكم خاصة بالإدارة، خيار المستهدف بالإشعار...)
+      document.querySelectorAll(".nav-admin-only").forEach((el) => {
         el.style.display = "none";
       });
       document.querySelectorAll(".sidebar .nav-teacher-only").forEach((el) => {
         el.style.display = "flex";
       });
+
+      // إزالة سجل عمليات المعلمين نهائياً من الصفحة إن كان أُنشئ مسبقاً بجلسة سابقة
+      const staleLogsCard = document.getElementById("teacher-logs-card");
+      if (staleLogsCard) staleLogsCard.remove();
 
       const financeNav = document.getElementById("nav-finance-link");
       if (financeNav) {
@@ -625,8 +637,9 @@ function adjustSidebarAndViewsForRole(role) {
       }
     } else {
       // إظهار كافة عناصر الإدارة ورابط التسميع للمدير أيضاً
-      document.querySelectorAll(".sidebar .nav-admin-only").forEach((el) => {
-        el.style.display = "flex";
+      // (استخدام "" بدل "flex" ليرجع كل عنصر لنمط العرض الطبيعي الخاص به من ملف style.css)
+      document.querySelectorAll(".nav-admin-only").forEach((el) => {
+        el.style.display = "";
       });
       document
         .querySelectorAll('.sidebar .nav-link[data-target="view-tasmeea"]')
@@ -1298,6 +1311,17 @@ function renderStudentData() {
       </div>
     </div>
 
+    <!-- تثبيت التطبيق وتفعيل الإشعارات (نسخة خاصة بصفحة الطالب) -->
+    <div class="card mb-3" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; padding: 0.9rem 1.25rem;">
+      <div>
+        <strong style="color: var(--primary-teal-dark); font-size: 0.92rem;">📲 ثبّت التطبيق وفعّل الإشعارات</strong>
+        <div class="js-install-notify-status" style="font-size: 0.75rem; color: #888; margin-top: 2px;"></div>
+      </div>
+      <button type="button" class="btn btn-primary btn-sm js-install-notify-btn" onclick="handleInstallAndEnableNotifications()">
+        تثبيت + تفعيل
+      </button>
+    </div>
+
     <!-- 1. الصف الأول: التميز والاختبارات التفاعلي المشروط -->
     ${row1ConditionalHtml}
 
@@ -1597,7 +1621,7 @@ function refreshActiveView(viewId) {
   }
 }
 
-// دالة لوحة التحكم المتوافقة كلياً مع محدد التاريخ والغياب التلقائي لأيام الأسبوع
+// دالة لوحة النظام المتوافقة كلياً مع محدد التاريخ والغياب التلقائي لأيام الأسبوع
 function renderDashboardView() {
   const user = window.currentUser;
   if (!user) return;
@@ -1659,7 +1683,8 @@ function renderDashboardView() {
   }
 
   if (isTeacher) {
-    if (teacherDashCols) teacherDashCols.style.display = "grid";
+    // بطاقتا "حلقاتي" و"جدول اليوم" غير مستخدمتين (تبقيان فارغتين دوماً) - تُخفى للمعلم
+    if (teacherDashCols) teacherDashCols.style.display = "none";
 
     const teacherObj = (window.appStore?.teachers || []).find(
       (t) =>
@@ -1799,9 +1824,33 @@ window.openTasmeeaDetailsModal = function (type) {
       ? dashDateSelect.value
       : new Date().toISOString().split("T")[0];
 
-  const activeStudents = (window.appStore?.students || []).filter(
+  let activeStudents = (window.appStore?.students || []).filter(
     (s) => s.status === "active",
   );
+
+  // المعلم يرى فقط طلاب حلقاته
+  const user = window.currentUser;
+  if (user && user.role === window.ROLES.TEACHER) {
+    const teacherObj = (window.appStore?.teachers || []).find(
+      (t) =>
+        t.userId === user.id ||
+        t.id === user.teacherId ||
+        t.id === user.id ||
+        t.phone === user.phone,
+    );
+    const teacherId = teacherObj ? teacherObj.id : user.teacherId || user.id;
+    const teacherCircleIds = (window.appStore?.circles || [])
+      .filter(
+        (c) =>
+          (Array.isArray(c.teacherIds) && c.teacherIds.includes(teacherId)) ||
+          c.teacherId === teacherId,
+      )
+      .map((c) => c.id);
+    activeStudents = activeStudents.filter((s) =>
+      teacherCircleIds.includes(s.circleId),
+    );
+  }
+
   const todayTasmeea = (window.appStore?.tasmeea || []).filter(
     (t) => t.date === todayStr,
   );
