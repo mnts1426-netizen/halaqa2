@@ -1,7 +1,8 @@
 /**
  * ==========================================================================
  * pwa-notifications.js - تثبيت التطبيق (PWA) وتفعيل إشعارات Push عبر OneSignal
- * الزر مخصص للمدير فقط (مربوط بصلاحية nav-admin-only في index.html)
+ * الزر متاح للمدير والمعلم والطالب (نسخة داخل الشريط الجانبي، ونسخة أخرى
+ * داخل صفحة الطالب) - كلها تشترك بنفس الأصناف js-install-notify-btn/status
  * ==========================================================================
  */
 
@@ -17,9 +18,17 @@ window.addEventListener("appinstalled", () => {
   updateInstallNotifyStatus("✅ التطبيق مثبت على هذا الجهاز");
 });
 
+// تحديث كل نسخ زر/شريط التثبيت الموجودة بالصفحة (شريط جانبي للمدير/المعلم + بطاقة صفحة الطالب)
 function updateInstallNotifyStatus(text) {
-  const el = document.getElementById("install-notify-status");
-  if (el) el.textContent = text;
+  document.querySelectorAll(".js-install-notify-status").forEach((el) => {
+    el.textContent = text;
+  });
+}
+
+function setInstallNotifyButtonsDisabled(disabled) {
+  document.querySelectorAll(".js-install-notify-btn").forEach((el) => {
+    el.disabled = disabled;
+  });
 }
 
 function isOneSignalConfigured() {
@@ -37,11 +46,7 @@ if (isOneSignalConfigured()) {
         serviceWorkerParam: { scope: "/" },
       });
 
-      if (
-        window.currentUser &&
-        window.currentUser.role === "admin" &&
-        OneSignal.User.PushSubscription.optedIn
-      ) {
+      if (window.currentUser && OneSignal.User.PushSubscription.optedIn) {
         updateInstallNotifyStatus("✅ الإشعارات مفعّلة على هذا الجهاز");
       }
     } catch (e) {
@@ -52,8 +57,7 @@ if (isOneSignalConfigured()) {
 
 // دالة الزر الموحّد: تثبيت التطبيق + تفعيل الإشعارات بضغطة واحدة
 window.handleInstallAndEnableNotifications = async function () {
-  const btn = document.getElementById("btn-install-notify");
-  if (btn) btn.disabled = true;
+  setInstallNotifyButtonsDisabled(true);
   updateInstallNotifyStatus("جاري التنفيذ...");
 
   // 1. تثبيت التطبيق على الجهاز (إن كان المتصفح يدعم ذلك ولم يثبت مسبقاً)
@@ -72,16 +76,18 @@ window.handleInstallAndEnableNotifications = async function () {
     updateInstallNotifyStatus(
       "⚠️ لم يتم ربط خدمة الإشعارات بعد (راجع ONESIGNAL_APP_ID في config.js)",
     );
-    if (btn) btn.disabled = false;
+    setInstallNotifyButtonsDisabled(false);
     return;
   }
+
+  const currentRole = (window.currentUser && window.currentUser.role) || "admin";
 
   OneSignalDeferred.push(async function (OneSignal) {
     try {
       await OneSignal.Notifications.requestPermission();
 
       if (OneSignal.Notifications.permission) {
-        OneSignal.User.addTag("role", "admin");
+        OneSignal.User.addTag("role", currentRole);
         updateInstallNotifyStatus("✅ تم تفعيل الإشعارات الفورية بنجاح");
       } else {
         updateInstallNotifyStatus("⚠️ لم يتم منح إذن الإشعارات من المتصفح");
@@ -90,7 +96,7 @@ window.handleInstallAndEnableNotifications = async function () {
       console.error("خطأ أثناء تفعيل الإشعارات:", e);
       updateInstallNotifyStatus("⚠️ حدث خطأ أثناء تفعيل الإشعارات");
     } finally {
-      if (btn) btn.disabled = false;
+      setInstallNotifyButtonsDisabled(false);
     }
   });
 };
