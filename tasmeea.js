@@ -305,7 +305,7 @@ function buildStudentAccordionCard(
 
           <!-- زر الحفظ والاعتماد الشامل (يحفظ كل الأقسام والملاحظات وخطة الغد دفعة واحدة) -->
           <div class="mt-3 text-left" style="display: flex; justify-content: flex-end;">
-            <button type="submit" class="btn btn-primary">💾 حفظ جميع الأقسام والملاحظات وخطة الغد دفعة واحدة</button>
+            <button type="submit" class="btn btn-primary">اعتماد الملاحظات</button>
           </div>
         </form>
       </div>
@@ -416,9 +416,33 @@ function saveTasmeeaSection(studentId, section) {
   if (!detailsEl) return;
 
   const fieldMap = {
-    hifz: { surahField: "hifz_surah", ratingField: "hifz_rating", nextField: "next_hifz", recordSurah: "hifzSurah", recordRating: "hifzRating", recordNext: "nextHifz", label: "الحفظ الجديد" },
-    murajaa: { surahField: "murajaa_surah", ratingField: "murajaa_rating", nextField: "next_murajaa", recordSurah: "murajaaSurah", recordRating: "murajaaRating", recordNext: "nextMurajaa", label: "المراجعة" },
-    tilawa: { surahField: "tilawa_surah", ratingField: "tilawa_rating", nextField: "next_tilawa", recordSurah: "tilawaSurah", recordRating: "tilawaRating", recordNext: "nextTilawa", label: "التلاوة" },
+    hifz: {
+      surahField: "hifz_surah",
+      ratingField: "hifz_rating",
+      nextField: "next_hifz",
+      recordSurah: "hifzSurah",
+      recordRating: "hifzRating",
+      recordNext: "nextHifz",
+      label: "الحفظ الجديد",
+    },
+    murajaa: {
+      surahField: "murajaa_surah",
+      ratingField: "murajaa_rating",
+      nextField: "next_murajaa",
+      recordSurah: "murajaaSurah",
+      recordRating: "murajaaRating",
+      recordNext: "nextMurajaa",
+      label: "المراجعة",
+    },
+    tilawa: {
+      surahField: "tilawa_surah",
+      ratingField: "tilawa_rating",
+      nextField: "next_tilawa",
+      recordSurah: "tilawaSurah",
+      recordRating: "tilawaRating",
+      recordNext: "nextTilawa",
+      label: "التلاوة",
+    },
   };
   const cfg = fieldMap[section];
   if (!cfg) return;
@@ -433,7 +457,9 @@ function saveTasmeeaSection(studentId, section) {
   ).trim();
 
   if (!surahVal && !ratingVal && !nextVal) {
-    alert(`⚠️ يرجى تعبئة مقرر اليوم أو الغد الخاص بـ (${cfg.label}) قبل الاعتماد.`);
+    alert(
+      `⚠️ يرجى تعبئة مقرر اليوم أو الغد الخاص بـ (${cfg.label}) قبل الاعتماد.`,
+    );
     return;
   }
 
