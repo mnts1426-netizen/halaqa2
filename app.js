@@ -437,6 +437,168 @@ window.updateSidebarUserAvatar = function (user) {
   }
 };
 
+// تعديل بياناتي الشخصية (متاح للمدير والمعلم والطالب لأنفسهم): كلمة المرور والصورة
+window._pendingMyProfilePhotoDataUrl = null;
+window._pendingMyProfilePhotoRemoved = false;
+
+window.openModalEditMyProfile = function () {
+  const user = window.currentUser;
+  if (!user) return;
+
+  const passInput = document.getElementById("my-profile-password");
+  if (passInput) passInput.value = "";
+
+  window._pendingMyProfilePhotoDataUrl = null;
+  window._pendingMyProfilePhotoRemoved = false;
+
+  const fileInput = document.getElementById("my-profile-photo-file");
+  const preview = document.getElementById("my-profile-photo-preview");
+  const letter = document.getElementById("my-profile-photo-letter");
+  const removeBtn = document.getElementById("btn-remove-my-profile-photo");
+  if (fileInput) fileInput.value = "";
+
+  if (user.photoURL) {
+    if (preview) {
+      preview.src = user.photoURL;
+      preview.style.display = "block";
+    }
+    if (letter) letter.style.display = "none";
+    if (removeBtn) removeBtn.style.display = "inline-flex";
+  } else {
+    if (preview) {
+      preview.src = "";
+      preview.style.display = "none";
+    }
+    if (letter) {
+      letter.style.display = "flex";
+      letter.textContent = user.name ? user.name.charAt(0) : "؟";
+    }
+    if (removeBtn) removeBtn.style.display = "none";
+  }
+
+  openModal("modal-edit-my-profile");
+};
+
+window.previewMyProfilePhotoFile = async function (event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    alert("⚠️ يرجى اختيار ملف صورة صالح.");
+    event.target.value = "";
+    return;
+  }
+
+  try {
+    const dataUrl = await resizeImageFileToDataUrl(file, 200, 0.75);
+    window._pendingMyProfilePhotoDataUrl = dataUrl;
+    window._pendingMyProfilePhotoRemoved = false;
+
+    const preview = document.getElementById("my-profile-photo-preview");
+    const letter = document.getElementById("my-profile-photo-letter");
+    const removeBtn = document.getElementById("btn-remove-my-profile-photo");
+    if (preview) {
+      preview.src = dataUrl;
+      preview.style.display = "block";
+    }
+    if (letter) letter.style.display = "none";
+    if (removeBtn) removeBtn.style.display = "inline-flex";
+  } catch (e) {
+    console.error("تعذر معالجة الصورة:", e);
+    alert("⚠️ تعذر معالجة الصورة المختارة، يرجى تجربة صورة أخرى.");
+  }
+};
+
+window.removeMyProfilePhoto = function () {
+  window._pendingMyProfilePhotoDataUrl = null;
+  window._pendingMyProfilePhotoRemoved = true;
+
+  const fileInput = document.getElementById("my-profile-photo-file");
+  const preview = document.getElementById("my-profile-photo-preview");
+  const letter = document.getElementById("my-profile-photo-letter");
+  const removeBtn = document.getElementById("btn-remove-my-profile-photo");
+  if (fileInput) fileInput.value = "";
+  if (preview) {
+    preview.src = "";
+    preview.style.display = "none";
+  }
+  if (letter) letter.style.display = "flex";
+  if (removeBtn) removeBtn.style.display = "none";
+};
+
+window.handleSaveMyProfile = function (e) {
+  if (e && e.preventDefault) e.preventDefault();
+
+  const user = window.currentUser;
+  if (!user) return;
+
+  const newPass = (
+    document.getElementById("my-profile-password")?.value || ""
+  ).trim();
+
+  let newPhotoURL = user.photoURL;
+  if (window._pendingMyProfilePhotoDataUrl) {
+    newPhotoURL = window._pendingMyProfilePhotoDataUrl;
+  } else if (window._pendingMyProfilePhotoRemoved) {
+    newPhotoURL = null;
+  }
+
+  const userRec = (window.appStore?.users || []).find(
+    (u) =>
+      u.id === user.id ||
+      (user.userId && u.id === user.userId) ||
+      u.username === user.username,
+  );
+
+  if (userRec) {
+    if (newPass) userRec.pass = newPass;
+    userRec.photoURL = newPhotoURL || null;
+    if (typeof saveToCloud === "function")
+      saveToCloud("users", userRec.id, userRec);
+  }
+
+  if (user.role === window.ROLES.STUDENT) {
+    const stu = (window.appStore?.students || []).find((s) => s.id === user.id);
+    if (stu) {
+      stu.photoURL = newPhotoURL || null;
+      if (typeof saveToCloud === "function")
+        saveToCloud("students", stu.id, stu);
+    }
+  } else if (user.role === window.ROLES.TEACHER) {
+    const teach = (window.appStore?.teachers || []).find(
+      (t) => t.id === user.teacherId || t.userId === user.id || t.id === user.id,
+    );
+    if (teach) {
+      teach.photoURL = newPhotoURL || null;
+      if (typeof saveToCloud === "function")
+        saveToCloud("teachers", teach.id, teach);
+    }
+  }
+
+  user.photoURL = newPhotoURL || null;
+  if (newPass) user.pass = newPass;
+
+  if (typeof saveLocalStore === "function") saveLocalStore();
+  try {
+    localStorage.setItem("HALAQAT_SESSION_USER", JSON.stringify(user));
+  } catch (err) {}
+
+  if (typeof updateSidebarUserAvatar === "function")
+    updateSidebarUserAvatar(user);
+  if (
+    user.role === window.ROLES.STUDENT &&
+    typeof renderStudentData === "function"
+  ) {
+    renderStudentData();
+  }
+
+  window._pendingMyProfilePhotoDataUrl = null;
+  window._pendingMyProfilePhotoRemoved = false;
+
+  closeModal("modal-edit-my-profile");
+  alert("✅ تم حفظ تعديلات حسابك بنجاح!");
+};
+
 // دالة اعتماد الجلسة وتوثيق آخر دخول بشكل دائم ومؤقت الخروج بعد ساعتين
 window.doLogin = function (user, isAutoSession = false) {
   if (!user) return;
@@ -1335,6 +1497,17 @@ function renderStudentData() {
       <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
         <img src="${logoTransparent}" alt="شعار المَجْمَع" style="height: 70px; width: auto; object-fit: contain; background: transparent; padding: 4px; border-radius: 8px; mix-blend-mode: screen;" />
         <div style="text-align: center; flex: 1;">
+          <div
+            onclick="openModalEditMyProfile()"
+            title="تعديل بياناتي الشخصية (كلمة المرور والصورة)"
+            style="width: 56px; height: 56px; margin: 0 auto 6px auto; border-radius: 50%; overflow: hidden; cursor: pointer; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.3rem; border: 2px solid rgba(255,255,255,0.5);"
+          >
+            ${
+              student.photoURL
+                ? `<img src="${student.photoURL}" alt="صورتي" style="width:100%; height:100%; object-fit:cover;">`
+                : (student.name ? student.name.charAt(0) : "؟")
+            }
+          </div>
           <h2 style="font-size: 1.4rem; font-weight: 900; margin-bottom: 4px;">${student.name}</h2>
           <p style="font-size: 0.95rem; opacity: 0.9; margin-bottom: 8px;">مَجْمَع عبدالله بن مهدي القرآني — جامع الهدى</p>
           <span style="background: rgba(255, 255, 255, 0.2); padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;">
