@@ -3360,11 +3360,21 @@ window.renderScreenView = function () {
 
       // بناء جدول أول 10 طلاب أتموا قسماً معيناً اليوم (الأقدم توثيقاً أولاً)
       const buildTopCompletedRows = (fieldName, ratingFieldName) => {
+        const getStudentName = (t) => {
+          const student = (window.appStore?.students || []).find(
+            (s) => s.id === t.studentId,
+          );
+          return student ? student.name : "";
+        };
+
+        // تحديد أول 10 حسب وقت الإنجاز الفعلي أولاً (يثبتون طوال اليوم ولا يُستبعدون
+        // بمجرد إنجاز طالب آخر لاحقاً)، ثم إعادة ترتيبهم أبجدياً للعرض فقط
         const rows = todayTasmeea
           .filter((t) => t[fieldName] && String(t[fieldName]).trim() !== "")
           .filter((t) => String(t[ratingFieldName] || "").trim() !== "يعيد")
           .sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0))
-          .slice(0, 10);
+          .slice(0, 10)
+          .sort((a, b) => getStudentName(a).localeCompare(getStudentName(b), "ar"));
 
         if (rows.length === 0) {
           return '<tr><td colspan="3" class="text-center text-muted p-2" style="font-size:0.85rem;">لا يوجد بعد</td></tr>';
@@ -3390,66 +3400,74 @@ window.renderScreenView = function () {
       };
 
       grid.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; margin-bottom: 0.4rem;">
-          <h2 style="font-size: 1.3rem; font-weight: 900; color: var(--primary-brown); margin: 0;">
-            📊 لوحة الإحصائيات الحية لمَجْمَع عبدالله بن مهدي القرآني
-          </h2>
-          <p class="text-muted" style="font-size: 0.8rem; margin: 2px 0 0 0;">جامع الهدى — تقرير المتابعة والإنجاز لليوم</p>
-        </div>
-
-        <div style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem;">
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 1.6rem;">👨‍🎓</div>
-            <div style="text-align: right;">
-              <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">إجمالي المسجلين</div>
-              <div style="font-size: 1.4rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${activeStudents.length}</div>
-            </div>
+        <div style="grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem;">
+          <div style="width: 55px; text-align: right; flex-shrink: 0;">
+            <img src="report_logo_right.png" alt="شعار المَجْمَع" style="height: 38px; width: auto; object-fit: contain;" />
           </div>
-
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 1.6rem;">🟢</div>
-            <div style="text-align: right;">
-              <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">حاضرون اليوم</div>
-              <div style="font-size: 1.4rem; font-weight: 900; color: #2e7d32; line-height: 1;">${presentCount}</div>
-            </div>
+          <div style="text-align: center; flex: 1;">
+            <h2 style="font-size: 1.05rem; font-weight: 900; color: var(--primary-brown); margin: 0;">
+              📊 لوحة الإحصائيات الحية لمَجْمَع عبدالله بن مهدي القرآني
+            </h2>
+            <p class="text-muted" style="font-size: 0.68rem; margin: 1px 0 0 0;">جامع الهدى — تقرير المتابعة والإنجاز لليوم</p>
           </div>
-
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 1.6rem;">🔴</div>
-            <div style="text-align: right;">
-              <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">غياب اليوم</div>
-              <div style="font-size: 1.4rem; font-weight: 900; color: #c62828; line-height: 1;">${absentCount}</div>
-            </div>
-          </div>
-
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 1.6rem;">📖</div>
-            <div style="text-align: right;">
-              <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">سمّعوا اليوم</div>
-              <div style="font-size: 1.4rem; font-weight: 900; color: #0b6b7d; line-height: 1;">${recitedCount}</div>
-            </div>
+          <div style="width: 55px; text-align: left; flex-shrink: 0;">
+            <img src="report_logo_left.png" alt="شعار المَجْمَع" style="height: 38px; width: auto; object-fit: contain;" />
           </div>
         </div>
 
-        <div style="grid-column: 1 / -1; margin-top: 0.5rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
-          <div class="card" style="padding: 0.75rem; margin-bottom: 0;">
-            <h3 style="font-size: 0.95rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0.4rem; text-align:center;">📖 أول 10 أتموا الحفظ الجديد اليوم</h3>
+        <div style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.35rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.3rem;">👨‍🎓</div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.62rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">إجمالي المسجلين</div>
+              <div style="font-size: 1.15rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${activeStudents.length}</div>
+            </div>
+          </div>
+
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.35rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.3rem;">🟢</div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.62rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">حاضرون اليوم</div>
+              <div style="font-size: 1.15rem; font-weight: 900; color: #2e7d32; line-height: 1;">${presentCount}</div>
+            </div>
+          </div>
+
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.35rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.3rem;">🔴</div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.62rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">غياب اليوم</div>
+              <div style="font-size: 1.15rem; font-weight: 900; color: #c62828; line-height: 1;">${absentCount}</div>
+            </div>
+          </div>
+
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.35rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.3rem;">📖</div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.62rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">سمّعوا اليوم</div>
+              <div style="font-size: 1.15rem; font-weight: 900; color: #0b6b7d; line-height: 1;">${recitedCount}</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="grid-column: 1 / -1; margin-top: 0.3rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem;">
+          <div class="card" style="padding: 0.5rem; margin-bottom: 0;">
+            <h3 style="font-size: 0.8rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0.25rem; text-align:center;">📖 أول 10 أتموا الحفظ الجديد اليوم</h3>
             <table class="data-table mini-report-table">
-              <thead><tr><th style="width:35px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
+              <thead><tr><th style="width:30px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
               <tbody>${buildTopCompletedRows("hifzSurah", "hifzRating")}</tbody>
             </table>
           </div>
-          <div class="card" style="padding: 0.75rem; margin-bottom: 0;">
-            <h3 style="font-size: 0.95rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0.4rem; text-align:center;">🔄 أول 10 أتموا المراجعة اليوم</h3>
+          <div class="card" style="padding: 0.5rem; margin-bottom: 0;">
+            <h3 style="font-size: 0.8rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0.25rem; text-align:center;">🔄 أول 10 أتموا المراجعة اليوم</h3>
             <table class="data-table mini-report-table">
-              <thead><tr><th style="width:35px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
+              <thead><tr><th style="width:30px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
               <tbody>${buildTopCompletedRows("murajaaSurah", "murajaaRating")}</tbody>
             </table>
           </div>
-          <div class="card" style="padding: 0.75rem; margin-bottom: 0;">
-            <h3 style="font-size: 0.95rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0.4rem; text-align:center;">🎧 أول 10 أتموا التلاوة اليوم</h3>
+          <div class="card" style="padding: 0.5rem; margin-bottom: 0;">
+            <h3 style="font-size: 0.8rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0.25rem; text-align:center;">🎧 أول 10 أتموا التلاوة اليوم</h3>
             <table class="data-table mini-report-table">
-              <thead><tr><th style="width:35px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
+              <thead><tr><th style="width:30px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
               <tbody>${buildTopCompletedRows("tilawaSurah", "tilawaRating")}</tbody>
             </table>
           </div>
