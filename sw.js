@@ -20,8 +20,15 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// تمرير الطلبات مباشرة للشبكة (بدون تخزين مؤقت) - يكفي لتحقيق شرط قابلية التثبيت
+// تمرير طلبات ملفات الموقع نفسه فقط للشبكة (يكفي لتحقيق شرط قابلية التثبيت)
+// مع تجاهل كامل لأي طلب خارجي (Firestore, Firebase, OneSignal...) أو غير GET
+// حتى لا يتدخل هذا العامل إطلاقاً في اتصالات الحفظ السحابي بأي شكل
 self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin || event.request.method !== "GET") {
+    return; // اترك الطلب يمر كأن لا يوجد Service Worker إطلاقاً
+  }
+
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request)),
   );
