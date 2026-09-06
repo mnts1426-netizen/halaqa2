@@ -3362,6 +3362,7 @@ window.renderScreenView = function () {
       const buildTopCompletedRows = (fieldName, ratingFieldName) => {
         const rows = todayTasmeea
           .filter((t) => t[fieldName] && String(t[fieldName]).trim() !== "")
+          .filter((t) => String(t[ratingFieldName] || "").trim() !== "يعيد")
           .sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0))
           .slice(0, 10);
 
