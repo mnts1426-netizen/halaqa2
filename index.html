@@ -441,8 +441,21 @@
         </nav>
 
         <div class="sidebar-user-card">
-          <div class="user-avatar" id="current-user-avatar">ص</div>
-          <div class="user-info">
+          <div
+            class="user-avatar"
+            id="current-user-avatar"
+            onclick="openModalEditMyProfile()"
+            style="cursor: pointer"
+            title="تعديل بياناتي الشخصية (كلمة المرور والصورة)"
+          >
+            ص
+          </div>
+          <div
+            class="user-info"
+            onclick="openModalEditMyProfile()"
+            style="cursor: pointer"
+            title="تعديل بياناتي الشخصية (كلمة المرور والصورة)"
+          >
             <h4 id="current-user-name">صالح ال ناشع</h4>
             <span id="current-user-role">المدير</span>
           </div>
@@ -2976,6 +2989,102 @@
               type="button"
               class="btn btn-outline-brown"
               onclick="closeModal('modal-edit-user-account')"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- نافذة تعديل بياناتي الشخصية (متاحة للمدير والمعلم والطالب لأنفسهم) -->
+    <div id="modal-edit-my-profile" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>تعديل بياناتي الشخصية</h3>
+          <button
+            class="modal-close"
+            onclick="closeModal('modal-edit-my-profile')"
+          >
+            &times;
+          </button>
+        </div>
+        <form
+          id="form-edit-my-profile"
+          onsubmit="handleSaveMyProfile(event)"
+        >
+          <div class="modal-body">
+            <div class="form-group">
+              <label>صورة الحساب</label>
+              <div style="display: flex; align-items: center; gap: 1rem">
+                <div
+                  id="my-profile-photo-circle"
+                  style="
+                    width: 64px;
+                    height: 64px;
+                    border-radius: 50%;
+                    overflow: hidden;
+                    background: linear-gradient(135deg, var(--accent-gold) 0%, var(--wood-brown) 100%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #fff;
+                    font-weight: 900;
+                    font-size: 1.5rem;
+                    flex-shrink: 0;
+                  "
+                >
+                  <span id="my-profile-photo-letter">ص</span>
+                  <img
+                    id="my-profile-photo-preview"
+                    src=""
+                    alt="صورة الحساب"
+                    style="
+                      display: none;
+                      width: 100%;
+                      height: 100%;
+                      object-fit: cover;
+                    "
+                  />
+                </div>
+                <div style="flex: 1">
+                  <input
+                    type="file"
+                    id="my-profile-photo-file"
+                    accept="image/*"
+                    class="form-control"
+                    onchange="previewMyProfilePhotoFile(event)"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-outline-brown btn-sm mt-1"
+                    id="btn-remove-my-profile-photo"
+                    onclick="removeMyProfilePhoto()"
+                    style="display: none"
+                  >
+                    🗑️ إزالة الصورة (الرجوع للحرف الافتراضي)
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label style="color: var(--primary-brown); font-weight: 800"
+                >كلمة المرور الجديدة</label
+              >
+              <input
+                type="text"
+                id="my-profile-password"
+                class="form-control"
+                placeholder="اتركه فارغاً إن لم ترغب بتغييره"
+              />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">حفظ التعديلات</button
+            ><button
+              type="button"
+              class="btn btn-outline-brown"
+              onclick="closeModal('modal-edit-my-profile')"
             >
               إلغاء
             </button>
