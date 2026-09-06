@@ -533,8 +533,9 @@ window.openStudentsFollowupModal = function () {
         <th>اسم الطالب</th>
         <th style="text-align: center">الحلقة</th>
         <th style="text-align: center">الحضور</th>
-        <th style="text-align: center">سمّع</th>
-        <th style="text-align: center">لم يسمّع</th>
+        <th style="text-align: center">الدرس</th>
+        <th style="text-align: center">المراجعة</th>
+        <th style="text-align: center">التلاوة</th>
       </tr>
     `;
   }
@@ -554,15 +555,7 @@ window.openStudentsFollowupModal = function () {
   const tasmMap = new Map();
   todayTasm
     .filter((t) => t.date === targetDateStr)
-    .forEach((t) => {
-      const hasRecited = Boolean(
-        t.hifzSurah ||
-        t.murajaaSurah ||
-        t.tilawaSurah ||
-        (t.rating && t.rating !== "—"),
-      );
-      if (hasRecited) tasmMap.set(t.studentId, t);
-    });
+    .forEach((t) => tasmMap.set(t.studentId, t));
 
   let html = "";
   activeStudents.forEach((s, idx) => {
@@ -588,12 +581,15 @@ window.openStudentsFollowupModal = function () {
           '<span class="badge" style="background:#e3f2fd; color:#1565c0;">🔵 مستأذن</span>';
     }
 
-    const hasRecited = tasmMap.has(s.id);
-    const recitedCol = hasRecited
+    const tasmRecord = tasmMap.get(s.id) || {};
+    const hifzCol = tasmRecord.hifzSurah
       ? '<span class="badge badge-active" style="font-size:0.85rem;">✅ سمّع</span>'
       : '<span class="text-muted">—</span>';
-    const notRecitedCol = !hasRecited
-      ? '<span class="badge badge-danger" style="font-size:0.85rem;">❌ لم يسمّع</span>'
+    const murajaaCol = tasmRecord.murajaaSurah
+      ? '<span class="badge badge-active" style="font-size:0.85rem;">✅ سمّع</span>'
+      : '<span class="text-muted">—</span>';
+    const tilawaCol = tasmRecord.tilawaSurah
+      ? '<span class="badge badge-active" style="font-size:0.85rem;">✅ سمّع</span>'
       : '<span class="text-muted">—</span>';
 
     html += `
@@ -602,15 +598,16 @@ window.openStudentsFollowupModal = function () {
         <td style="font-weight: 700;">${s.name}</td>
         <td style="text-align: center; font-weight: 600; color: var(--text-dark);">${circleName}</td>
         <td style="text-align: center;">${attText}</td>
-        <td style="text-align: center;">${recitedCol}</td>
-        <td style="text-align: center;">${notRecitedCol}</td>
+        <td style="text-align: center;">${hifzCol}</td>
+        <td style="text-align: center;">${murajaaCol}</td>
+        <td style="text-align: center;">${tilawaCol}</td>
       </tr>
     `;
   });
 
   tbody.innerHTML =
     html ||
-    '<tr><td colspan="6" class="text-center text-muted p-4">لا توجد بيانات طلاب نشطين لهذا اليوم</td></tr>';
+    '<tr><td colspan="7" class="text-center text-muted p-4">لا توجد بيانات طلاب نشطين لهذا اليوم</td></tr>';
   openModal("modal-students-followup");
 };
 
@@ -2416,7 +2413,7 @@ window.renderAccountsTable = function () {
 
   if (filtered.length === 0) {
     tbody.innerHTML =
-      '<tr><td colspan="6" class="text-center text-muted p-4">لا توجد حسابات مطابقة</td></tr>';
+      '<tr><td colspan="7" class="text-center text-muted p-4">لا توجد حسابات مطابقة</td></tr>';
     return;
   }
 
@@ -2439,6 +2436,7 @@ window.renderAccountsTable = function () {
         <td style="font-weight: 700;">${u.name}</td>
         <td>${roleBadge}</td>
         <td><code>${u.username}</code></td>
+        <td><code>${u.pass || (u.role === "student" ? "1111" : "1234")}</code></td>
         <td><span class="badge ${isActive ? "badge-active" : "badge-danger"}">${isActive ? "نشط" : "موقوف"}</span></td>
         <td>
           <div style="display: flex; gap: 0.35rem;">
@@ -3337,6 +3335,10 @@ window.renderScreenView = function () {
       const activeStudents = (window.appStore?.students || []).filter(
         (s) => s.status === "active",
       );
+      const teachersCount = (window.appStore?.teachers || []).filter(
+        (t) => t.status === "active",
+      ).length;
+      const circlesCount = (window.appStore?.circles || []).length;
       const todayAtt = (window.appStore?.attendance || []).filter(
         (a) => a.date === todayStr,
       );
@@ -3373,7 +3375,7 @@ window.renderScreenView = function () {
           .filter((t) => t[fieldName] && String(t[fieldName]).trim() !== "")
           .filter((t) => String(t[ratingFieldName] || "").trim() !== "يعيد")
           .sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0))
-          .slice(0, 10)
+          .slice(0, 15)
           .sort((a, b) => getStudentName(a).localeCompare(getStudentName(b), "ar"));
 
         if (rows.length === 0) {
@@ -3415,57 +3417,76 @@ window.renderScreenView = function () {
           </div>
         </div>
 
-        <div style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.35rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 1.3rem;">👨‍🎓</div>
+        <div style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem;">
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.4rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.3rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.1rem;">👨‍🎓</div>
             <div style="text-align: right;">
-              <div style="font-size: 0.62rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">إجمالي المسجلين</div>
-              <div style="font-size: 1.15rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${activeStudents.length}</div>
+              <div style="font-size: 0.55rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">إجمالي المسجلين</div>
+              <div style="font-size: 1rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${activeStudents.length}</div>
             </div>
           </div>
 
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.35rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 1.3rem;">🟢</div>
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.4rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.3rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.1rem;">🟢</div>
             <div style="text-align: right;">
-              <div style="font-size: 0.62rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">حاضرون اليوم</div>
-              <div style="font-size: 1.15rem; font-weight: 900; color: #2e7d32; line-height: 1;">${presentCount}</div>
+              <div style="font-size: 0.55rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">حاضرون اليوم</div>
+              <div style="font-size: 1rem; font-weight: 900; color: #2e7d32; line-height: 1;">${presentCount}</div>
             </div>
           </div>
 
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.35rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 1.3rem;">🔴</div>
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.4rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.3rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.1rem;">🔴</div>
             <div style="text-align: right;">
-              <div style="font-size: 0.62rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">غياب اليوم</div>
-              <div style="font-size: 1.15rem; font-weight: 900; color: #c62828; line-height: 1;">${absentCount}</div>
+              <div style="font-size: 0.55rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">غياب اليوم</div>
+              <div style="font-size: 1rem; font-weight: 900; color: #c62828; line-height: 1;">${absentCount}</div>
             </div>
           </div>
 
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.35rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 1.3rem;">📖</div>
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.4rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.3rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.1rem;">📖</div>
             <div style="text-align: right;">
-              <div style="font-size: 0.62rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">سمّعوا اليوم</div>
-              <div style="font-size: 1.15rem; font-weight: 900; color: #0b6b7d; line-height: 1;">${recitedCount}</div>
+              <div style="font-size: 0.55rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">سمّعوا اليوم</div>
+              <div style="font-size: 1rem; font-weight: 900; color: #0b6b7d; line-height: 1;">${recitedCount}</div>
+            </div>
+          </div>
+
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.4rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.3rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.1rem;">🏛️</div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.55rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">عدد الحلقات</div>
+              <div style="font-size: 1rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${circlesCount}</div>
+            </div>
+          </div>
+
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.4rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.3rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.1rem;">👨‍🏫</div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.55rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">عدد المعلمين</div>
+              <div style="font-size: 1rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${teachersCount}</div>
             </div>
           </div>
         </div>
 
         <div style="grid-column: 1 / -1; margin-top: 0.3rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem;">
           <div class="card" style="padding: 0.5rem; margin-bottom: 0;">
-            <h3 style="font-size: 0.8rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0.25rem; text-align:center;">📖 أول 10 أتموا الحفظ الجديد اليوم</h3>
+            <h3 style="font-size: 0.8rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0; text-align:center;">📖 أول 15 أتموا</h3>
+            <p style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); margin: 0 0 0.25rem 0; text-align:center;">(الدرس الجديد)</p>
             <table class="data-table mini-report-table">
               <thead><tr><th style="width:30px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
               <tbody>${buildTopCompletedRows("hifzSurah", "hifzRating")}</tbody>
             </table>
           </div>
           <div class="card" style="padding: 0.5rem; margin-bottom: 0;">
-            <h3 style="font-size: 0.8rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0.25rem; text-align:center;">🔄 أول 10 أتموا المراجعة اليوم</h3>
+            <h3 style="font-size: 0.8rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0; text-align:center;">🔄 أول 15 أتموا</h3>
+            <p style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); margin: 0 0 0.25rem 0; text-align:center;">(المراجعة)</p>
             <table class="data-table mini-report-table">
               <thead><tr><th style="width:30px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
               <tbody>${buildTopCompletedRows("murajaaSurah", "murajaaRating")}</tbody>
             </table>
           </div>
           <div class="card" style="padding: 0.5rem; margin-bottom: 0;">
-            <h3 style="font-size: 0.8rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0.25rem; text-align:center;">🎧 أول 10 أتموا التلاوة اليوم</h3>
+            <h3 style="font-size: 0.8rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0; text-align:center;">🎧 أول 15 أتموا</h3>
+            <p style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); margin: 0 0 0.25rem 0; text-align:center;">(التلاوة)</p>
             <table class="data-table mini-report-table">
               <thead><tr><th style="width:30px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
               <tbody>${buildTopCompletedRows("tilawaSurah", "tilawaRating")}</tbody>
