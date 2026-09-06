@@ -235,9 +235,9 @@ function buildStudentAccordionCard(
         <form onsubmit="saveStudentTasmeea(event, '${student.id}')">
           <div class="tasmeea-sections-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
             
-            <!-- 1. الحفظ الجديد (اليوم وغداً معاً كعمود واحد مستقل) -->
+            <!-- 1. الدرس الجديد (اليوم وغداً معاً كعمود واحد مستقل) -->
             <div class="tasmeea-section-box p-3" style="background: #faf8f5; border: 1px solid var(--border-color); border-radius: 8px;">
-              <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">📖 الحفظ الجديد</h4>
+              <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">📖 الدرس الجديد</h4>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">مقرر اليوم</label>
                 <input type="text" class="form-control" name="hifz_surah" value="${initialHifz}" placeholder="مثال: البقرة (1-15)">
@@ -250,7 +250,7 @@ function buildStudentAccordionCard(
                 <label style="font-size: 0.82rem; color: #d84315; font-weight: 800;">📌 مقرر الغد</label>
                 <input type="text" class="form-control" name="next_hifz" value="${record.nextHifz || ""}" placeholder="مثال: سورة البقرة (16-30)">
               </div>
-              <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'hifz')">✅ اعتماد الحفظ الجديد (اليوم والغد)</button>
+              <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'hifz')">✅ اعتماد الدرس الجديد (اليوم والغد)</button>
             </div>
 
             <!-- 2. المراجعة (اليوم وغداً معاً كعمود واحد مستقل) -->
@@ -402,7 +402,7 @@ function saveQuickAttendance(studentId, status) {
   }
 }
 
-// اعتماد قسم واحد فقط (الحفظ الجديد / المراجعة / التلاوة) بشكل مستقل دون التأثير على باقي الأقسام
+// اعتماد قسم واحد فقط (الدرس الجديد / المراجعة / التلاوة) بشكل مستقل دون التأثير على باقي الأقسام
 function saveTasmeeaSection(studentId, section) {
   const dateVal = document.getElementById("tasmeea-date-select")?.value;
   const circleId = document.getElementById("tasmeea-circle-select")?.value;
@@ -423,7 +423,7 @@ function saveTasmeeaSection(studentId, section) {
       recordSurah: "hifzSurah",
       recordRating: "hifzRating",
       recordNext: "nextHifz",
-      label: "الحفظ الجديد",
+      label: "الدرس الجديد",
     },
     murajaa: {
       surahField: "murajaa_surah",
