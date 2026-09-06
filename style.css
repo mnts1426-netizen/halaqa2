@@ -980,15 +980,16 @@ body {
 /* جداول أول 10 (شاشة العرض) - صفوف مضغوطة قليلاً مع إبقاء الأسماء واضحة لإظهار الطلاب العشرة كاملين */
 .mini-report-table th,
 .mini-report-table td {
-  padding: 0.22rem 0.4rem !important;
-  font-size: 0.82rem;
+  padding: 0.12rem 0.3rem !important;
+  font-size: 0.72rem;
+  line-height: 1.2;
 }
 
 /* لوحة العرض (التميز/الإحصائيات) عند وضع ملء الشاشة - تظهر هي فقط بدون أي عنصر آخر */
 #mosque-screen-grid:fullscreen,
 #mosque-screen-grid:-webkit-full-screen {
   background: var(--bg-main);
-  padding: 2rem;
+  padding: 1rem;
   overflow-y: auto;
   align-content: start;
   cursor: pointer;
