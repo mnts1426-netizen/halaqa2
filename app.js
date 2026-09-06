@@ -1062,10 +1062,22 @@ window.handleTeacherSelfCheckIn = function () {
       { enableHighAccuracy: true, timeout: 10000 },
     );
   } else {
-    // لا يوجد موقع جغرافي معتمد للمَجْمَع بعد - يُمنع التحضير الذاتي منعاً للتحضير من أي مكان بعيد
-    alert(
-      "⚠️ لم يتم اعتماد الموقع الجغرافي للمَجْمَع بعد من قبل الإدارة.\nيرجى مراجعة (الإعدادات) وتحديد موقع الجامع على الخريطة أولاً، حتى يمكن تفعيل تسجيل الحضور الذاتي بدقة.",
-    );
+    // لم يُعتمد موقع جغرافي للمَجْمَع بعد - يتم التحضير مباشرة دون التحقق من الموقع
+    // (تحضير الموقع سيُفعَّل تلقائياً فور اعتماد الإدارة لموقع الجامع لاحقاً من الإعدادات)
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const coords = `إحداثيات: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+          performCheckIn(coords);
+        },
+        () => {
+          performCheckIn();
+        },
+        { timeout: 5000 },
+      );
+    } else {
+      performCheckIn();
+    }
   }
 };
 
