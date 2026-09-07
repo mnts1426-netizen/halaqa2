@@ -489,7 +489,7 @@ function generateReport() {
     const chrome =
       typeof buildOfficialPrintChrome === "function"
         ? buildOfficialPrintChrome(
-            printTitle ? printTitle.textContent : "تقرير رسمي",
+            printTitle ? printTitle.textContent : "تقرير التميز",
             selectedCircleName,
           )
         : { header: "", footer: "" };
