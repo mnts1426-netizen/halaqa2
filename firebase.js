@@ -8,6 +8,20 @@ let dbFirestore = null;
 let firebaseAuth = null;
 let isFirebaseOnline = false;
 
+// تحصين ضد حقن HTML/جافاسكريبت (XSS): يُستخدم عند إدراج أي نص مصدره المستخدم
+// (اسم، ملاحظة، رقم جوال...) داخل innerHTML، خصوصاً النصوص القادمة من نماذج
+// عامة لا تتطلب تسجيل دخول (مثل استمارة طلب الالتحاق) حيث يمكن لأي زائر كتابة
+// أي نص فيها - بدون هذا التحصين قد يُنفَّذ كودٌ ضار داخل متصفح المدير نفسه
+window.escapeHtml = function (value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+};
+
 // الإعدادات الافتراضية
 const SAFE_DEFAULT_SETTINGS = window.DEFAULT_SETTINGS || {
   orgName: "مَجْمَع عبدالله بن مهدي القرآني",
