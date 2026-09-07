@@ -13,29 +13,66 @@ document.addEventListener("DOMContentLoaded", () => {
   populateReportWeekRangeDropdowns();
 });
 
-// تعبئة قوائم نطاق أسابيع التميز (من - إلى)
+// نقطة انطلاق ترقيم أسابيع التميز (الأسبوع الأول): يوم الأحد الموافق 17 ربيع الأول 1448هـ
+// (بحسب التقويم الهجري لأم القرى) = الأحد 30 أغسطس 2026م ميلادي
+const TAMAYUZ_EPOCH_SUNDAY = new Date(2026, 7, 30);
+
+// إرجاع نص هجري مختصر بصيغة "يوم/شهر" (تقويم أم القرى) لتاريخ معيّن
+function getHijriShortLabel(date) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-u-ca-islamic-umalqura", {
+      day: "numeric",
+      month: "numeric",
+    }).formatToParts(date);
+    const day = parts.find((p) => p.type === "day")?.value || "";
+    const month = parts.find((p) => p.type === "month")?.value || "";
+    return day && month ? `${day}/${month}` : "";
+  } catch (e) {
+    return "";
+  }
+}
+
+// رقم الأسبوع الحالي (الأسبوع الأول = 1) بالنسبة لنقطة الانطلاق أعلاه
+function getCurrentTamayuzWeekNumber() {
+  const now = new Date();
+  const nowSunday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() - now.getDay(),
+  );
+  const diffDays = Math.round(
+    (nowSunday - TAMAYUZ_EPOCH_SUNDAY) / (24 * 60 * 60 * 1000),
+  );
+  const weekNum = Math.floor(diffDays / 7) + 1;
+  return weekNum < 1 ? 1 : weekNum;
+}
+
+// تاريخ يوم الأحد لأسبوع معيّن برقمه
+function getSundayDateForWeekNumber(weekNumber) {
+  const d = new Date(TAMAYUZ_EPOCH_SUNDAY);
+  d.setDate(d.getDate() + (weekNumber - 1) * 7);
+  return d;
+}
+
+// تعبئة قوائم نطاق أسابيع التميز (من - إلى) بترقيم متزايد يبدأ من الأسبوع الأول
+// ويزداد تلقائياً مع مرور الأسابيع، وكل أسبوع يظهر بجانبه تاريخ يوم الأحد بالهجري
 function populateReportWeekRangeDropdowns() {
   const weekFromSelect = document.getElementById("report-week-from");
   const weekToSelect = document.getElementById("report-week-to");
   if (!weekFromSelect || !weekToSelect) return;
 
-  const weekOptions = [
-    { id: "current", label: "الأسبوع الحالي" },
-    { id: "w_1", label: "الأسبوع السابق (1)" },
-    { id: "w_2", label: "الأسبوع السابق (2)" },
-    { id: "w_3", label: "الأسبوع السابق (3)" },
-    { id: "w_4", label: "الأسبوع السابق (4)" },
-  ];
+  const currentWeekNum = getCurrentTamayuzWeekNumber();
 
   let optionsHtml = "";
-  weekOptions.forEach((w) => {
-    optionsHtml += `<option value="${w.id}">${w.label}</option>`;
-  });
+  for (let n = 1; n <= currentWeekNum; n++) {
+    const hijriLabel = getHijriShortLabel(getSundayDateForWeekNumber(n));
+    optionsHtml += `<option value="${n}">الأسبوع ${n}${hijriLabel ? ` (${hijriLabel})` : ""}</option>`;
+  }
 
   weekFromSelect.innerHTML = optionsHtml;
   weekToSelect.innerHTML = optionsHtml;
-  weekToSelect.value = "current";
-  weekFromSelect.value = "w_4";
+  weekToSelect.value = String(currentWeekNum);
+  weekFromSelect.value = String(Math.max(1, currentWeekNum - 4));
 }
 
 function populateReportStudentsDropdown() {
@@ -120,18 +157,11 @@ function handleReportTypeChange() {
   if (thead) thead.innerHTML = "";
 }
 
-function getSundayToWednesdayDatesByWeekOption(weekOption) {
-  const now = new Date();
-  const dayOfWeek = now.getDay();
+function getSundayToWednesdayDatesByWeekOption(weekNumber) {
+  const n = parseInt(weekNumber, 10);
+  if (!n || n < 1) return [];
 
-  let offsetWeeks = 0;
-  if (weekOption === "w_1") offsetWeeks = 1;
-  else if (weekOption === "w_2") offsetWeeks = 2;
-  else if (weekOption === "w_3") offsetWeeks = 3;
-  else if (weekOption === "w_4") offsetWeeks = 4;
-
-  const sunday = new Date(now);
-  sunday.setDate(now.getDate() - dayOfWeek - offsetWeeks * 7);
+  const sunday = getSundayDateForWeekNumber(n);
 
   const days = [];
   for (let i = 0; i < 4; i++) {
@@ -154,8 +184,13 @@ function generateReport() {
     document.getElementById("report-circle-select")?.value || "all";
   const dateFrom = document.getElementById("report-date-from")?.value;
   const dateTo = document.getElementById("report-date-to")?.value;
-  const weekFrom = document.getElementById("report-week-from")?.value || "w_4";
-  const weekTo = document.getElementById("report-week-to")?.value || "current";
+  const currentTamayuzWeek = getCurrentTamayuzWeekNumber();
+  const weekFrom =
+    document.getElementById("report-week-from")?.value ||
+    String(Math.max(1, currentTamayuzWeek - 4));
+  const weekTo =
+    document.getElementById("report-week-to")?.value ||
+    String(currentTamayuzWeek);
 
   const wrapper = document.getElementById("report-results-wrapper");
   const thead = document.getElementById("report-thead");
@@ -177,25 +212,30 @@ function generateReport() {
 
   let headHtml = "";
   let bodyHtml = "";
+  let printTitleText = "";
 
   // 1. تقرير إنجاز الطالب اليومي
-  if (reportType === "student_achievement" || reportType === "tasmeea") {
+  if (reportType === "student_achievement") {
     const targetDateLabel =
       dateTo || dateFrom || new Date().toISOString().split("T")[0];
 
-    if (printTitle) printTitle.textContent = "إنجاز الطالب اليومي";
+    printTitleText = "تقرير إنجاز الطالب اليومي";
+    if (printTitle) printTitle.textContent = printTitleText;
     if (printPeriod) {
       printPeriod.textContent = "";
       printPeriod.style.display = "none";
     }
 
     headHtml = `
-      <tr style="background: #1a365d; color: #ffffff;">
+      <tr style="background: #0a5c71; color: #ffffff;">
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">الطالب</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">الحضور</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">مقرر الدرس</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">التقدير</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">مقرر المراجعة</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">التقدير</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">مقرر التلاوة</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">التقدير</th>
       </tr>
     `;
 
@@ -212,7 +252,7 @@ function generateReport() {
 
     if (students.length === 0) {
       bodyHtml =
-        '<tr><td colspan="5" class="text-center text-muted p-4">لا توجد بيانات مطابقة للطلاب</td></tr>';
+        '<tr><td colspan="8" class="text-center text-muted p-4">لا توجد بيانات مطابقة للطلاب</td></tr>';
     } else {
       students.forEach((s) => {
         const allAtt = (window.appStore.attendance || []).filter(
@@ -239,28 +279,89 @@ function generateReport() {
         const allTasm = (window.appStore.tasmeea || []).filter(
           (t) => t.studentId === s.id,
         );
-        const todayTasm = allTasm.find((t) => t.date === targetDateLabel);
-
-        const hifzDisplay =
-          todayTasm && todayTasm.hifzSurah
-            ? `${todayTasm.hifzSurah} (${todayTasm.hifzRating || "—"})`
-            : "—";
-        const murajaaDisplay =
-          todayTasm && todayTasm.murajaaSurah
-            ? `${todayTasm.murajaaSurah} (${todayTasm.murajaaRating || "—"})`
-            : "—";
-        const tilawaDisplay =
-          todayTasm && todayTasm.tilawaSurah
-            ? `${todayTasm.tilawaSurah} (${todayTasm.tilawaRating || "—"})`
-            : "—";
+        const todayTasm = allTasm.find((t) => t.date === targetDateLabel) || {};
 
         bodyHtml += `
           <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.88rem;">
             <td style="padding: 8px; font-weight: 800; color: #1e293b; text-align: right;">${s.name}</td>
             <td style="padding: 8px;">${attStatusText}</td>
-            <td style="padding: 8px; color: #334155;">${hifzDisplay}</td>
-            <td style="padding: 8px; color: #334155;">${murajaaDisplay}</td>
-            <td style="padding: 8px; color: #334155;">${tilawaDisplay}</td>
+            <td style="padding: 8px; color: #334155;">${todayTasm.hifzSurah || "—"}</td>
+            <td style="padding: 8px; color: #334155;">${todayTasm.hifzRating || "—"}</td>
+            <td style="padding: 8px; color: #334155;">${todayTasm.murajaaSurah || "—"}</td>
+            <td style="padding: 8px; color: #334155;">${todayTasm.murajaaRating || "—"}</td>
+            <td style="padding: 8px; color: #334155;">${todayTasm.tilawaSurah || "—"}</td>
+            <td style="padding: 8px; color: #334155;">${todayTasm.tilawaRating || "—"}</td>
+          </tr>
+        `;
+      });
+    }
+  }
+
+  // 1ب. تقرير آخر ما وصل إليه الطالب (أحدث سجل مسجَّل لكل قسم، بغض النظر عن التاريخ)
+  else if (reportType === "tasmeea") {
+    printTitleText = "تقرير آخر ما وصل إليه الطالب";
+    if (printTitle) printTitle.textContent = printTitleText;
+    if (printPeriod) {
+      printPeriod.textContent = "";
+      printPeriod.style.display = "none";
+    }
+
+    headHtml = `
+      <tr style="background: #0a5c71; color: #ffffff;">
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">الطالب</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">آخر الدرس</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">التقدير</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">آخر المراجعة</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">التقدير</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">آخر التلاوة</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">التقدير</th>
+      </tr>
+    `;
+
+    let students = (window.appStore.students || []).filter(
+      (s) => s.status !== "pending",
+    );
+
+    if (circleId !== "all") {
+      students = students.filter((s) => s.circleId === circleId);
+    }
+    if (selectedStudentId !== "all") {
+      students = students.filter((s) => s.id === selectedStudentId);
+    }
+
+    if (students.length === 0) {
+      bodyHtml =
+        '<tr><td colspan="7" class="text-center text-muted p-4">لا توجد بيانات مطابقة للطلاب</td></tr>';
+    } else {
+      const findLatest = (records, field) => {
+        return (
+          records
+            .filter((t) => t[field] && String(t[field]).trim() !== "")
+            .sort(
+              (a, b) =>
+                (b.date || "").localeCompare(a.date || "") ||
+                (b.updatedAt || 0) - (a.updatedAt || 0),
+            )[0] || null
+        );
+      };
+
+      students.forEach((s) => {
+        const allTasm = (window.appStore.tasmeea || []).filter(
+          (t) => t.studentId === s.id,
+        );
+        const latestHifz = findLatest(allTasm, "hifzSurah");
+        const latestMurajaa = findLatest(allTasm, "murajaaSurah");
+        const latestTilawa = findLatest(allTasm, "tilawaSurah");
+
+        bodyHtml += `
+          <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.88rem;">
+            <td style="padding: 8px; font-weight: 800; color: #1e293b; text-align: right;">${s.name}</td>
+            <td style="padding: 8px; color: #334155;">${latestHifz ? latestHifz.hifzSurah : "—"}</td>
+            <td style="padding: 8px; color: #334155;">${latestHifz ? latestHifz.hifzRating || "—" : "—"}</td>
+            <td style="padding: 8px; color: #334155;">${latestMurajaa ? latestMurajaa.murajaaSurah : "—"}</td>
+            <td style="padding: 8px; color: #334155;">${latestMurajaa ? latestMurajaa.murajaaRating || "—" : "—"}</td>
+            <td style="padding: 8px; color: #334155;">${latestTilawa ? latestTilawa.tilawaSurah : "—"}</td>
+            <td style="padding: 8px; color: #334155;">${latestTilawa ? latestTilawa.tilawaRating || "—" : "—"}</td>
           </tr>
         `;
       });
@@ -269,9 +370,8 @@ function generateReport() {
 
   // 2. التقرير الإحصائي الشامل للطلاب
   else if (reportType === "students") {
-    if (printTitle)
-      printTitle.textContent =
-        "التقرير الإحصائي الشامل للطلاب (أعداد الإنجاز والحضور)";
+    printTitleText = "التقرير الإحصائي الشامل للطلاب (أعداد الإنجاز والحضور)";
+    if (printTitle) printTitle.textContent = printTitleText;
     if (printPeriod) {
       printPeriod.textContent =
         dateFrom && dateTo
@@ -281,17 +381,17 @@ function generateReport() {
     }
 
     headHtml = `
-      <tr style="background: #1a365d; color: #ffffff;">
+      <tr style="background: #0a5c71; color: #ffffff;">
         <th rowspan="2" style="vertical-align: middle; text-align: center; border: 1px solid #cbd5e1;">م</th>
         <th rowspan="2" style="vertical-align: middle; border: 1px solid #cbd5e1;">اسم الطالب</th>
-        <th rowspan="2" style="vertical-align: middle; text-align: center; border: 1px solid #cbd5e1;">أيام الحضور</th>
-        <th rowspan="2" style="vertical-align: middle; text-align: center; border: 1px solid #cbd5e1;">أيام الغياب</th>
-        <th rowspan="2" style="vertical-align: middle; text-align: center; border: 1px solid #cbd5e1;">مرات التميز</th>
+        <th rowspan="2" style="vertical-align: middle; text-align: center; border: 1px solid #cbd5e1;">أيام<br>الحضور</th>
+        <th rowspan="2" style="vertical-align: middle; text-align: center; border: 1px solid #cbd5e1;">أيام<br>الغياب</th>
+        <th rowspan="2" style="vertical-align: middle; text-align: center; border: 1px solid #cbd5e1;">مرات<br>التميز</th>
         <th colspan="4" style="text-align: center; border: 1px solid #cbd5e1;">الدرس الجديد</th>
         <th colspan="4" style="text-align: center; border: 1px solid #cbd5e1;">المراجعة</th>
         <th colspan="4" style="text-align: center; border: 1px solid #cbd5e1;">التلاوة</th>
       </tr>
-      <tr style="background: #2b4c7e; color: #ffffff; font-size: 0.8rem;">
+      <tr style="background: #c59b27; color: #ffffff; font-size: 0.8rem;">
         <th style="border: 1px solid #cbd5e1;">ممتاز</th>
         <th style="border: 1px solid #cbd5e1;">ج.جداً</th>
         <th style="border: 1px solid #cbd5e1;">جيد</th>
@@ -386,19 +486,20 @@ function generateReport() {
 
   // 3. تقرير التميز الأسبوعي
   else if (reportType === "tamayuz") {
-    if (printTitle)
-      printTitle.textContent =
-        "تقرير التميز الأسبوعي (عدد بطاقات التميز المعتمدة)";
+    printTitleText = "تقرير التميز الأسبوعي (عدد بطاقات التميز المعتمدة)";
+    if (printTitle) printTitle.textContent = printTitleText;
     if (printPeriod) {
-      printPeriod.textContent = `نطاق الأسابيع (من ${weekFrom} إلى ${weekTo})`;
+      printPeriod.textContent =
+        weekFrom === weekTo
+          ? `الأسبوع ${weekFrom}`
+          : `من الأسبوع ${weekFrom} إلى الأسبوع ${weekTo}`;
       printPeriod.style.display = "block";
     }
 
     headHtml = `
-      <tr style="background: #1a365d; color: #ffffff;">
-        <th style="padding: 10px; width: 60px; text-align: center; border: 1px solid #cbd5e1;">م</th>
+      <tr style="background: #0a5c71; color: #ffffff;">
         <th style="padding: 10px; text-align: right; border: 1px solid #cbd5e1;">اسم الطالب المتميز</th>
-        <th style="padding: 10px; text-align: center; border: 1px solid #cbd5e1;">عدد بطاقات التميز</th>
+        <th style="padding: 10px; text-align: center; border: 1px solid #cbd5e1;">مرات التميز الأسبوعية</th>
       </tr>
     `;
 
@@ -410,13 +511,16 @@ function generateReport() {
     if (selectedStudentId !== "all")
       students = students.filter((s) => s.id === selectedStudentId);
 
-    const allWeekKeys = ["w_4", "w_3", "w_2", "w_1", "current"];
-    const startIdx = allWeekKeys.indexOf(weekFrom);
-    const endIdx = allWeekKeys.indexOf(weekTo);
-    const selectedWeeks =
-      startIdx > -1 && endIdx >= startIdx
-        ? allWeekKeys.slice(startIdx, endIdx + 1)
-        : ["current"];
+    const weekFromNum = parseInt(weekFrom, 10) || getCurrentTamayuzWeekNumber();
+    const weekToNum = parseInt(weekTo, 10) || getCurrentTamayuzWeekNumber();
+    const selectedWeeks = [];
+    for (
+      let n = Math.min(weekFromNum, weekToNum);
+      n <= Math.max(weekFromNum, weekToNum);
+      n++
+    ) {
+      selectedWeeks.push(n);
+    }
 
     const isCleanMumtazOrEmpty = (r) => {
       if (!r) return true;
@@ -468,14 +572,13 @@ function generateReport() {
 
     if (studentBadgesCount.length === 0) {
       bodyHtml =
-        '<tr><td colspan="3" class="text-center text-muted p-4">لا توجد بطاقات تميز مسجلة للطلاب في هذا النطاق</td></tr>';
+        '<tr><td colspan="2" class="text-center text-muted p-4">لا توجد بطاقات تميز مسجلة للطلاب في هذا النطاق</td></tr>';
     } else {
-      studentBadgesCount.forEach((item, idx) => {
+      studentBadgesCount.forEach((item) => {
         bodyHtml += `
           <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.9rem;">
-            <td style="padding: 8px;">${idx + 1}</td>
             <td style="padding: 8px; font-weight: 800; text-align: right;">⭐ ${item.student.name}</td>
-            <td style="padding: 8px; font-weight: 900; color: #1a365d;">🎖️ ${item.count} بطاقات</td>
+            <td style="padding: 8px; font-weight: 900; color: #0a5c71;">🎖️ ${item.count} بطاقات</td>
           </tr>
         `;
       });
@@ -485,23 +588,23 @@ function generateReport() {
   // إظهار الصندوق وتطبيق الهيكل الرسمي الموحّد (نفس الترويسة/التذييل بكل التقارير)
   if (wrapper) {
     wrapper.style.display = "block";
+    // يُحفظ عنوان التقرير هنا لأن wrapper.innerHTML سيُستبدل بالكامل بعد قليل،
+    // فلا يعود بالإمكان قراءته لاحقاً عبر عنصر #print-report-title القديم
+    wrapper.dataset.reportTitle = printTitleText;
 
     const chrome =
       typeof buildOfficialPrintChrome === "function"
-        ? buildOfficialPrintChrome(
-            printTitle ? printTitle.textContent : "تقرير رسمي",
-            selectedCircleName,
-          )
+        ? buildOfficialPrintChrome(printTitleText, selectedCircleName)
         : { header: "", footer: "" };
 
     wrapper.innerHTML = `
-      <div style="border: 2.5px double #1a365d; border-radius: 8px; padding: 1.5rem; background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-top: 1rem;">
+      <div style="border: 2.5px double #0a5c71; border-radius: 8px; padding: 1.5rem; background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-top: 1rem;">
 
         ${chrome.header}
 
         <!-- جدول البيانات المؤطر الفخم -->
         <div class="table-responsive" style="margin-bottom: 1.5rem;">
-          <table class="data-table" id="report-results-table" style="width: 100%; border-collapse: collapse; border: 1.5px solid #1a365d;">
+          <table class="data-table" id="report-results-table" style="width: 100%; border-collapse: collapse; border: 1.5px solid #0a5c71;">
             <thead id="report-thead">${headHtml}</thead>
             <tbody id="report-tbody">${bodyHtml}</tbody>
           </table>
@@ -525,7 +628,7 @@ function exportReportExcel() {
     alert("⚠️ مكتبة Excel غير متوفرة!");
     return;
   }
-  const wb = XLSX.utils.table_to_book(table, { sheet: "التقرير الرسمي" });
+  const wb = XLSX.utils.table_to_book(table, { sheet: "التقرير" });
   XLSX.writeFile(
     wb,
     `تقرير_المجمع_${new Date().toISOString().split("T")[0]}.xlsx`,
@@ -544,9 +647,7 @@ function downloadReportPDF() {
     return;
   }
 
-  const reportTitle =
-    document.getElementById("print-report-title")?.textContent ||
-    "تقرير_المجمع_الرسمي";
+  const reportTitle = element.dataset.reportTitle || "تقرير_المَجْمَع";
 
   if (typeof html2pdf !== "undefined") {
     const opt = {
@@ -574,9 +675,21 @@ function printOfficialReport() {
     return;
   }
 
-  const reportTitle =
-    document.getElementById("print-report-title")?.textContent ||
-    "تقرير المَجْمَع الرسمي";
+  const reportTitle = wrapper.dataset.reportTitle || "تقرير المَجْمَع القرآني";
+
+  const printCircleId = document.getElementById("report-circle-select")?.value;
+  const printCircleName =
+    (window.appStore?.circles || []).find((c) => c.id === printCircleId)
+      ?.name || "";
+  const chrome =
+    typeof buildOfficialPrintChrome === "function"
+      ? buildOfficialPrintChrome(reportTitle, printCircleName)
+      : { header: "", footer: "" };
+  const reportTable = wrapper.querySelector("#report-results-table");
+  const reportTableHtml =
+    reportTable && typeof buildRepeatingHeaderTableHtml === "function"
+      ? buildRepeatingHeaderTableHtml(reportTable, chrome.header)
+      : chrome.header + (reportTable ? reportTable.outerHTML : "");
 
   const printWindow = window.open("", "_blank");
   printWindow.document.write(`
@@ -609,7 +722,7 @@ function printOfficialReport() {
             text-align: center;
           }
           th {
-            background-color: #1a365d !important;
+            background-color: #0a5c71 !important;
             color: #ffffff !important;
             font-weight: bold;
           }
@@ -619,7 +732,8 @@ function printOfficialReport() {
         </style>
       </head>
       <body>
-        ${wrapper.innerHTML}
+        ${reportTableHtml}
+        ${chrome.footer}
       </body>
     </html>
   `);
