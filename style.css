@@ -1,6 +1,6 @@
 /* ==========================================================================
    style.css - الهوية البصرية الرسمية لمَجْمَع عبدالله بن مهدي القرآني
-   (أزرق بترولي ملكي + خطوط ولمسات ذهبية عسلية + أرضيات بيضاء نقية)
+   (أزرق بترولي + أخضر مائل للأزرق + لمسات ذهبية وبنّية ورصاصية أنيقة)
    ========================================================================== */
 
 :root {
@@ -10,15 +10,25 @@
   --primary-teal-light: #eaf4f7;
   --primary-teal-subtle: #f3f8fa;
 
+  /* أزرق فاتح زاهٍ يُستخدم كلمسة تزيينية إضافية (تدرّجات، حدود، تمييز عند التحويم) */
+  --accent-skyblue: #4fa3d1;
+  --accent-skyblue-dark: #2f7fab;
+  --accent-skyblue-light: #eaf6fc;
+
   /* الذهبي العسلي المعتمد من قباب جامع الهدى وحامل المصحف والخطوط الديكورية */
   --accent-gold: #c59b27;
   --accent-gold-dark: #9e7817;
   --accent-gold-light: #fdfaf2;
   --accent-gold-border: #ebd99f;
 
-  /* البني الخشبي الدافئ لغلاف المصحف */
-  --wood-brown: #5a381e;
+  /* البني الخشبي الدافئ لغلاف المصحف - يُستخدم كلمسة تزيينية ثانية (تحويم/ضغط الأزرار) */
+  --wood-brown: #6b4226;
+  --wood-brown-dark: #4a2c18;
   --wood-brown-light: #f7efe8;
+
+  /* الرصاصي الأنيق كلمسة تزيينية محايدة إضافية */
+  --accent-slate: #5b6472;
+  --accent-slate-light: #f1f3f5;
 
   /* متغيرات التوافقية البرمجية لمنع أي تعارض مع ملفات الـ JS */
   --primary-brown: #0a5c71;
@@ -178,7 +188,7 @@ body {
 
 .login-right-panel {
   flex: 1.25;
-  background: linear-gradient(135deg, #0a5c71 0%, #063945 100%);
+  background: linear-gradient(135deg, #0a5c71 0%, #4fa3d1 55%, #063945 100%);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -231,6 +241,7 @@ body {
   font-weight: 900;
   margin-bottom: 0.25rem;
   color: #ffffff;
+  font-family: "Amiri", "Cairo", serif;
 }
 
 .brand-sub-big {
@@ -278,6 +289,7 @@ body {
     var(--primary-teal-dark) 100%
   );
   color: #ffffff;
+  border-bottom: 2px solid var(--accent-gold);
   box-shadow: 0 4px 10px rgba(10, 92, 113, 0.22);
 }
 
@@ -286,18 +298,32 @@ body {
   box-shadow: 0 6px 16px rgba(10, 92, 113, 0.32);
 }
 
+.btn-primary:active {
+  transform: translateY(0);
+  background: linear-gradient(135deg, var(--wood-brown) 0%, var(--wood-brown-dark) 100%);
+  border-bottom-color: var(--accent-gold);
+}
+
 .btn-outline-brown,
 .btn-outline-custom {
   background-color: #ffffff;
   border-color: #cbd5e1;
+  border-right: 3px solid var(--wood-brown);
   color: var(--text-secondary);
 }
 
 .btn-outline-brown:hover,
 .btn-outline-custom:hover {
-  background-color: var(--primary-teal-subtle);
-  border-color: var(--accent-gold);
-  color: var(--primary-teal);
+  background-color: var(--wood-brown-light);
+  border-color: var(--wood-brown);
+  color: var(--wood-brown-dark);
+}
+
+.btn-outline-brown:active,
+.btn-outline-custom:active {
+  background-color: var(--wood-brown);
+  border-color: var(--wood-brown-dark);
+  color: #ffffff;
 }
 
 .btn-success {
@@ -401,6 +427,7 @@ body {
   font-weight: 900;
   color: var(--primary-teal);
   line-height: 1.35;
+  font-family: "Amiri", "Cairo", serif;
 }
 
 .logo-text p,
@@ -975,6 +1002,12 @@ body {
 /* نافذة بحجم صفحة كاملة (مثل متابعة الطلاب) - تعطي إحساس الدخول لصفحة/خانة جديدة كاملة */
 .modal-fullscreen-overlay {
   padding: 0 !important;
+}
+
+/* جداول أول 15 (شاشة العرض) - عرض متوسط ومتمركز يتناسب مع صف الأيقونات بدلاً من امتداده لكامل البطاقة */
+.mini-report-table {
+  width: 82% !important;
+  margin: 0 auto;
 }
 
 /* جداول أول 10 (شاشة العرض) - صفوف مضغوطة قليلاً مع إبقاء الأسماء واضحة لإظهار الطلاب العشرة كاملين */
