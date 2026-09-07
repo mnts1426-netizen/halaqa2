@@ -102,9 +102,10 @@ window.handleInstallAndEnableNotifications = async function () {
 };
 
 // إرسال إشعار Push فوري لأجهزة المدير المفعّلة (عبر REST API الخاص بـ OneSignal)
-// ملاحظة أمنية: يتم استدعاء هذا مباشرة من المتصفح (بدون سيرفر خاص)، لذا مفتاح
-// ONESIGNAL_REST_API_KEY يكون ظاهراً في كود الصفحة. هذا مقبول لتطبيق داخلي
-// صغير كهذا، لكن لا يصلح لتطبيق عام كبير الحجم.
+// ملاحظة أمنية: هذا الاستدعاء غير آمن أصلاً من داخل المتصفح مباشرة (لأن الموقع
+// فيه صفحة تسجيل عامة لا تتطلب دخولاً، فأي كود بالصفحة يظهر لأي زائر) - لذا
+// window.ONESIGNAL_REST_API_KEY فارغ الآن عمداً حتى يُبنى خادم وسيط آمن يحمل
+// المفتاح بدلاً من المتصفح. الدالة تتوقف بأمان دون أي تأثير طالما المفتاح فارغ.
 window.sendAdminPushNotification = async function (title, message) {
   if (!window.ONESIGNAL_APP_ID || !window.ONESIGNAL_REST_API_KEY) return;
 
