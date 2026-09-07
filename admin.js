@@ -697,8 +697,8 @@ window.openStudentsFollowupModal = function () {
     html += `
       <tr>
         <td style="text-align: center;">${idx + 1}</td>
-        <td style="font-weight: 700;">${s.name}</td>
-        <td style="text-align: center; font-weight: 600; color: var(--text-dark);">${circleName}</td>
+        <td style="font-weight: 700;">${escapeHtml(s.name)}</td>
+        <td style="text-align: center; font-weight: 600; color: var(--text-dark);">${escapeHtml(circleName)}</td>
         <td style="text-align: center;">${attText}</td>
         <td style="text-align: center;">${hifzCol}</td>
         <td style="text-align: center;">${murajaaCol}</td>
@@ -899,10 +899,10 @@ window.openDashboardDetailsModal = function (type) {
       html += `
         <tr>
           <td style="text-align: center;">${idx + 1}</td>
-          <td style="font-weight: 700;">${s.name}</td>
-          <td>${circle ? circle.name : "غير مسجل"}</td>
+          <td style="font-weight: 700;">${escapeHtml(s.name)}</td>
+          <td>${escapeHtml(circle ? circle.name : "غير مسجل")}</td>
           <td><span class="badge ${att.status === "present" ? "badge-active" : "badge-warning"}">${statusLabel}</span></td>
-          <td>${att.notes || "—"}</td>
+          <td>${escapeHtml(att.notes) || "—"}</td>
         </tr>
       `;
     });
@@ -1067,7 +1067,7 @@ window.renderCirclesCards = function () {
       <div class="circle-card" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 10px; padding: 1.25rem;">
         <div class="circle-header flex-between mb-2">
           <div class="circle-title">
-            <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 2px;">${circle.name}</h3>
+            <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 2px;">${escapeHtml(circle.name)}</h3>
             <p class="text-muted" style="font-size: 0.82rem; margin: 0;">جامع الهدى</p>
           </div>
           <span class="badge badge-active">${circle.status || "نشطة"}</span>
@@ -1085,7 +1085,7 @@ window.renderCirclesCards = function () {
         </div>
 
         <div class="circle-teacher-info mb-3" style="font-size: 0.85rem;">
-          <strong>المعلمون:</strong> <span class="text-muted">${teacherNamesStr}</span>
+          <strong>المعلمون:</strong> <span class="text-muted">${escapeHtml(teacherNamesStr)}</span>
         </div>
 
         <div class="circle-card-actions flex-align-gap">
@@ -1411,9 +1411,9 @@ window.renderTeachersTable = function () {
 
     html += `
       <tr>
-        <td style="font-weight: 700;">${t.name} ${financeBadge}</td>
-        <td>${t.phone || "—"}</td>
-        <td><span style="font-weight: 600; color: var(--text-dark);">${circleNamesStr}</span></td>
+        <td style="font-weight: 700;">${escapeHtml(t.name)} ${financeBadge}</td>
+        <td>${escapeHtml(t.phone) || "—"}</td>
+        <td><span style="font-weight: 600; color: var(--text-dark);">${escapeHtml(circleNamesStr)}</span></td>
         <td dir="ltr" class="text-muted" style="text-align: right;">${t.lastLogin || "لم يدخل بعد"}</td>
         <td>
           <div style="display: flex; gap: 0.35rem;">
@@ -1823,7 +1823,7 @@ window.renderTeachersAttendanceTable = function () {
           </select>
         </td>
         <td>
-          <input type="text" class="form-control" placeholder="ملاحظة إدارية..." value="${record.notes || ""}" onchange="updateTeacherAttendanceNotes('${t.id}', this.value)">
+          <input type="text" class="form-control" placeholder="ملاحظة إدارية..." value="${escapeHtml(record.notes)}" onchange="updateTeacherAttendanceNotes('${t.id}', this.value)">
         </td>
       </tr>
     `;
@@ -2020,12 +2020,12 @@ window.renderStudentsTable = function () {
         <td style="text-align: center;">
           <input type="checkbox" class="student-row-cb" value="${s.id}" onchange="handleStudentRowSelectionChange()">
         </td>
-        <td style="font-weight: 700;">${s.name}</td>
-        <td>${s.nationalId || "—"}</td>
-        <td>${s.phone || "—"}</td>
-        <td>${s.parentName || "—"}</td>
-        <td>${s.parentRelation || "—"}</td>
-        <td style="color: var(--primary-brown); font-weight: 700;">${s.parentPhone || "—"}</td>
+        <td style="font-weight: 700;">${escapeHtml(s.name)}</td>
+        <td>${escapeHtml(s.nationalId) || "—"}</td>
+        <td>${escapeHtml(s.phone) || "—"}</td>
+        <td>${escapeHtml(s.parentName) || "—"}</td>
+        <td>${escapeHtml(s.parentRelation) || "—"}</td>
+        <td style="color: var(--primary-brown); font-weight: 700;">${escapeHtml(s.parentPhone) || "—"}</td>
         <td><span style="font-weight: 600; color: var(--text-dark);">${circleName}</span></td>
         <td dir="ltr" class="text-muted" style="text-align: right;">${s.lastLogin || "لم يدخل بعد"}</td>
         <td>
@@ -2542,10 +2542,10 @@ window.renderAccountsTable = function () {
     html += `
       <tr>
         <td style="text-align: center;">${idx + 1}</td>
-        <td style="font-weight: 700;">${u.name}</td>
+        <td style="font-weight: 700;">${escapeHtml(u.name)}</td>
         <td>${roleBadge}</td>
-        <td><code>${u.username}</code></td>
-        <td><code>${u.pass || (u.role === "student" ? "1111" : "1234")}</code></td>
+        <td><code>${escapeHtml(u.username)}</code></td>
+        <td><code>${escapeHtml(u.pass) || (u.role === "student" ? "1111" : "1234")}</code></td>
         <td><span class="badge ${isActive ? "badge-active" : "badge-danger"}">${isActive ? "نشط" : "موقوف"}</span></td>
         <td>
           <div style="display: flex; gap: 0.35rem;">
@@ -2863,15 +2863,15 @@ window.renderAttendanceTable = function () {
 
     html += `
       <tr>
-        <td style="font-weight: 700;">${s.name}</td>
-        <td>${getCircleName(s.circleId)}</td>
+        <td style="font-weight: 700;">${escapeHtml(s.name)}</td>
+        <td>${escapeHtml(getCircleName(s.circleId))}</td>
         <td>
           <select class="form-control" style="font-weight: 700;" onchange="setStudentAttendance('${s.id}', this.value)">
             ${selectOptionsHtml}
           </select>
         </td>
         <td>
-          <input type="text" class="form-control" placeholder="ملاحظة..." value="${record.notes || ""}" onchange="updateAttendanceNotes('${s.id}', this.value)" ${isTeacher ? 'readonly title="تعديل الملاحظات محصور بالإدارة"' : ""}>
+          <input type="text" class="form-control" placeholder="ملاحظة..." value="${escapeHtml(record.notes) || ""}" onchange="updateAttendanceNotes('${s.id}', this.value)" ${isTeacher ? 'readonly title="تعديل الملاحظات محصور بالإدارة"' : ""}>
         </td>
       </tr>
     `;
@@ -3046,10 +3046,10 @@ window.renderTeacherNotesTable = function () {
       <tr>
         <td style="text-align: center;">${idx + 1}</td>
         <td>${t.date || "—"}</td>
-        <td style="font-weight: 700;">${teacherName}</td>
-        <td><span style="font-weight: 600; color: var(--text-dark);">${circle ? circle.name : "—"}</span></td>
-        <td style="font-weight: 700; color: var(--primary-brown);">${student ? student.name : "طالب"}</td>
-        <td style="white-space: normal; line-height: 1.6;">${t.adminNotes}</td>
+        <td style="font-weight: 700;">${escapeHtml(teacherName)}</td>
+        <td><span style="font-weight: 600; color: var(--text-dark);">${escapeHtml(circle ? circle.name : "—")}</span></td>
+        <td style="font-weight: 700; color: var(--primary-brown);">${escapeHtml(student ? student.name : "طالب")}</td>
+        <td style="white-space: normal; line-height: 1.6;">${escapeHtml(t.adminNotes)}</td>
       </tr>
     `;
   });
@@ -3999,17 +3999,19 @@ window.renderPendingRequestsTable = function () {
     return;
   }
 
+  // ملاحظة أمنية: هذه البيانات مصدرها استمارة عامة لا تتطلب تسجيل دخول، لذا يجب
+  // تحصينها دائماً (escapeHtml) قبل عرضها هنا لمنع أي محاولة حقن كود ضار
   let html = "";
   pendingList.forEach((stu) => {
     html += `
       <tr>
-        <td style="font-weight: 700;">${stu.name}</td>
-        <td>${stu.nationalId || "—"}</td>
-        <td>${stu.hifzAmount || "—"}</td>
-        <td>${stu.parentName || "—"}</td>
-        <td>${stu.parentRelation || "—"}</td>
-        <td style="color: var(--primary-brown); font-weight: 700;">${stu.parentPhone || "—"}</td>
-        <td>${stu.residence || "—"}</td>
+        <td style="font-weight: 700;">${escapeHtml(stu.name)}</td>
+        <td>${escapeHtml(stu.nationalId) || "—"}</td>
+        <td>${escapeHtml(stu.hifzAmount) || "—"}</td>
+        <td>${escapeHtml(stu.parentName) || "—"}</td>
+        <td>${escapeHtml(stu.parentRelation) || "—"}</td>
+        <td style="color: var(--primary-brown); font-weight: 700;">${escapeHtml(stu.parentPhone) || "—"}</td>
+        <td>${escapeHtml(stu.residence) || "—"}</td>
         <td>
           <div style="display: flex; gap: 0.35rem;">
             <button class="btn btn-success btn-sm" onclick="approveStudentRequest('${stu.id}')">قبول</button>
