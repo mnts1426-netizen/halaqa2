@@ -41,26 +41,34 @@ function getCircleNameTasmeea(circleId) {
   return c ? c.name : "—";
 }
 
-// ترحيل تلقائي لمقرر اليوم من "مقرر الغد" الذي سُجِّل بآخر يوم متاح (حتى لو تخللته أيام غياب)
-// يُستخدم في أي مكان يعرض "مقرر اليوم" الفعلي للطالب (تقارير، لوحة الطالب...)، بحيث لا يظهر فارغاً
-// طالما كان هناك مقرر سابق له - إلا إذا سجّل المعلم/المدير قيمة صريحة لهذا اليوم بالذات فتُعتمد هي أولاً
+// ترحيل تلقائي لمقرر اليوم: يبقى نفس آخر مقرر معروف (سواء كان محدداً صراحة كـ"مقرر الغد"
+// أو كان مجرد "مقرر اليوم" الذي لم يُتبع بتحديد مقرر غدٍ له) ويتكرر يوماً بعد يوم - حتى لو
+// تخللته أيام غياب متعددة أو أيام لم يُسجَّل بها شيء إطلاقاً لهذا القسم بعينه - إلى أن يسجّل
+// المعلم أو المدير قيمة صريحة جديدة (لنفس اليوم أو كـ"مقرر غد") فتحل محل القديمة فوراً
 window.getCarriedForwardLessonValue = function (
   studentId,
   dateVal,
   todayField,
   nextFieldName,
 ) {
-  const allTasm = (window.appStore?.tasmeea || []).filter(
-    (t) => t.studentId === studentId,
-  );
+  const allTasm = (window.appStore?.tasmeea || [])
+    .filter((t) => t.studentId === studentId)
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  // 1. قيمة صريحة مسجّلة لهذا اليوم بالذات - لها الأولوية دائماً مهما وُجد غيرها
   const todayRecord = allTasm.find((t) => t.date === dateVal);
   if (todayRecord && todayRecord[todayField]) {
     return todayRecord[todayField];
   }
-  const carried = allTasm
-    .filter((t) => t.date < dateVal && t[nextFieldName])
-    .sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0];
-  return carried ? carried[nextFieldName] : "";
+
+  // 2. ابحث للخلف يوماً فيوماً (متجاهلاً الأيام التي لم يُسجَّل بها شيء لهذا القسم بعينه)
+  //    عن آخر قيمة معروفة - أولوية لِما حُدِّد صراحة كـ"مقرر غد"، وإلا فآخر "مقرر يوم" يتكرر تلقائياً
+  for (const t of allTasm) {
+    if (t.date >= dateVal) continue;
+    if (t[nextFieldName]) return t[nextFieldName];
+    if (t[todayField]) return t[todayField];
+  }
+  return "";
 };
 
 // عرض قائمة طلاب الحلقة مع إتاحة الوصول الكامل للمدير وعزل المعلم
@@ -138,16 +146,6 @@ function renderTasmeeaStudents() {
         (t) => t.studentId === student.id && t.date === dateVal,
       ) || {};
 
-    const previousPlanRecord =
-      (window.appStore.tasmeea || [])
-        .filter(
-          (t) =>
-            t.studentId === student.id &&
-            t.date < dateVal &&
-            (t.nextHifz || t.nextMurajaa || t.nextTilawa),
-        )
-        .sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {};
-
     const attRecord =
       (window.appStore.attendance || []).find(
         (a) => a.studentId === student.id && a.date === dateVal,
@@ -156,7 +154,6 @@ function renderTasmeeaStudents() {
     html += buildStudentAccordionCard(
       student,
       existingRecord,
-      previousPlanRecord,
       attRecord,
       index + 1,
       dateVal,
@@ -169,7 +166,6 @@ function renderTasmeeaStudents() {
 function buildStudentAccordionCard(
   student,
   record,
-  previousPlanRecord,
   attRecord,
   index,
   currentDateVal,
@@ -196,11 +192,24 @@ function buildStudentAccordionCard(
     currentAtt = "absent";
   }
 
-  const initialHifz = record.hifzSurah || previousPlanRecord.nextHifz || "";
-  const initialMurajaa =
-    record.murajaaSurah || previousPlanRecord.nextMurajaa || "";
-  const initialTilawa =
-    record.tilawaSurah || previousPlanRecord.nextTilawa || "";
+  const initialHifz = getCarriedForwardLessonValue(
+    student.id,
+    currentDateVal,
+    "hifzSurah",
+    "nextHifz",
+  );
+  const initialMurajaa = getCarriedForwardLessonValue(
+    student.id,
+    currentDateVal,
+    "murajaaSurah",
+    "nextMurajaa",
+  );
+  const initialTilawa = getCarriedForwardLessonValue(
+    student.id,
+    currentDateVal,
+    "tilawaSurah",
+    "nextTilawa",
+  );
 
   let quickAttOptions = "";
   if (isTeacher) {
@@ -232,7 +241,7 @@ function buildStudentAccordionCard(
           </span>
           <div>
             <h3 style="margin: 0; font-size: 1.05rem; font-weight:800; color: var(--text-dark);">
-              ${student.name}
+              ${escapeHtml(student.name)}
             </h3>
             <small class="text-muted">
               ${isSaved ? '<span style="color:#2e7d32; font-weight:700;">🟢 تم رصد التسميع</span>' : "⚪ لم يُرصد التسميع بعد"}
@@ -262,7 +271,7 @@ function buildStudentAccordionCard(
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">📖 الدرس الجديد</h4>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">مقرر اليوم</label>
-                <input type="text" class="form-control" name="hifz_surah" value="${initialHifz}" placeholder="مثال: البقرة (1-15)">
+                <input type="text" class="form-control" name="hifz_surah" value="${escapeHtml(initialHifz)}" placeholder="مثال: البقرة (1-15)">
               </div>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">التقدير</label>
@@ -270,7 +279,7 @@ function buildStudentAccordionCard(
               </div>
               <div class="form-group mb-2" style="border-top: 2px dashed #ef6c00; background: linear-gradient(135deg, #fff3e0 0%, #ffebee 100%); border-radius: 6px; padding: 0.5rem 0.6rem; margin-top: 0.5rem;">
                 <label style="font-size: 0.82rem; color: #d84315; font-weight: 800;">📌 مقرر الغد</label>
-                <input type="text" class="form-control" name="next_hifz" value="${record.nextHifz || ""}" placeholder="مثال: سورة البقرة (16-30)">
+                <input type="text" class="form-control" name="next_hifz" value="${escapeHtml(record.nextHifz)}" placeholder="مثال: سورة البقرة (16-30)">
               </div>
               <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'hifz')">✅ اعتماد الدرس الجديد (اليوم والغد)</button>
               ${isAdmin ? `<button type="button" class="btn btn-danger btn-sm mt-1" style="width: 100%;" onclick="cancelTasmeeaSection('${student.id}', 'hifz')">↩️ إلغاء الاعتماد</button>` : ""}
@@ -281,7 +290,7 @@ function buildStudentAccordionCard(
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">🔄 المراجعة</h4>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">مقرر اليوم</label>
-                <input type="text" class="form-control" name="murajaa_surah" value="${initialMurajaa}" placeholder="مثال: سورة يس كاملة">
+                <input type="text" class="form-control" name="murajaa_surah" value="${escapeHtml(initialMurajaa)}" placeholder="مثال: سورة يس كاملة">
               </div>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">التقدير</label>
@@ -289,7 +298,7 @@ function buildStudentAccordionCard(
               </div>
               <div class="form-group mb-2" style="border-top: 2px dashed #ef6c00; background: linear-gradient(135deg, #fff3e0 0%, #ffebee 100%); border-radius: 6px; padding: 0.5rem 0.6rem; margin-top: 0.5rem;">
                 <label style="font-size: 0.82rem; color: #d84315; font-weight: 800;">📌 مقرر الغد</label>
-                <input type="text" class="form-control" name="next_murajaa" value="${record.nextMurajaa || ""}" placeholder="مثال: سورة الكهف كاملة">
+                <input type="text" class="form-control" name="next_murajaa" value="${escapeHtml(record.nextMurajaa)}" placeholder="مثال: سورة الكهف كاملة">
               </div>
               <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'murajaa')">✅ اعتماد المراجعة (اليوم والغد)</button>
               ${isAdmin ? `<button type="button" class="btn btn-danger btn-sm mt-1" style="width: 100%;" onclick="cancelTasmeeaSection('${student.id}', 'murajaa')">↩️ إلغاء الاعتماد</button>` : ""}
@@ -300,7 +309,7 @@ function buildStudentAccordionCard(
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">🎧 التلاوة</h4>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">مقرر اليوم</label>
-                <input type="text" class="form-control" name="tilawa_surah" value="${initialTilawa}" placeholder="مثال: آل عمران (1-20)">
+                <input type="text" class="form-control" name="tilawa_surah" value="${escapeHtml(initialTilawa)}" placeholder="مثال: آل عمران (1-20)">
               </div>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">التقدير</label>
@@ -308,7 +317,7 @@ function buildStudentAccordionCard(
               </div>
               <div class="form-group mb-2" style="border-top: 2px dashed #ef6c00; background: linear-gradient(135deg, #fff3e0 0%, #ffebee 100%); border-radius: 6px; padding: 0.5rem 0.6rem; margin-top: 0.5rem;">
                 <label style="font-size: 0.82rem; color: #d84315; font-weight: 800;">📌 مقرر الغد</label>
-                <input type="text" class="form-control" name="next_tilawa" value="${record.nextTilawa || ""}" placeholder="مثال: سورة النساء (1-10)">
+                <input type="text" class="form-control" name="next_tilawa" value="${escapeHtml(record.nextTilawa)}" placeholder="مثال: سورة النساء (1-10)">
               </div>
               <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'tilawa')">✅ اعتماد التلاوة (اليوم والغد)</button>
               ${isAdmin ? `<button type="button" class="btn btn-danger btn-sm mt-1" style="width: 100%;" onclick="cancelTasmeeaSection('${student.id}', 'tilawa')">↩️ إلغاء الاعتماد</button>` : ""}
@@ -320,11 +329,11 @@ function buildStudentAccordionCard(
           <div class="form-row mt-3">
             <div class="form-group flex-1">
               <label style="font-size: 0.85rem; font-weight: 700;">💬 توجيه وملاحظة للطالب وولي الأمر:</label>
-              <input type="text" class="form-control" name="student_notes" value="${record.studentNotes || ""}" placeholder="أحسنت الترتيل، يُرجى التركيز على الغنة...">
+              <input type="text" class="form-control" name="student_notes" value="${escapeHtml(record.studentNotes)}" placeholder="أحسنت الترتيل، يُرجى التركيز على الغنة...">
             </div>
             <div class="form-group flex-1">
               <label style="font-size: 0.85rem; font-weight: 700; color: var(--primary-brown);">📝 ملاحظة موجهة للإدارة:</label>
-              <input type="text" class="form-control" name="admin_notes" value="${record.adminNotes || ""}" placeholder="اكتب ملاحظة خاصة موجهة للمدير بخصوص الطالب...">
+              <input type="text" class="form-control" name="admin_notes" value="${escapeHtml(record.adminNotes)}" placeholder="اكتب ملاحظة خاصة موجهة للمدير بخصوص الطالب...">
             </div>
           </div>
 
