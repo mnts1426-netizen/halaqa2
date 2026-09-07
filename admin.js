@@ -642,9 +642,9 @@ window.openStudentsFollowupModal = function () {
     `;
   }
 
-  const activeStudents = (window.appStore?.students || []).filter(
-    (s) => s.status === "active",
-  );
+  const activeStudents = (window.appStore?.students || [])
+    .filter((s) => s.status === "active")
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
   const todayAtt = window.appStore?.attendance || [];
   const todayTasm = window.appStore?.tasmeea || [];
   const isWorkday = isOfficialWorkday(targetDateStr);
@@ -1027,9 +1027,9 @@ window.renderCirclesCards = function () {
     .toLowerCase();
   let circlesList = window.appStore?.circles || [];
 
-  const filtered = circlesList.filter(
-    (c) => c.name && c.name.toLowerCase().includes(searchVal),
-  );
+  const filtered = circlesList
+    .filter((c) => c.name && c.name.toLowerCase().includes(searchVal))
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
 
   if (filtered.length === 0) {
     container.innerHTML = `
@@ -1380,11 +1380,13 @@ window.renderTeachersTable = function () {
     .toLowerCase();
   const teachers = window.appStore?.teachers || [];
 
-  const filtered = teachers.filter(
-    (t) =>
-      (t.name && t.name.toLowerCase().includes(searchVal)) ||
-      (t.phone && String(t.phone).includes(searchVal)),
-  );
+  const filtered = teachers
+    .filter(
+      (t) =>
+        (t.name && t.name.toLowerCase().includes(searchVal)) ||
+        (t.phone && String(t.phone).includes(searchVal)),
+    )
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
 
   if (filtered.length === 0) {
     tbody.innerHTML =
@@ -1984,17 +1986,20 @@ window.renderStudentsTable = function () {
     (s) => s.status !== "pending",
   );
 
-  const filtered = studentsList.filter((s) => {
-    const matchesSearch =
-      (s.name && s.name.toLowerCase().includes(searchVal)) ||
-      (s.nationalId && String(s.nationalId).includes(searchVal)) ||
-      (s.phone && String(s.phone).includes(searchVal)) ||
-      (s.parentPhone && String(s.parentPhone).includes(searchVal));
+  const filtered = studentsList
+    .filter((s) => {
+      const matchesSearch =
+        (s.name && s.name.toLowerCase().includes(searchVal)) ||
+        (s.nationalId && String(s.nationalId).includes(searchVal)) ||
+        (s.phone && String(s.phone).includes(searchVal)) ||
+        (s.parentPhone && String(s.parentPhone).includes(searchVal));
 
-    const matchesCircle = circleFilter === "all" || s.circleId === circleFilter;
-    const matchesStatus = s.status === statusFilter;
-    return matchesSearch && matchesCircle && matchesStatus;
-  });
+      const matchesCircle =
+        circleFilter === "all" || s.circleId === circleFilter;
+      const matchesStatus = s.status === statusFilter;
+      return matchesSearch && matchesCircle && matchesStatus;
+    })
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
 
   if (filtered.length === 0) {
     tbody.innerHTML =
@@ -2498,20 +2503,22 @@ window.renderAccountsTable = function () {
     document.getElementById("filter-account-status")?.value || "all";
 
   const users = window.appStore?.users || [];
-  const filtered = users.filter((u) => {
-    const matchesSearch =
-      (u.name && u.name.toLowerCase().includes(searchVal)) ||
-      (u.username && String(u.username).includes(searchVal)) ||
-      (u.phone && String(u.phone).includes(searchVal));
+  const filtered = users
+    .filter((u) => {
+      const matchesSearch =
+        (u.name && u.name.toLowerCase().includes(searchVal)) ||
+        (u.username && String(u.username).includes(searchVal)) ||
+        (u.phone && String(u.phone).includes(searchVal));
 
-    const matchesRole = roleFilter === "all" || u.role === roleFilter;
-    let matchesStatus = true;
-    if (statusFilter === "active") matchesStatus = u.status === "active";
-    else if (statusFilter === "suspended")
-      matchesStatus = u.status === "suspended" || u.status === "archived";
+      const matchesRole = roleFilter === "all" || u.role === roleFilter;
+      let matchesStatus = true;
+      if (statusFilter === "active") matchesStatus = u.status === "active";
+      else if (statusFilter === "suspended")
+        matchesStatus = u.status === "suspended" || u.status === "archived";
 
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+      return matchesSearch && matchesRole && matchesStatus;
+    })
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
 
   if (filtered.length === 0) {
     tbody.innerHTML =
@@ -2809,6 +2816,9 @@ window.renderAttendanceTable = function () {
     students = students.filter(
       (s) => s.name && s.name.toLowerCase().includes(searchVal),
     );
+  students = students.sort((a, b) =>
+    (a.name || "").localeCompare(b.name || "", "ar"),
+  );
 
   if (students.length === 0) {
     tbody.innerHTML =
