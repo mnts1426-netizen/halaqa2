@@ -1316,6 +1316,30 @@ function renderStudentData() {
   const todayRecord = studentTasmeea.find((t) => t.date === todayStr) || {};
   const todayAttRecord = studentAtt.find((a) => a.date === todayStr);
 
+  // ترحيل مقرر اليوم تلقائياً من "مقرر الغد" الذي حدده المعلم آخر مرة، حتى لو تخلّل ذلك أيام غياب
+  const carriedHifzSurah =
+    typeof getCarriedForwardLessonValue === "function"
+      ? getCarriedForwardLessonValue(studentId, todayStr, "hifzSurah", "nextHifz")
+      : todayRecord.hifzSurah;
+  const carriedMurajaaSurah =
+    typeof getCarriedForwardLessonValue === "function"
+      ? getCarriedForwardLessonValue(
+          studentId,
+          todayStr,
+          "murajaaSurah",
+          "nextMurajaa",
+        )
+      : todayRecord.murajaaSurah;
+  const carriedTilawaSurah =
+    typeof getCarriedForwardLessonValue === "function"
+      ? getCarriedForwardLessonValue(
+          studentId,
+          todayStr,
+          "tilawaSurah",
+          "nextTilawa",
+        )
+      : todayRecord.tilawaSurah;
+
   const latestTasmWithNext =
     studentTasmeea
       .filter((t) => t.nextHifz || t.nextMurajaa || t.nextTilawa)
@@ -1676,17 +1700,17 @@ function renderStudentData() {
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem;">
           <div style="background: #f4f9f9; padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
             <strong style="color: var(--primary-brown); font-size: 0.85rem;">📖 الدرس الجديد:</strong>
-            <p style="margin-top: 4px; font-weight: 700;">${todayRecord.hifzSurah || "لم يسجل بعد"}</p>
+            <p style="margin-top: 4px; font-weight: 700;">${carriedHifzSurah || "لم يسجل بعد"}</p>
             ${todayRecord.hifzRating ? `<span class="badge badge-active mt-1">${todayRecord.hifzRating}</span>` : ""}
           </div>
           <div style="background: #f4f9f9; padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
             <strong style="color: var(--primary-brown); font-size: 0.85rem;">🔄 المراجعة:</strong>
-            <p style="margin-top: 4px; font-weight: 700;">${todayRecord.murajaaSurah || "لم يسجل بعد"}</p>
+            <p style="margin-top: 4px; font-weight: 700;">${carriedMurajaaSurah || "لم يسجل بعد"}</p>
             ${todayRecord.murajaaRating ? `<span class="badge badge-active mt-1">${todayRecord.murajaaRating}</span>` : ""}
           </div>
           <div style="background: #f4f9f9; padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
             <strong style="color: var(--primary-brown); font-size: 0.85rem;">🎧 التلاوة:</strong>
-            <p style="margin-top: 4px; font-weight: 700;">${todayRecord.tilawaSurah || "لم يسجل بعد"}</p>
+            <p style="margin-top: 4px; font-weight: 700;">${carriedTilawaSurah || "لم يسجل بعد"}</p>
             ${todayRecord.tilawaRating ? `<span class="badge badge-active mt-1">${todayRecord.tilawaRating}</span>` : ""}
           </div>
         </div>
