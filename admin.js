@@ -290,38 +290,62 @@ window.buildOfficialPrintChrome = function (titleText, rightSubText) {
   });
 
   const header = `
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1a365d; padding-bottom: 0.8rem; margin-bottom: 1rem;">
+    <div style="height: 5px; border-radius: 3px; margin-bottom: 0.7rem; background: linear-gradient(90deg, #0a5c71 0%, #c59b27 55%, #6b4226 100%);"></div>
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px double #0a5c71; padding-bottom: 0.8rem; margin-bottom: 1rem;">
       <div style="width: 120px; text-align: right;">
         <img src="report_logo_right.png" alt="شعار المَجْمَع" style="height: 55px; width: auto; object-fit: contain;" />
-        ${rightSubText ? `<div style="font-weight:800; color:#1a365d; font-size:0.8rem; margin-top:4px;">${rightSubText}</div>` : ""}
+        ${rightSubText ? `<div style="font-weight:800; color:#9e7817; font-size:0.8rem; margin-top:4px;">${rightSubText}</div>` : ""}
       </div>
       <div style="text-align: center; flex: 1;">
-        <h2 style="margin: 3px 0; font-size: 1.3rem; font-weight: 900; color: #1a365d;">مَجْمَع عبدالله بن مهدي القرآني</h2>
-        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #334155;">جامع الهدى</h4>
-        <div style="display: inline-block; border: 2px solid #1a365d; border-radius: 6px; padding: 0.3rem 1.4rem; margin-top: 0.5rem; background: #f8fafc;">
-          <h3 style="margin: 0; font-size: 1.05rem; font-weight: 900; color: #1a365d;">${titleText}</h3>
+        <h2 style="margin: 3px 0; font-size: 1.35rem; font-weight: 900; color: #0a5c71; font-family: 'Amiri', 'Cairo', serif;">مَجْمَع عبدالله بن مهدي القرآني</h2>
+        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #6b4226;">جامع الهدى</h4>
+        <div style="display: inline-block; border: 1.5px solid #c59b27; border-radius: 6px; padding: 0.3rem 1.4rem; margin-top: 0.5rem; background: #f3f8fa;">
+          <h3 style="margin: 0; font-size: 1.05rem; font-weight: 900; color: #0a5c71;">${titleText}</h3>
         </div>
       </div>
       <div style="width: 120px; text-align: left;">
         <img src="report_logo_left.png" alt="شعار المَجْمَع" style="height: 55px; width: auto; object-fit: contain;" />
-        <div style="font-weight:800; color:#1a365d; font-size:0.78rem; margin-top:4px;">${dateDisplay}<br>${timeDisplay}</div>
+        <div style="font-weight:800; color:#6b4226; font-size:0.78rem; margin-top:4px;">${dateDisplay}<br>${timeDisplay}</div>
       </div>
     </div>
   `;
 
   const footer = `
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px solid #cbd5e1; padding-top: 1rem; margin-top: 1.5rem; font-size: 0.9rem;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px solid #ebd99f; padding-top: 1rem; margin-top: 1.5rem; font-size: 0.9rem;">
       <div style="text-align: right;">
-        <strong style="color: #1a365d;">المنصّة الإلكترونيّة للمَجْمَع القرآنيّ</strong>
+        <strong style="color: #0a5c71;">المنصّة الإلكترونيّة للمَجْمَع القرآنيّ</strong>
       </div>
       <div style="text-align: center;">
-        <div style="font-weight: 800; color: #1a365d;">مدير المَجْمَع القرآنيّ</div>
-        <div style="font-weight: 900; color: #334155;">أحمد بن عبدالله ال مهدي</div>
+        <div style="font-weight: 800; color: #6b4226;">مدير المَجْمَع القرآنيّ</div>
+        <div style="font-weight: 900; color: #0a5c71;">أحمد بن عبدالله ال مهدي</div>
       </div>
     </div>
   `;
 
   return { header, footer };
+};
+
+// إدراج الترويسة كصف إضافي داخل thead الجدول حتى تتكرر تلقائياً بأعلى كل صفحة مطبوعة
+// (thead يتكرر أصلاً بكل المتصفحات عند الطباعة، بعكس أي عنصر خارج الجدول)
+window.buildRepeatingHeaderTableHtml = function (originalTable, headerHtml) {
+  const clone = originalTable.cloneNode(true);
+  let thead = clone.querySelector("thead");
+  if (!thead) {
+    thead = document.createElement("thead");
+    clone.insertBefore(thead, clone.firstChild);
+  }
+  const firstRow = thead.querySelector("tr");
+  const colCount = firstRow ? firstRow.children.length : 1;
+
+  const headerRow = document.createElement("tr");
+  const headerCell = document.createElement("td");
+  headerCell.colSpan = colCount;
+  headerCell.style.cssText = "padding: 0; border: none; background: #fff;";
+  headerCell.innerHTML = headerHtml;
+  headerRow.appendChild(headerCell);
+  thead.insertBefore(headerRow, thead.firstChild);
+
+  return clone.outerHTML;
 };
 
 // دوال الطباعة والتصدير العام
@@ -336,6 +360,11 @@ window.printTableElement = function (tableId, title) {
       ? buildOfficialPrintChrome(title, "")
       : { header: "", footer: "" };
 
+  const tableHtml =
+    typeof buildRepeatingHeaderTableHtml === "function"
+      ? buildRepeatingHeaderTableHtml(table, chrome.header)
+      : chrome.header + table.outerHTML;
+
   const printWindow = window.open("", "_blank");
   printWindow.document.write(`
     <html dir="rtl" lang="ar">
@@ -345,13 +374,12 @@ window.printTableElement = function (tableId, title) {
           body { font-family: 'Cairo', 'Tajawal', sans-serif; direction: rtl; padding: 25px; }
           table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
           th, td { border: 1px solid #cbd5e1; padding: 8px 6px; text-align: center; }
-          th { background-color: #1a365d; color: #ffffff; font-weight: bold; }
+          th { background-color: #0a5c71; color: #ffffff; font-weight: bold; }
           .no-print, button { display: none !important; }
         </style>
       </head>
       <body>
-        ${chrome.header}
-        ${table.outerHTML}
+        ${tableHtml}
         ${chrome.footer}
       </body>
     </html>
@@ -378,10 +406,18 @@ window.directDownloadPDF = function (elementId, filename, title) {
         : { header: "", footer: "" };
 
     // بناء نسخة مؤقتة خارج الشاشة تحتوي الترويسة والجدول والتذييل معاً قبل تصديرها PDF
+    // ملاحظة: تكرار الترويسة بكل صفحة داخل PDF غير مضمون تقنياً (عكس الطباعة المباشرة)
+    // لأن مكتبة التصدير تُحوّل المحتوى لصورة واحدة طويلة ثم تقصّها، فتظهر الترويسة أول مرة فقط
+    const isTableElement = element.tagName === "TABLE";
+    const contentHtml =
+      isTableElement && typeof buildRepeatingHeaderTableHtml === "function"
+        ? buildRepeatingHeaderTableHtml(element, chrome.header)
+        : chrome.header + element.outerHTML;
+
     const wrapper = document.createElement("div");
     wrapper.style.cssText =
       "position: fixed; top: -99999px; left: -99999px; background:#fff; padding: 1.5rem; width: 1200px; font-family: 'Cairo','Tajawal',sans-serif;";
-    wrapper.innerHTML = chrome.header + element.outerHTML + chrome.footer;
+    wrapper.innerHTML = contentHtml + chrome.footer;
     document.body.appendChild(wrapper);
 
     const opt = {
@@ -3583,6 +3619,21 @@ window.renderScreenView = function () {
     }
     renderScreenView();
   }, 300000);
+
+  // مراقبة تغيّر اليوم بشكل سريع (كل 30 ثانية): جداول "أول 15 أتموا" مبنية أصلاً
+  // على بيانات اليوم الحالي فقط، فبمجرد دخول يوم جديد يعاد بناؤها فارغة تلقائياً
+  // دون انتظار دورة التحديث الكاملة كل 5 دقائق - لضمان تصفير الأسماء فور منتصف الليل
+  if (!window.screenCurrentDateStr) {
+    window.screenCurrentDateStr = new Date().toISOString().split("T")[0];
+  }
+  if (window.screenDayChangeTimer) clearInterval(window.screenDayChangeTimer);
+  window.screenDayChangeTimer = setInterval(() => {
+    const nowStr = new Date().toISOString().split("T")[0];
+    if (nowStr !== window.screenCurrentDateStr) {
+      window.screenCurrentDateStr = nowStr;
+      renderScreenView();
+    }
+  }, 30000);
 
   if (tbody) {
     if (qualifyingStudents.length === 0) {
