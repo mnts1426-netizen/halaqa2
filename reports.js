@@ -165,31 +165,23 @@ function generateReport() {
 
   if (!thead || !tbody) return;
 
-  const now = new Date();
-  const currentDateFormatted = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
-  const currentTimeFormatted = now.toLocaleTimeString("ar-SA", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // إلزام اختيار حلقة محددة قبل استخراج أي تقرير (لا يُسمح باختيار "كل الحلقات")
+  if (circleId === "all") {
+    alert("⚠️ يرجى اختيار الحلقة أولاً قبل استخراج التقرير.");
+    if (wrapper) wrapper.style.display = "none";
+    return;
+  }
+  const selectedCircleName =
+    (window.appStore?.circles || []).find((c) => c.id === circleId)?.name ||
+    "";
 
   let headHtml = "";
   let bodyHtml = "";
-  let studentDailyHeaderInfo = null;
 
   // 1. تقرير إنجاز الطالب اليومي
   if (reportType === "student_achievement" || reportType === "tasmeea") {
     const targetDateLabel =
       dateTo || dateFrom || new Date().toISOString().split("T")[0];
-    const targetDateObj = new Date(targetDateLabel + "T00:00:00");
-    const targetDayName = targetDateObj.toLocaleDateString("ar-SA", {
-      weekday: "long",
-    });
-    const targetDateDisplay = targetDateObj.toLocaleDateString("ar-SA", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-    studentDailyHeaderInfo = { targetDayName, targetDateDisplay };
 
     if (printTitle) printTitle.textContent = "إنجاز الطالب اليومي";
     if (printPeriod) {
@@ -200,7 +192,6 @@ function generateReport() {
     headHtml = `
       <tr style="background: #1a365d; color: #ffffff;">
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">الطالب</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">الحلقة</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">الحضور</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">مقرر الدرس</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1; font-size: 0.92rem;">مقرر المراجعة</th>
@@ -221,14 +212,9 @@ function generateReport() {
 
     if (students.length === 0) {
       bodyHtml =
-        '<tr><td colspan="6" class="text-center text-muted p-4">لا توجد بيانات مطابقة للطلاب</td></tr>';
+        '<tr><td colspan="5" class="text-center text-muted p-4">لا توجد بيانات مطابقة للطلاب</td></tr>';
     } else {
       students.forEach((s) => {
-        const circle = (window.appStore.circles || []).find(
-          (c) => c.id === s.circleId,
-        );
-        const circleName = circle ? circle.name : "حلقة عامة";
-
         const allAtt = (window.appStore.attendance || []).filter(
           (a) => a.studentId === s.id,
         );
@@ -271,7 +257,6 @@ function generateReport() {
         bodyHtml += `
           <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.88rem;">
             <td style="padding: 8px; font-weight: 800; color: #1e293b; text-align: right;">${s.name}</td>
-            <td style="padding: 8px; color: #334155;">${circleName}</td>
             <td style="padding: 8px;">${attStatusText}</td>
             <td style="padding: 8px; color: #334155;">${hifzDisplay}</td>
             <td style="padding: 8px; color: #334155;">${murajaaDisplay}</td>
@@ -413,7 +398,6 @@ function generateReport() {
       <tr style="background: #1a365d; color: #ffffff;">
         <th style="padding: 10px; width: 60px; text-align: center; border: 1px solid #cbd5e1;">م</th>
         <th style="padding: 10px; text-align: right; border: 1px solid #cbd5e1;">اسم الطالب المتميز</th>
-        <th style="padding: 10px; text-align: center; border: 1px solid #cbd5e1;">الحلقة</th>
         <th style="padding: 10px; text-align: center; border: 1px solid #cbd5e1;">عدد بطاقات التميز</th>
       </tr>
     `;
@@ -484,17 +468,13 @@ function generateReport() {
 
     if (studentBadgesCount.length === 0) {
       bodyHtml =
-        '<tr><td colspan="4" class="text-center text-muted p-4">لا توجد بطاقات تميز مسجلة للطلاب في هذا النطاق</td></tr>';
+        '<tr><td colspan="3" class="text-center text-muted p-4">لا توجد بطاقات تميز مسجلة للطلاب في هذا النطاق</td></tr>';
     } else {
       studentBadgesCount.forEach((item, idx) => {
-        const circle = (window.appStore?.circles || []).find(
-          (c) => c.id === item.student.circleId,
-        );
         bodyHtml += `
           <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.9rem;">
             <td style="padding: 8px;">${idx + 1}</td>
             <td style="padding: 8px; font-weight: 800; text-align: right;">⭐ ${item.student.name}</td>
-            <td style="padding: 8px;">${circle ? circle.name : "جامع الهدى"}</td>
             <td style="padding: 8px; font-weight: 900; color: #1a365d;">🎖️ ${item.count} بطاقات</td>
           </tr>
         `;
@@ -502,108 +482,22 @@ function generateReport() {
     }
   }
 
-  // إظهار الصندوق وتطبيق الهيكل الملكي الفاخر كاملاً
+  // إظهار الصندوق وتطبيق الهيكل الرسمي الموحّد (نفس الترويسة/التذييل بكل التقارير)
   if (wrapper) {
     wrapper.style.display = "block";
 
-    let headerSectionHtml = "";
-    let footerSectionHtml = "";
-
-    if (studentDailyHeaderInfo) {
-      // ترويسة وتذييل خاصان بتقرير (إنجاز الطالب اليومي) فقط - دون التأثير على باقي التقارير
-      headerSectionHtml = `
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1a365d; padding-bottom: 0.8rem; margin-bottom: 1rem;">
-          <div style="width: 100px; text-align: right;">
-            <img src="report_logo_right.png" alt="شعار المَجْمَع" style="height: 65px; width: auto; object-fit: contain;" />
-          </div>
-          <div style="text-align: center; flex: 1;">
-            <h2 style="margin: 3px 0; font-size: 1.35rem; font-weight: 900; color: #1a365d;">مَجْمَع عبدالله بن مهدي القرآني</h2>
-            <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #334155;">جامع الهدى</h4>
-          </div>
-          <div style="width: 100px; text-align: left;">
-            <img src="report_logo_left.png" alt="شعار المَجْمَع" style="height: 60px; width: auto; object-fit: contain;" />
-          </div>
-        </div>
-
-        <!-- صندوق العنوان: اليوم يمين، العنوان بالمنتصف، التاريخ يسار -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-          <div style="width: 100px; text-align: right; font-weight: 800; color: #1a365d; font-size: 0.95rem;">
-            ${studentDailyHeaderInfo.targetDayName}
-          </div>
-          <div style="display: inline-block; border: 2px solid #1a365d; border-radius: 6px; padding: 0.4rem 1.8rem; background: #f8fafc;">
-            <h3 id="print-report-title" style="margin: 0; font-size: 1.15rem; font-weight: 900; color: #1a365d;">
-              ${printTitle ? printTitle.textContent : "إنجاز الطالب اليومي"}
-            </h3>
-          </div>
-          <div style="width: 100px; text-align: left; font-weight: 800; color: #1a365d; font-size: 0.95rem;">
-            ${studentDailyHeaderInfo.targetDateDisplay}
-          </div>
-        </div>
-      `;
-
-      footerSectionHtml = `
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px solid #cbd5e1; padding-top: 1rem; margin-top: 1.5rem; font-size: 0.9rem;">
-          <div style="text-align: right;">
-            <strong style="color: #1a365d;">المنصّة الإلكترونيّة للمَجْمَع القرآنيّ</strong>
-          </div>
-          <div style="text-align: center;">
-            <div style="font-weight: 800; color: #1a365d;">مدير المَجْمَع القرآنيّ</div>
-            <div style="font-weight: 900; color: #334155;">أحمد بن عبدالله ال مهدي</div>
-          </div>
-        </div>
-      `;
-    } else {
-      // الترويسة والتذييل الأصليان (بدون أي تغيير) لباقي أنواع التقارير
-      headerSectionHtml = `
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1a365d; padding-bottom: 0.8rem; margin-bottom: 1rem;">
-          <div style="width: 100px; text-align: right;">
-            <img src="logo12.jpeg" alt="شعار المَجْمَع" style="height: 65px; width: auto; object-fit: contain;" />
-          </div>
-          <div style="text-align: center; flex: 1;">
-            <h4 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: #475569;">المملكة العربية السعودية</h4>
-            <h2 style="margin: 3px 0; font-size: 1.35rem; font-weight: 900; color: #1a365d;">مَجْمَع عبدالله بن مهدي القرآني</h2>
-            <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #334155;">جامع الهدى</h4>
-            <div style="margin-top: 4px; font-size: 0.78rem; color: #64748b; font-weight: 600;">
-              تاريخ التقرير: ${currentDateFormatted} | الوقت: ${currentTimeFormatted}
-            </div>
-          </div>
-          <div style="width: 100px; text-align: left;">
-            <img src="logo_transparent_1.png" alt="شعار المَجْمَع" style="height: 60px; width: auto; object-fit: contain;" />
-          </div>
-        </div>
-
-        <!-- صندوق العنوان المؤطر في المنتصف -->
-        <div style="text-align: center; margin-bottom: 1.25rem;">
-          <div style="display: inline-block; border: 2px solid #1a365d; border-radius: 6px; padding: 0.4rem 1.8rem; background: #f8fafc;">
-            <h3 id="print-report-title" style="margin: 0; font-size: 1.15rem; font-weight: 900; color: #1a365d;">
-              ${printTitle ? printTitle.textContent : "تقرير رسمي"}
-            </h3>
-            <p id="print-report-period" style="margin: 3px 0 0 0; font-size: 0.82rem; font-weight: 700; color: #475569;">
-              ${printPeriod ? printPeriod.textContent : ""}
-            </p>
-          </div>
-        </div>
-      `;
-
-      footerSectionHtml = `
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px solid #cbd5e1; padding-top: 1rem; margin-top: 1.5rem; font-size: 0.9rem;">
-          <div style="text-align: right;">
-            <strong style="color: #1a365d;">نظام إدارة الحلقات القرآني</strong>
-          </div>
-          <div style="text-align: center; color: #64748b; font-size: 0.82rem;">
-            صفحة 1 / 1
-          </div>
-          <div style="text-align: left;">
-            <div style="font-weight: 900; color: #334155;">احمد بن عبدالله ال مهدي</div>
-          </div>
-        </div>
-      `;
-    }
+    const chrome =
+      typeof buildOfficialPrintChrome === "function"
+        ? buildOfficialPrintChrome(
+            printTitle ? printTitle.textContent : "تقرير رسمي",
+            selectedCircleName,
+          )
+        : { header: "", footer: "" };
 
     wrapper.innerHTML = `
       <div style="border: 2.5px double #1a365d; border-radius: 8px; padding: 1.5rem; background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-top: 1rem;">
 
-        ${headerSectionHtml}
+        ${chrome.header}
 
         <!-- جدول البيانات المؤطر الفخم -->
         <div class="table-responsive" style="margin-bottom: 1.5rem;">
@@ -613,7 +507,7 @@ function generateReport() {
           </table>
         </div>
 
-        ${footerSectionHtml}
+        ${chrome.footer}
 
       </div>
     `;
