@@ -111,7 +111,7 @@ function populateReportStudentsDropdown() {
 
   let optionsHtml = '<option value="all">كل الطلاب</option>';
   students.forEach((s) => {
-    optionsHtml += `<option value="${s.id}">${s.name}</option>`;
+    optionsHtml += `<option value="${s.id}">${escapeHtml(s.name)}</option>`;
   });
 
   studentSelect.innerHTML = optionsHtml;
@@ -310,7 +310,7 @@ function generateReport() {
 
         bodyHtml += `
           <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.88rem;">
-            <td style="padding: 8px; font-weight: 800; color: #1e293b; text-align: right;">${s.name}</td>
+            <td style="padding: 8px; font-weight: 800; color: #1e293b; text-align: right;">${escapeHtml(s.name)}</td>
             <td style="padding: 8px;">${attStatusText}</td>
             <td style="padding: 8px; color: #334155;">${carryHifz || "—"}</td>
             <td style="padding: 8px; color: #334155;">${todayTasm.hifzRating || "—"}</td>
@@ -382,7 +382,7 @@ function generateReport() {
 
         bodyHtml += `
           <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.88rem;">
-            <td style="padding: 8px; font-weight: 800; color: #1e293b; text-align: right;">${s.name}</td>
+            <td style="padding: 8px; font-weight: 800; color: #1e293b; text-align: right;">${escapeHtml(s.name)}</td>
             <td style="padding: 8px; color: #334155;">${latestHifz ? latestHifz.hifzSurah : "—"}</td>
             <td style="padding: 8px; color: #334155;">${latestHifz ? latestHifz.hifzRating || "—" : "—"}</td>
             <td style="padding: 8px; color: #334155;">${latestMurajaa ? latestMurajaa.murajaaSurah : "—"}</td>
@@ -489,7 +489,7 @@ function generateReport() {
         bodyHtml += `
           <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.85rem;">
             <td style="padding: 6px;">${idx + 1}</td>
-            <td style="padding: 6px; font-weight:700; text-align: right;">${s.name}</td>
+            <td style="padding: 6px; font-weight:700; text-align: right;">${escapeHtml(s.name)}</td>
             <td style="padding: 6px; font-weight:700; color: #2e7d32;">${presentCount}</td>
             <td style="padding: 6px; font-weight:700; color: #c62828;">${absentCount}</td>
             <td style="padding: 6px; font-weight:800; color: var(--primary-brown);">${tamayuzCount}</td>
@@ -604,7 +604,7 @@ function generateReport() {
       studentBadgesCount.forEach((item) => {
         bodyHtml += `
           <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.9rem;">
-            <td style="padding: 8px; font-weight: 800; text-align: right;">⭐ ${item.student.name}</td>
+            <td style="padding: 8px; font-weight: 800; text-align: right;">⭐ ${escapeHtml(item.student.name)}</td>
             <td style="padding: 8px; font-weight: 900; color: #0a5c71;">🎖️ ${item.count} بطاقات</td>
           </tr>
         `;
