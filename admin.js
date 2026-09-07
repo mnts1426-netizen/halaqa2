@@ -275,6 +275,55 @@ window.exportTeacherLogsPDF = function () {
   );
 };
 
+// بناء ترويسة وتذييل الطباعة الرسمية الموحّدة (تُستخدم في كل ما يُطبع أو يُصدَّر PDF بالنظام)
+// rightSubText: نص اختياري يظهر تحت الشعار الأيمن (مثال: اسم الحلقة بالتقارير الرسمية)
+window.buildOfficialPrintChrome = function (titleText, rightSubText) {
+  const now = new Date();
+  const dateDisplay = now.toLocaleDateString("ar-SA", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const timeDisplay = now.toLocaleTimeString("ar-SA", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const header = `
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1a365d; padding-bottom: 0.8rem; margin-bottom: 1rem;">
+      <div style="width: 120px; text-align: right;">
+        <img src="report_logo_right.png" alt="شعار المَجْمَع" style="height: 55px; width: auto; object-fit: contain;" />
+        ${rightSubText ? `<div style="font-weight:800; color:#1a365d; font-size:0.8rem; margin-top:4px;">${rightSubText}</div>` : ""}
+      </div>
+      <div style="text-align: center; flex: 1;">
+        <h2 style="margin: 3px 0; font-size: 1.3rem; font-weight: 900; color: #1a365d;">مَجْمَع عبدالله بن مهدي القرآني</h2>
+        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #334155;">جامع الهدى</h4>
+        <div style="display: inline-block; border: 2px solid #1a365d; border-radius: 6px; padding: 0.3rem 1.4rem; margin-top: 0.5rem; background: #f8fafc;">
+          <h3 style="margin: 0; font-size: 1.05rem; font-weight: 900; color: #1a365d;">${titleText}</h3>
+        </div>
+      </div>
+      <div style="width: 120px; text-align: left;">
+        <img src="report_logo_left.png" alt="شعار المَجْمَع" style="height: 55px; width: auto; object-fit: contain;" />
+        <div style="font-weight:800; color:#1a365d; font-size:0.78rem; margin-top:4px;">${dateDisplay}<br>${timeDisplay}</div>
+      </div>
+    </div>
+  `;
+
+  const footer = `
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px solid #cbd5e1; padding-top: 1rem; margin-top: 1.5rem; font-size: 0.9rem;">
+      <div style="text-align: right;">
+        <strong style="color: #1a365d;">المنصّة الإلكترونيّة للمَجْمَع القرآنيّ</strong>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-weight: 800; color: #1a365d;">مدير المَجْمَع القرآنيّ</div>
+        <div style="font-weight: 900; color: #334155;">أحمد بن عبدالله ال مهدي</div>
+      </div>
+    </div>
+  `;
+
+  return { header, footer };
+};
+
 // دوال الطباعة والتصدير العام
 window.printTableElement = function (tableId, title) {
   const table = document.getElementById(tableId);
@@ -282,19 +331,18 @@ window.printTableElement = function (tableId, title) {
     alert("⚠️ لا يوجد جدول متاح للطباعة.");
     return;
   }
-  const orgName =
-    window.appStore?.settings?.orgName || "مَجْمَع عبدالله بن مهدي القرآني";
-  const mosqueName = window.appStore?.settings?.subTitle || "جامع الهدى";
+  const chrome =
+    typeof buildOfficialPrintChrome === "function"
+      ? buildOfficialPrintChrome(title, "")
+      : { header: "", footer: "" };
+
   const printWindow = window.open("", "_blank");
   printWindow.document.write(`
     <html dir="rtl" lang="ar">
       <head>
         <title>${title}</title>
         <style>
-          body { font-family: 'Cairo', 'Tajawal', sans-serif; direction: rtl; padding: 25px; text-align: center; }
-          .header { border-bottom: 2px solid #0b6b7d; padding-bottom: 12px; margin-bottom: 15px; }
-          .header h2 { margin: 0; color: #0b6b7d; font-size: 1.4rem; }
-          .header p { margin: 5px 0 0 0; color: #475569; font-weight: 700; }
+          body { font-family: 'Cairo', 'Tajawal', sans-serif; direction: rtl; padding: 25px; }
           table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
           th, td { border: 1px solid #cbd5e1; padding: 8px 6px; text-align: center; }
           th { background-color: #1a365d; color: #ffffff; font-weight: bold; }
@@ -302,12 +350,9 @@ window.printTableElement = function (tableId, title) {
         </style>
       </head>
       <body>
-        <div class="header">
-          <h2>${orgName}</h2>
-          <p>${mosqueName} — ${title}</p>
-          <small>تاريخ الطباعة: ${new Date().toLocaleDateString("ar-SA")}</small>
-        </div>
+        ${chrome.header}
         ${table.outerHTML}
+        ${chrome.footer}
       </body>
     </html>
   `);
@@ -327,6 +372,18 @@ window.directDownloadPDF = function (elementId, filename, title) {
   }
 
   if (typeof html2pdf !== "undefined") {
+    const chrome =
+      typeof buildOfficialPrintChrome === "function"
+        ? buildOfficialPrintChrome(title, "")
+        : { header: "", footer: "" };
+
+    // بناء نسخة مؤقتة خارج الشاشة تحتوي الترويسة والجدول والتذييل معاً قبل تصديرها PDF
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText =
+      "position: fixed; top: -99999px; left: -99999px; background:#fff; padding: 1.5rem; width: 1200px; font-family: 'Cairo','Tajawal',sans-serif;";
+    wrapper.innerHTML = chrome.header + element.outerHTML + chrome.footer;
+    document.body.appendChild(wrapper);
+
     const opt = {
       margin: [8, 8, 8, 8],
       filename: `${filename}_${new Date().toISOString().split("T")[0]}.pdf`,
@@ -334,7 +391,16 @@ window.directDownloadPDF = function (elementId, filename, title) {
       html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
     };
-    html2pdf().set(opt).from(element).save();
+    html2pdf()
+      .set(opt)
+      .from(wrapper)
+      .save()
+      .then(() => {
+        document.body.removeChild(wrapper);
+      })
+      .catch(() => {
+        document.body.removeChild(wrapper);
+      });
   } else {
     window.printTableElement(elementId, title);
   }
