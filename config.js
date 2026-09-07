@@ -163,8 +163,14 @@ const QURAN_SURAHS = [
 const LOCAL_STORAGE_KEY = "HALAQAT_ALHUDA_DB_V1";
 
 // 7. إعدادات OneSignal لتفعيل إشعارات Push الفورية للمدير
-// احصل على القيمتين من: OneSignal Dashboard > Settings > Keys & IDs
-// ONESIGNAL_APP_ID: قيمة "OneSignal App ID"
-// ONESIGNAL_REST_API_KEY: قيمة "REST API Key"
+// ONESIGNAL_APP_ID: قيمة عامة غير حساسة، لا مشكلة من بقائها هنا
 window.ONESIGNAL_APP_ID = "6496e020-94c9-477d-bd15-d5f02531d9c5";
-window.ONESIGNAL_REST_API_KEY = "os_v2_app_msloaieuzfdx3piv2xyckmozyvsgj3mb54du7f47gpwl3bbvtqv2jcokmxbshtdlp72ggvzqfljpchilweeotojzx7ggqivggvv65cq";
+
+// تنبيه أمني مهم: تم حذف ONESIGNAL_REST_API_KEY من هذا الملف لأنه كان يظهر مباشرة
+// لأي زائر للموقع (حتى بدون تسجيل دخول) عبر "عرض مصدر الصفحة" - وهو مفتاح سري
+// خطير يسمح لأي شخص يحصل عليه بإرسال إشعارات مزيفة لجميع مستخدمي التطبيق أو
+// الوصول لبيانات المشتركين. يجب توليد مفتاح REST API جديد فوراً من لوحة تحكم
+// OneSignal (الحالي يُعتبر مخترقاً) ثم استخدامه فقط من خلال خادم وسيط (Cloud
+// Function) وليس مباشرة من كود المتصفح - إرسال الإشعارات الفعلي متوقف الآن
+// إلى حين توفير هذا الحل الآمن (وكان أصلاً متوقفاً بسبب قيود CORS في المتصفح)
+window.ONESIGNAL_REST_API_KEY = "";
