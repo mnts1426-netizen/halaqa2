@@ -1010,12 +1010,28 @@ body {
   margin: 0 auto;
 }
 
-/* جداول أول 10 (شاشة العرض) - صفوف مضغوطة قليلاً مع إبقاء الأسماء واضحة لإظهار الطلاب العشرة كاملين */
+/* جداول أول 15 (شاشة العرض) - صفوف مضغوطة قليلاً لإظهار الطلاب الخمسة عشر كاملين بدون تمرير */
 .mini-report-table th,
 .mini-report-table td {
-  padding: 0.12rem 0.3rem !important;
-  font-size: 0.72rem;
-  line-height: 1.2;
+  padding: 0.1rem 0.25rem !important;
+  font-size: 0.68rem;
+  line-height: 1.15;
+}
+
+/* اسم الطالب أكبر وأوضح من بقية الأعمدة (وهو الأهم للعرض) دون التأثير على تنسيق
+   الجدول أو موضعه - يقابله تصغير طفيف بعمودي الترتيب والحلقة لتعويض المساحة */
+.mini-report-table td.screen-student-name {
+  font-size: 0.86rem !important;
+  font-weight: 800;
+}
+
+.mini-report-table td.screen-rank-num {
+  font-size: 0.62rem !important;
+}
+
+.mini-report-table td.screen-circle-name {
+  font-size: 0.56rem !important;
+  color: var(--text-muted);
 }
 
 /* لوحة العرض (التميز/الإحصائيات) عند وضع ملء الشاشة - تظهر هي فقط بدون أي عنصر آخر */
