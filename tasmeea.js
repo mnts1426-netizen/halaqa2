@@ -457,6 +457,7 @@ function saveTasmeeaSection(studentId, section) {
       recordSurah: "hifzSurah",
       recordRating: "hifzRating",
       recordNext: "nextHifz",
+      recordOrder: "hifzOrderAt",
       label: "الدرس الجديد",
     },
     murajaa: {
@@ -466,6 +467,7 @@ function saveTasmeeaSection(studentId, section) {
       recordSurah: "murajaaSurah",
       recordRating: "murajaaRating",
       recordNext: "nextMurajaa",
+      recordOrder: "murajaaOrderAt",
       label: "المراجعة",
     },
     tilawa: {
@@ -475,6 +477,7 @@ function saveTasmeeaSection(studentId, section) {
       recordSurah: "tilawaSurah",
       recordRating: "tilawaRating",
       recordNext: "nextTilawa",
+      recordOrder: "tilawaOrderAt",
       label: "التلاوة",
     },
   };
@@ -528,6 +531,14 @@ function saveTasmeeaSection(studentId, section) {
   record[cfg.recordSurah] = surahVal;
   record[cfg.recordRating] = ratingVal;
   record[cfg.recordNext] = nextVal;
+  // وقت "أول اعتماد" لهذا القسم بعينه - يُسجَّل مرة واحدة فقط ولا يتغيّر أبداً بعد
+  // ذلك مهما عُدِّل القسم لاحقاً، حتى يبقى ترتيب "أول 15" في شاشة العرض ثابتاً طوال
+  // اليوم (لا يعتمد على وقت آخر تعديل، بل وقت أول اعتماد فعلي فقط)
+  if (surahVal) {
+    if (!record[cfg.recordOrder]) record[cfg.recordOrder] = Date.now();
+  } else {
+    record[cfg.recordOrder] = null;
+  }
   record.rating =
     record.hifzRating || record.murajaaRating || record.tilawaRating || "ممتاز";
   record.updatedBy = isAdmin ? "admin" : "teacher";
@@ -569,9 +580,9 @@ function cancelTasmeeaSection(studentId, section) {
   if (!dateVal || !circleId) return;
 
   const fieldMap = {
-    hifz: { recordSurah: "hifzSurah", recordRating: "hifzRating", recordNext: "nextHifz", label: "الدرس الجديد" },
-    murajaa: { recordSurah: "murajaaSurah", recordRating: "murajaaRating", recordNext: "nextMurajaa", label: "المراجعة" },
-    tilawa: { recordSurah: "tilawaSurah", recordRating: "tilawaRating", recordNext: "nextTilawa", label: "التلاوة" },
+    hifz: { recordSurah: "hifzSurah", recordRating: "hifzRating", recordNext: "nextHifz", recordOrder: "hifzOrderAt", label: "الدرس الجديد" },
+    murajaa: { recordSurah: "murajaaSurah", recordRating: "murajaaRating", recordNext: "nextMurajaa", recordOrder: "murajaaOrderAt", label: "المراجعة" },
+    tilawa: { recordSurah: "tilawaSurah", recordRating: "tilawaRating", recordNext: "nextTilawa", recordOrder: "tilawaOrderAt", label: "التلاوة" },
   };
   const cfg = fieldMap[section];
   if (!cfg) return;
@@ -588,6 +599,7 @@ function cancelTasmeeaSection(studentId, section) {
   record[cfg.recordSurah] = "";
   record[cfg.recordRating] = "";
   record[cfg.recordNext] = "";
+  record[cfg.recordOrder] = null;
   record.rating =
     record.hifzRating || record.murajaaRating || record.tilawaRating || "";
   record.updatedBy = "admin";
@@ -636,17 +648,52 @@ function saveStudentTasmeea(e, studentId) {
 
   const fallbackRating = hifzRating || murajaaRating || tilawaRating || "ممتاز";
 
+  const newHifzSurah = form.elements["hifz_surah"]?.value.trim() || "";
+  const newMurajaaSurah = form.elements["murajaa_surah"]?.value.trim() || "";
+  const newTilawaSurah = form.elements["tilawa_surah"]?.value.trim() || "";
+
+  if (!window.appStore.tasmeea) window.appStore.tasmeea = [];
+  const existingIndex = window.appStore.tasmeea.findIndex(
+    (t) => t.id === `tasm_${studentId}_${dateVal}`,
+  );
+  const oldRecord =
+    existingIndex > -1 ? window.appStore.tasmeea[existingIndex] : null;
+  const previousAdminNotes = oldRecord ? oldRecord.adminNotes || "" : "";
+
+  // وقت "أول اعتماد" لكل قسم يُحفَظ مرة واحدة فقط ولا يتغيّر بتعديل لاحق (انظر نفس
+  // المنطق في saveTasmeeaSection) - حتى لا يتأثر ترتيب "أول 15" في شاشة العرض
+  const carryOrderAt = (oldVal, newVal, oldOrderAt) => {
+    if (!newVal) return null;
+    if (oldVal && oldOrderAt) return oldOrderAt;
+    return Date.now();
+  };
+
   const tasmeeaData = {
     id: `tasm_${studentId}_${dateVal}`,
     studentId: studentId,
     circleId: circleId,
     date: dateVal,
-    hifzSurah: form.elements["hifz_surah"]?.value.trim() || "",
+    hifzSurah: newHifzSurah,
     hifzRating: hifzRating,
-    murajaaSurah: form.elements["murajaa_surah"]?.value.trim() || "",
+    hifzOrderAt: carryOrderAt(
+      oldRecord?.hifzSurah,
+      newHifzSurah,
+      oldRecord?.hifzOrderAt,
+    ),
+    murajaaSurah: newMurajaaSurah,
     murajaaRating: murajaaRating,
-    tilawaSurah: form.elements["tilawa_surah"]?.value.trim() || "",
+    murajaaOrderAt: carryOrderAt(
+      oldRecord?.murajaaSurah,
+      newMurajaaSurah,
+      oldRecord?.murajaaOrderAt,
+    ),
+    tilawaSurah: newTilawaSurah,
     tilawaRating: tilawaRating,
+    tilawaOrderAt: carryOrderAt(
+      oldRecord?.tilawaSurah,
+      newTilawaSurah,
+      oldRecord?.tilawaOrderAt,
+    ),
     rating: fallbackRating,
     studentNotes: form.elements["student_notes"]?.value.trim() || "",
     adminNotes: form.elements["admin_notes"]?.value.trim() || "",
@@ -656,15 +703,6 @@ function saveStudentTasmeea(e, studentId) {
     updatedBy: isAdmin ? "admin" : "teacher",
     updatedAt: Date.now(),
   };
-
-  if (!window.appStore.tasmeea) window.appStore.tasmeea = [];
-  const existingIndex = window.appStore.tasmeea.findIndex(
-    (t) => t.id === tasmeeaData.id,
-  );
-  const previousAdminNotes =
-    existingIndex > -1
-      ? window.appStore.tasmeea[existingIndex].adminNotes || ""
-      : "";
 
   if (existingIndex > -1) {
     window.appStore.tasmeea[existingIndex] = tasmeeaData;
