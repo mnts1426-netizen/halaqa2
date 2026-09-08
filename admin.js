@@ -3472,15 +3472,44 @@ window.renderScreenView = function () {
           .map((t) => t.studentId),
       ).size;
 
-      // بناء جدول أول 10 طلاب أتموا قسماً معيناً اليوم (الأقدم توثيقاً أولاً)
-      const buildTopCompletedRows = (fieldName, ratingFieldName) => {
-        // تحديد أول 15 حسب وقت الإنجاز الفعلي أولاً (يثبتون طوال اليوم ولا يُستبعدون
-        // بمجرد إنجاز طالب آخر لاحقاً) - والترتيب المعروض (١، ٢، ٣...) هو ترتيب
-        // اعتماد المعلمين الفعلي، فأول من اعتُمد تسميعه يظهر أولاً دائماً
+      // اسم مختصر (٣ مقاطع كحد أقصى) ليتّسع الخط الأكبر داخل الجدول دون كسر التنسيق
+      const shortenNameForScreen = (fullName) => {
+        const tokens = String(fullName || "")
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean);
+        // "بن"/"ال" وصلات لا تُحتسب من الأجزاء الثلاثة حتى لا ينتهي الاسم المختصر
+        // بكلمة معلّقة بلا معنى (مثل "...عبدالله ال" بدل "...عبدالله ال مهدي")
+        const connectors = new Set(["بن", "ابن", "آل", "ال"]);
+        const result = [];
+        let contentCount = 0;
+        for (let i = 0; i < tokens.length && contentCount < 3; i++) {
+          result.push(tokens[i]);
+          if (!connectors.has(tokens[i])) contentCount++;
+        }
+        if (
+          connectors.has(result[result.length - 1]) &&
+          result.length < tokens.length
+        ) {
+          result.push(tokens[result.length]);
+        }
+        return result.join(" ");
+      };
+
+      // بناء جدول أول 15 طالباً أتموا قسماً معيناً اليوم (الأقدم اعتماداً أولاً)
+      const buildTopCompletedRows = (fieldName, ratingFieldName, orderFieldName) => {
+        // الترتيب يعتمد على "وقت أول اعتماد فعلي" لهذا القسم بعينه (orderFieldName) وليس
+        // وقت آخر تعديل - فبمجرد دخول الطالب ضمن أول 15 يثبت مكانه نهائياً طوال اليوم
+        // ولا يتغيّر حتى لو عُدِّل سجله لاحقاً (تصحيح تقدير، تعديل ملاحظة...)؛ السجلات
+        // القديمة التي لا تملك بعد هذا الحقل (قبل هذا التحديث) ترجع لوقت آخر تعديل احتياطياً
         const rows = todayTasmeea
           .filter((t) => t[fieldName] && String(t[fieldName]).trim() !== "")
           .filter((t) => String(t[ratingFieldName] || "").trim() !== "يعيد")
-          .sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0))
+          .sort(
+            (a, b) =>
+              (a[orderFieldName] || a.updatedAt || 0) -
+              (b[orderFieldName] || b.updatedAt || 0),
+          )
           .slice(0, 15);
 
         if (rows.length === 0) {
@@ -3497,9 +3526,9 @@ window.renderScreenView = function () {
             );
             return `
               <tr>
-                <td style="text-align:center; font-weight:800;">${idx + 1}</td>
-                <td style="font-weight:700;">${student ? student.name : "—"}</td>
-                <td>${circle ? circle.name : "—"}</td>
+                <td class="screen-rank-num" style="text-align:center; font-weight:800;">${idx + 1}</td>
+                <td class="screen-student-name" style="font-weight:800;">${escapeHtml(shortenNameForScreen(student ? student.name : "—"))}</td>
+                <td class="screen-circle-name">${escapeHtml(circle ? circle.name : "—")}</td>
               </tr>
             `;
           })
@@ -3578,7 +3607,7 @@ window.renderScreenView = function () {
             <p style="font-size: 0.62rem; font-weight: 700; color: var(--text-muted); margin: 0 0 0.1rem 0; text-align:center;">(الدرس الجديد)</p>
             <table class="data-table mini-report-table">
               <thead><tr><th style="width:30px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
-              <tbody>${buildTopCompletedRows("hifzSurah", "hifzRating")}</tbody>
+              <tbody>${buildTopCompletedRows("hifzSurah", "hifzRating", "hifzOrderAt")}</tbody>
             </table>
           </div>
           <div class="card" style="padding: 0.4rem; margin-bottom: 0;">
@@ -3586,7 +3615,7 @@ window.renderScreenView = function () {
             <p style="font-size: 0.62rem; font-weight: 700; color: var(--text-muted); margin: 0 0 0.1rem 0; text-align:center;">(المراجعة)</p>
             <table class="data-table mini-report-table">
               <thead><tr><th style="width:30px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
-              <tbody>${buildTopCompletedRows("murajaaSurah", "murajaaRating")}</tbody>
+              <tbody>${buildTopCompletedRows("murajaaSurah", "murajaaRating", "murajaaOrderAt")}</tbody>
             </table>
           </div>
           <div class="card" style="padding: 0.4rem; margin-bottom: 0;">
@@ -3594,7 +3623,7 @@ window.renderScreenView = function () {
             <p style="font-size: 0.62rem; font-weight: 700; color: var(--text-muted); margin: 0 0 0.1rem 0; text-align:center;">(التلاوة)</p>
             <table class="data-table mini-report-table">
               <thead><tr><th style="width:30px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
-              <tbody>${buildTopCompletedRows("tilawaSurah", "tilawaRating")}</tbody>
+              <tbody>${buildTopCompletedRows("tilawaSurah", "tilawaRating", "tilawaOrderAt")}</tbody>
             </table>
           </div>
         </div>
