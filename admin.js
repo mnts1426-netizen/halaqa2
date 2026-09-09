@@ -290,22 +290,31 @@ window.buildOfficialPrintChrome = function (titleText, rightSubText) {
   });
 
   const header = `
-    <div style="height: 5px; border-radius: 3px; margin-bottom: 0.7rem; background: linear-gradient(90deg, #0a5c71 0%, #c59b27 55%, #6b4226 100%);"></div>
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px double #0a5c71; padding-bottom: 0.8rem; margin-bottom: 1rem;">
-      <div style="width: 120px; text-align: right;">
-        <img src="report_logo_right.png" alt="شعار المَجْمَع" style="height: 55px; width: auto; object-fit: contain;" />
-        ${rightSubText ? `<div style="font-weight:800; color:#9e7817; font-size:0.8rem; margin-top:4px;">${rightSubText}</div>` : ""}
+    <div style="height: 5px; border-radius: 3px; margin-bottom: 0.6rem; background: linear-gradient(90deg, #0a5c71 0%, #c59b27 55%, #6b4226 100%);"></div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div style="width: 130px; text-align: right;">
+        <img src="report_logo_right.png" alt="شعار المَجْمَع" style="height: 70px; width: auto; object-fit: contain;" />
       </div>
       <div style="text-align: center; flex: 1;">
         <h2 style="margin: 3px 0; font-size: 1.35rem; font-weight: 900; color: #0a5c71; font-family: 'Amiri', 'Cairo', serif;">مَجْمَع عبدالله بن مهدي القرآني</h2>
         <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #6b4226;">جامع الهدى</h4>
-        <div style="display: inline-block; border: 1.5px solid #c59b27; border-radius: 6px; padding: 0.3rem 1.4rem; margin-top: 0.5rem; background: #f3f8fa;">
-          <h3 style="margin: 0; font-size: 1.05rem; font-weight: 900; color: #0a5c71;">${titleText}</h3>
+      </div>
+      <div style="width: 130px; text-align: left;">
+        <img src="report_logo_left.png" alt="شعار المَجْمَع" style="height: 70px; width: auto; object-fit: contain;" />
+      </div>
+    </div>
+    <div style="height: 2px; width: 100%; margin: 0.5rem 0; background: linear-gradient(90deg, #c59b27, #6b4226);"></div>
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px double #0a5c71; padding-bottom: 0.7rem; margin-bottom: 1rem;">
+      <div style="width: 130px; text-align: right;">
+        ${rightSubText ? `<div style="font-weight:800; color:#9e7817; font-size:0.8rem;">${rightSubText}</div>` : ""}
+      </div>
+      <div style="text-align: center; flex: 1;">
+        <div style="display: table; max-width: 70%; margin: 0 auto; border: 1.5px solid #c59b27; border-radius: 6px; padding: 0.2rem 0.9rem; background: #f3f8fa;">
+          <h3 style="margin: 0; font-size: 0.95rem; font-weight: 900; color: #0a5c71; line-height: 1.3; word-break: break-word;">${titleText}</h3>
         </div>
       </div>
-      <div style="width: 120px; text-align: left;">
-        <img src="report_logo_left.png" alt="شعار المَجْمَع" style="height: 55px; width: auto; object-fit: contain;" />
-        <div style="font-weight:800; color:#6b4226; font-size:0.78rem; margin-top:4px;">${dateDisplay}<br>${timeDisplay}</div>
+      <div style="width: 130px; text-align: left;">
+        <div style="font-weight:800; color:#6b4226; font-size:0.78rem;">${dateDisplay}<br>${timeDisplay}</div>
       </div>
     </div>
   `;
@@ -440,6 +449,117 @@ window.directDownloadPDF = function (elementId, filename, title) {
   } else {
     window.printTableElement(elementId, title);
   }
+};
+
+// تصدير PDF متعدد الصفحات مع تكرار الترويسة الرسمية (الشعارات + العنوان) أعلى كل
+// صفحة فعلياً - وليس فقط الصفحة الأولى. يُقسِّم صفوف الجدول إلى مجموعات بحسب المساحة
+// المتاحة فعلياً بعد قياس ارتفاع الترويسة وصف واحد من الجدول، ثم يبني كل صفحة على حدة
+// ويجمعها في ملف PDF واحد. (بديل عن downloadReportPDF/directDownloadPDF التي تكتفي
+// بترويسة الصفحة الأولى فقط بسبب أسلوب تصدير html2pdf بتحويل المحتوى لصورة طويلة)
+window.generateMultiPagePDF = async function (
+  chromeHeader,
+  chromeFooter,
+  table,
+  filename,
+) {
+  const pageWidthMm = 297,
+    pageHeightMm = 210,
+    marginMm = 6;
+  const usableWidthMm = pageWidthMm - marginMm * 2;
+  const usableHeightMm = pageHeightMm - marginMm * 2;
+  const contentWidthPx = 1200;
+  const scaleMmPerPx = usableWidthMm / contentWidthPx;
+  const usableHeightPx = usableHeightMm / scaleMmPerPx;
+
+  const makeWrapper = () => {
+    const w = document.createElement("div");
+    w.style.cssText =
+      "position: fixed; top: -99999px; left: -99999px; background:#fff; padding: 1.5rem; width: 1200px; font-family: 'Cairo','Tajawal',sans-serif;";
+    return w;
+  };
+
+  // قياس ارتفاع الترويسة وصف واحد من الجدول لتحديد كم صفاً يتسع بكل صفحة فعلياً
+  const measureWrapper = makeWrapper();
+  document.body.appendChild(measureWrapper);
+  measureWrapper.innerHTML = chromeHeader;
+  const headerHeightPx = measureWrapper.scrollHeight;
+  const tableClone = table.cloneNode(true);
+  measureWrapper.innerHTML = "";
+  measureWrapper.appendChild(tableClone);
+  const theadEl = tableClone.querySelector("thead");
+  const theadHeightPx = theadEl ? theadEl.getBoundingClientRect().height : 0;
+  const bodyRowsClone = Array.from(tableClone.querySelectorAll("tbody tr"));
+  const rowHeightPx =
+    bodyRowsClone.length > 0
+      ? bodyRowsClone[0].getBoundingClientRect().height
+      : 30;
+  document.body.removeChild(measureWrapper);
+
+  const availablePx = usableHeightPx - headerHeightPx - theadHeightPx - 30;
+  const rowsPerPage = Math.max(1, Math.floor(availablePx / rowHeightPx));
+
+  const allRows = Array.from(table.querySelectorAll("tbody tr"));
+  const pageChunks = [];
+  for (let i = 0; i < allRows.length; i += rowsPerPage) {
+    pageChunks.push(allRows.slice(i, i + rowsPerPage));
+  }
+  if (pageChunks.length === 0) pageChunks.push([]);
+
+  const theadHtml = table.querySelector("thead")
+    ? table.querySelector("thead").outerHTML
+    : "";
+  const tableClassAttr = table.className || "";
+  const tableStyleAttr = table.getAttribute("style") || "";
+
+  let pdfDoc = null;
+  for (let pageIdx = 0; pageIdx < pageChunks.length; pageIdx++) {
+    const isLastPage = pageIdx === pageChunks.length - 1;
+    const pageWrapper = makeWrapper();
+    const rowsHtml = pageChunks[pageIdx].map((r) => r.outerHTML).join("");
+    pageWrapper.innerHTML =
+      chromeHeader +
+      `<div class="table-responsive" style="margin-bottom: 1.5rem;"><table class="${tableClassAttr}" style="${tableStyleAttr}"><thead>${theadHtml}</thead><tbody>${rowsHtml}</tbody></table></div>` +
+      (isLastPage ? chromeFooter : "");
+    document.body.appendChild(pageWrapper);
+    // انتظار قصير لضمان اكتمال تخطيط (layout) العنصر الجديد قبل التقاطه بالصورة -
+    // بدون هذا التأخير البسيط يلتقط html2canvas أحياناً ارتفاعاً صفرياً للعنصر المُدرَج حديثاً
+    await new Promise((r) => setTimeout(r, 30));
+
+    const w = pageWrapper.scrollWidth,
+      h = pageWrapper.scrollHeight;
+    const opt = {
+      image: { type: "jpeg", quality: 0.98 },
+      // تمرير الأبعاد صراحة لـ html2canvas ضروري هنا: بدونها يفشل التقاط أي عنصر
+      // ثانٍ يُضاف للصفحة بعد أول استدعاء ناجح لـ html2pdf (يلتقط ارتفاعاً صفرياً)
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        width: w,
+        height: h,
+        windowWidth: w,
+        windowHeight: h,
+      },
+      jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+    };
+
+    if (pageIdx === 0) {
+      const worker = html2pdf().set(opt).from(pageWrapper);
+      await worker.toPdf();
+      pdfDoc = worker.prop.pdf;
+    } else {
+      const worker = html2pdf().set(opt).from(pageWrapper);
+      await worker.toCanvas();
+      const canvas = worker.prop.canvas;
+      const imgData = canvas.toDataURL("image/jpeg", 0.98);
+      pdfDoc.addPage();
+      const imgProps = pdfDoc.getImageProperties(imgData);
+      const imgHeightMm = (imgProps.height * usableWidthMm) / imgProps.width;
+      pdfDoc.addImage(imgData, "JPEG", marginMm, marginMm, usableWidthMm, imgHeightMm);
+    }
+    document.body.removeChild(pageWrapper);
+  }
+
+  pdfDoc.save(`${filename}_${new Date().toISOString().split("T")[0]}.pdf`);
 };
 
 window.printTeachersTable = function () {
@@ -3538,73 +3658,73 @@ window.renderScreenView = function () {
       grid.innerHTML = `
         <div style="grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.15rem;">
           <div style="width: 44px; text-align: right; flex-shrink: 0;">
-            <img src="report_logo_right.png" alt="شعار المَجْمَع" style="height: 28px; width: auto; object-fit: contain;" />
+            <img src="report_logo_right.png" alt="شعار المَجْمَع" style="height: 52px; width: auto; object-fit: contain;" />
           </div>
           <div style="text-align: center; flex: 1;">
-            <h2 style="font-size: 0.9rem; font-weight: 900; color: var(--primary-brown); margin: 0;">
+            <h2 style="font-size: 1.5rem; font-weight: 900; color: var(--primary-brown); margin: 0;">
               📊 لوحة الإحصائيات الحية لمَجْمَع عبدالله بن مهدي القرآني
             </h2>
-            <p class="text-muted" style="font-size: 0.58rem; margin: 0; line-height: 1.1;">جامع الهدى — تقرير المتابعة والإنجاز لليوم</p>
+            <p class="text-muted" style="font-size: 0.9rem; margin: 2px 0 0 0; line-height: 1.2;">جامع الهدى — تقرير المتابعة والإنجاز لليوم</p>
           </div>
           <div style="width: 44px; text-align: left; flex-shrink: 0;">
-            <img src="report_logo_left.png" alt="شعار المَجْمَع" style="height: 28px; width: auto; object-fit: contain;" />
+            <img src="report_logo_left.png" alt="شعار المَجْمَع" style="height: 52px; width: auto; object-fit: contain;" />
           </div>
         </div>
 
-        <div style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.35rem;">
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.4rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.2rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 0.95rem;">👨‍🎓</div>
+        <div style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem;">
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.7rem;">👨‍🎓</div>
             <div style="text-align: right;">
-              <div style="font-size: 0.5rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">إجمالي المسجلين</div>
-              <div style="font-size: 0.9rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${activeStudents.length}</div>
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">إجمالي المسجلين</div>
+              <div style="font-size: 1.5rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${activeStudents.length}</div>
             </div>
           </div>
 
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.4rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.2rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 0.95rem;">🟢</div>
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.7rem;">🟢</div>
             <div style="text-align: right;">
-              <div style="font-size: 0.5rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">حاضرون اليوم</div>
-              <div style="font-size: 0.9rem; font-weight: 900; color: #2e7d32; line-height: 1;">${presentCount}</div>
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">حاضرون اليوم</div>
+              <div style="font-size: 1.5rem; font-weight: 900; color: #2e7d32; line-height: 1;">${presentCount}</div>
             </div>
           </div>
 
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.4rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.2rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 0.95rem;">🔴</div>
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.7rem;">🔴</div>
             <div style="text-align: right;">
-              <div style="font-size: 0.5rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">غياب اليوم</div>
-              <div style="font-size: 0.9rem; font-weight: 900; color: #c62828; line-height: 1;">${absentCount}</div>
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">غياب اليوم</div>
+              <div style="font-size: 1.5rem; font-weight: 900; color: #c62828; line-height: 1;">${absentCount}</div>
             </div>
           </div>
 
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.4rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.2rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 0.95rem;">📖</div>
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.7rem;">📖</div>
             <div style="text-align: right;">
-              <div style="font-size: 0.5rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">سمّعوا اليوم</div>
-              <div style="font-size: 0.9rem; font-weight: 900; color: #0b6b7d; line-height: 1;">${recitedCount}</div>
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">سمّعوا اليوم</div>
+              <div style="font-size: 1.5rem; font-weight: 900; color: #0b6b7d; line-height: 1;">${recitedCount}</div>
             </div>
           </div>
 
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.4rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.2rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 0.95rem;">🏛️</div>
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.7rem;">🏛️</div>
             <div style="text-align: right;">
-              <div style="font-size: 0.5rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">عدد الحلقات</div>
-              <div style="font-size: 0.9rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${circlesCount}</div>
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">عدد الحلقات</div>
+              <div style="font-size: 1.5rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${circlesCount}</div>
             </div>
           </div>
 
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.4rem; border: 1.5px solid var(--border-color); border-radius: 8px; padding: 0.2rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 0.95rem;">👨‍🏫</div>
+          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
+            <div style="font-size: 1.7rem;">👨‍🏫</div>
             <div style="text-align: right;">
-              <div style="font-size: 0.5rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">عدد المعلمين</div>
-              <div style="font-size: 0.9rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${teachersCount}</div>
+              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">عدد المعلمين</div>
+              <div style="font-size: 1.5rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${teachersCount}</div>
             </div>
           </div>
         </div>
 
         <div style="grid-column: 1 / -1; margin-top: 0.15rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem;">
           <div class="card" style="padding: 0.4rem; margin-bottom: 0;">
-            <h3 style="font-size: 0.72rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0; text-align:center;">📖 أول 15 أتموا</h3>
-            <p style="font-size: 0.62rem; font-weight: 700; color: var(--text-muted); margin: 0 0 0.1rem 0; text-align:center;">(الدرس الجديد)</p>
+            <h3 style="font-size: 1rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 2px; text-align:center;">📖 أول 15 أتموا</h3>
+            <p style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin: 0 0 0.2rem 0; text-align:center;">(الدرس الجديد)</p>
             <table class="data-table mini-report-table">
               <thead><tr><th style="width:30px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
               <tbody>${buildTopCompletedRows("hifzSurah", "hifzRating", "hifzOrderAt")}</tbody>
@@ -3766,6 +3886,33 @@ window.setTrophyStudent = function (studentId) {
   }
   if (typeof saveLocalStore === "function") saveLocalStore();
   renderScreenView();
+};
+
+// التقاط موقع المدير الحالي فعلياً عبر GPS الجهاز وتعبئته في حقل موقع المَجْمَع
+// (كان هذا الزر معطلاً تماماً بسبب دالة غير معرّفة - تم اكتشافه وإصلاحه أثناء الفحص)
+window.getCurrentLocationCoords = function () {
+  if (!navigator.geolocation) {
+    alert("⚠️ جهازك لا يدعم خاصية تحديد الموقع الجغرافي GPS.");
+    return;
+  }
+
+  const input = document.getElementById("set-org-location");
+  alert("📡 جاري تحديد موقعك الحالي...");
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lat = pos.coords.latitude.toFixed(6);
+      const lng = pos.coords.longitude.toFixed(6);
+      if (input) input.value = `${lat}, ${lng}`;
+      alert(`✅ تم تحديد موقعك الحالي: ${lat}, ${lng}`);
+    },
+    () => {
+      alert(
+        "❌ تعذر التقاط موقعك الجغرافي. يرجى تفعيل الـ GPS وإعطاء الإذن للمتصفح.",
+      );
+    },
+    { enableHighAccuracy: true, timeout: 10000 },
+  );
 };
 
 // الخريطة التفاعلية
