@@ -675,11 +675,31 @@ function downloadReportPDF() {
   }
 
   const reportTitle = element.dataset.reportTitle || "تقرير_المَجْمَع";
+  const safeFilename = reportTitle.trim().replace(/\s+/g, "_");
 
+  // المسار الرئيسي: تصدير متعدد الصفحات مع تكرار الترويسة الرسمية أعلى كل صفحة فعلياً
+  if (
+    typeof html2pdf !== "undefined" &&
+    typeof buildOfficialPrintChrome === "function" &&
+    typeof window.generateMultiPagePDF === "function"
+  ) {
+    const printCircleId = document.getElementById("report-circle-select")?.value;
+    const printCircleName =
+      (window.appStore?.circles || []).find((c) => c.id === printCircleId)
+        ?.name || "";
+    const chrome = buildOfficialPrintChrome(reportTitle, printCircleName);
+    const table = element.querySelector("#report-results-table");
+    if (table) {
+      window.generateMultiPagePDF(chrome.header, chrome.footer, table, safeFilename);
+      return;
+    }
+  }
+
+  // احتياطي فقط إن تعذّر المسار أعلاه لأي سبب (ترويسة الصفحة الأولى فقط)
   if (typeof html2pdf !== "undefined") {
     const opt = {
       margin: [6, 6, 6, 6],
-      filename: `${reportTitle.trim().replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`,
+      filename: `${safeFilename}_${new Date().toISOString().split("T")[0]}.pdf`,
       image: { type: "jpeg", quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
