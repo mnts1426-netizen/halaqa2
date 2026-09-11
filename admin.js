@@ -277,7 +277,12 @@ window.exportTeacherLogsPDF = function () {
 
 // بناء ترويسة وتذييل الطباعة الرسمية الموحّدة (تُستخدم في كل ما يُطبع أو يُصدَّر PDF بالنظام)
 // rightSubText: نص اختياري يظهر تحت الشعار الأيمن (مثال: اسم الحلقة بالتقارير الرسمية)
-window.buildOfficialPrintChrome = function (titleText, rightSubText) {
+window.buildOfficialPrintChrome = function (
+  titleText,
+  rightSubText,
+  centerSubHtml,
+  leftSubText,
+) {
   const now = new Date();
   const dateDisplay = now.toLocaleDateString("ar-SA", {
     year: "numeric",
@@ -290,7 +295,6 @@ window.buildOfficialPrintChrome = function (titleText, rightSubText) {
   });
 
   const header = `
-    <div style="height: 5px; border-radius: 3px; margin-bottom: 0.6rem; background: linear-gradient(90deg, #0a5c71 0%, #c59b27 55%, #6b4226 100%);"></div>
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <div style="width: 130px; text-align: right;">
         <img src="report_logo_right.png" alt="شعار المَجْمَع" style="height: 70px; width: auto; object-fit: contain;" />
@@ -305,16 +309,21 @@ window.buildOfficialPrintChrome = function (titleText, rightSubText) {
     </div>
     <div style="height: 2px; width: 100%; margin: 0.5rem 0; background: linear-gradient(90deg, #c59b27, #6b4226);"></div>
     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px double #0a5c71; padding-bottom: 0.7rem; margin-bottom: 1rem;">
-      <div style="width: 130px; text-align: right;">
-        ${rightSubText ? `<div style="font-weight:800; color:#9e7817; font-size:0.8rem;">${rightSubText}</div>` : ""}
+      <div style="width: 130px; text-align: right; padding-right: 10px;">
+        ${rightSubText ? `<div style="font-weight:800; color:#9e7817; font-size:0.8rem; white-space: nowrap;">${rightSubText}</div>` : ""}
       </div>
       <div style="text-align: center; flex: 1;">
-        <div style="display: table; max-width: 70%; margin: 0 auto; border: 1.5px solid #c59b27; border-radius: 6px; padding: 0.2rem 0.9rem; background: #f3f8fa;">
+        <div style="display: table; max-width: 90%; margin: 0 auto; border: 1.5px solid #c59b27; border-radius: 6px; padding: 0.2rem 0.9rem; background: #f3f8fa;">
           <h3 style="margin: 0; font-size: 0.95rem; font-weight: 900; color: #0a5c71; line-height: 1.3; word-break: break-word;">${titleText}</h3>
         </div>
+        ${centerSubHtml ? `<div style="margin-top: 4px; font-weight: 800; color: #6b4226; font-size: 0.78rem; white-space: nowrap;">${centerSubHtml}</div>` : ""}
       </div>
-      <div style="width: 130px; text-align: left;">
-        <div style="font-weight:800; color:#6b4226; font-size:0.78rem;">${dateDisplay}<br>${timeDisplay}</div>
+      <div style="width: 130px; text-align: left; padding-left: 10px;">
+        ${
+          leftSubText
+            ? `<div style="font-weight:800; color:#6b4226; font-size:0.78rem; white-space: normal; word-wrap: break-word; overflow-wrap: break-word;">${leftSubText}</div>`
+            : `<div style="font-weight:800; color:#6b4226; font-size:0.78rem;">${dateDisplay}<br>${timeDisplay}</div>`
+        }
       </div>
     </div>
   `;
@@ -378,11 +387,13 @@ window.printTableElement = function (tableId, title) {
   printWindow.document.write(`
     <html dir="rtl" lang="ar">
       <head>
+        <meta charset="utf-8" />
         <title>${title}</title>
         <style>
-          body { font-family: 'Cairo', 'Tajawal', sans-serif; direction: rtl; padding: 25px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
-          th, td { border: 1px solid #cbd5e1; padding: 8px 6px; text-align: center; }
+          @page { size: A4 landscape; margin: 10mm; }
+          body { font-family: 'Cairo', 'Tajawal', sans-serif; direction: rtl; padding: 15px; }
+          table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
+          th, td { border: 1px solid #cbd5e1; padding: 5px 4px; text-align: center; word-wrap: break-word; overflow-wrap: break-word; }
           th { background-color: #0a5c71; color: #ffffff; font-weight: bold; }
           .no-print, button { display: none !important; }
         </style>
@@ -461,9 +472,11 @@ window.generateMultiPagePDF = async function (
   chromeFooter,
   table,
   filename,
+  orientation = "landscape",
 ) {
-  const pageWidthMm = 297,
-    pageHeightMm = 210,
+  const isPortrait = orientation === "portrait";
+  const pageWidthMm = isPortrait ? 210 : 297,
+    pageHeightMm = isPortrait ? 297 : 210,
     marginMm = 6;
   const usableWidthMm = pageWidthMm - marginMm * 2;
   const usableHeightMm = pageHeightMm - marginMm * 2;
@@ -539,7 +552,7 @@ window.generateMultiPagePDF = async function (
         windowWidth: w,
         windowHeight: h,
       },
-      jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+      jsPDF: { unit: "mm", format: "a4", orientation },
     };
 
     if (pageIdx === 0) {
@@ -551,7 +564,7 @@ window.generateMultiPagePDF = async function (
       await worker.toCanvas();
       const canvas = worker.prop.canvas;
       const imgData = canvas.toDataURL("image/jpeg", 0.98);
-      pdfDoc.addPage();
+      pdfDoc.addPage([pageWidthMm, pageHeightMm], orientation);
       const imgProps = pdfDoc.getImageProperties(imgData);
       const imgHeightMm = (imgProps.height * usableWidthMm) / imgProps.width;
       pdfDoc.addImage(imgData, "JPEG", marginMm, marginMm, usableWidthMm, imgHeightMm);
@@ -2344,7 +2357,7 @@ window.handleSaveStudentComprehensive = function (e) {
   renderStudentsTable();
 };
 
-window.deleteStudent = function (studentId) {
+window.deleteStudent = async function (studentId) {
   const student = (window.appStore?.students || []).find(
     (s) => s.id === studentId,
   );
@@ -2359,14 +2372,17 @@ window.deleteStudent = function (studentId) {
     (u) => u.id !== studentId,
   );
 
-  if (typeof saveToCloud === "function") {
-    saveToCloud("students", studentId, null, true);
-    saveToCloud("users", studentId, null, true);
-  }
   if (typeof saveLocalStore === "function") saveLocalStore();
+  renderStudentsTable();
+
+  // ننتظر تأكيد الحذف الفعلي من الخادم قبل إعلان النجاح (بدل إعلانه فوراً ثم اكتشاف
+  // الفشل لاحقاً بصمت) - saveToCloud نفسها تعرض تنبيهاً واضحاً تلقائياً إن فشلت
+  if (typeof saveToCloud === "function") {
+    await saveToCloud("students", studentId, null, true);
+    await saveToCloud("users", studentId, null, true);
+  }
 
   alert(`✅ تم حذف الطالب (${student.name}) بنجاح!`);
-  renderStudentsTable();
 };
 
 window.toggleSelectAllStudents = function (masterCb) {
@@ -3335,6 +3351,28 @@ function getSundayToWednesdayDatesForWeek(weekOption = "current") {
   const now = new Date();
   const dayOfWeek = now.getDay();
 
+  // دورة عرض شاشة العرض فقط: نتيجة الأسبوع لا تُعرف فعلياً إلا يوم الأربعاء (اكتمال
+  // الأيام الأربعة أحد-أربعاء)، فتُعرض من ذلك الأربعاء وتبقى ثابتة أسبوعاً كاملاً حتى
+  // الأربعاء التالي - بحيث لا تفرغ الشاشة أبداً بين الأسبوعين (بخلاف "current" العادي
+  // المستخدم بصفحة إدارة التميز والذي يعني الأسبوع التقويمي الجاري كما هو)
+  if (weekOption === "screen_cycle") {
+    const offsetFromWednesday = (dayOfWeek + 4) % 7; // الأربعاء = يوم 3
+    const referenceWednesday = new Date(now);
+    referenceWednesday.setDate(now.getDate() - offsetFromWednesday);
+    const sunday = new Date(referenceWednesday);
+    sunday.setDate(referenceWednesday.getDate() - 3);
+    const days = [];
+    for (let i = 0; i < 4; i++) {
+      const d = new Date(sunday);
+      d.setDate(sunday.getDate() + i);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      days.push(`${y}-${m}-${day}`);
+    }
+    return days;
+  }
+
   let offsetWeeks = 0;
   if (weekOption === "w_1") offsetWeeks = 1;
   else if (weekOption === "w_2") offsetWeeks = 2;
@@ -3379,15 +3417,18 @@ function isStudentTamayuzForWeek(studentId, weekOption = "current") {
     const tasm = (window.appStore?.tasmeea || []).find(
       (t) => t.studentId === studentId && t.date === day,
     );
-    if (tasm) {
-      if (
-        !isCleanMumtazOrEmpty(tasm.hifzRating) ||
-        !isCleanMumtazOrEmpty(tasm.murajaaRating) ||
-        !isCleanMumtazOrEmpty(tasm.tilawaRating) ||
-        !isCleanMumtazOrEmpty(tasm.rating)
-      ) {
-        return false;
-      }
+    // لا يوجد سجل تسميع مُعتمَد فعلياً لهذا اليوم = يُعامل كـ"يعيد" ويُسقط الطالب من
+    // التميز (يمنع مرور طالب "مُرحَّل تلقائياً" لم يُعتمد له شيء فعلياً من قبل المعلم)
+    if (!tasm) {
+      return false;
+    }
+    if (
+      !isCleanMumtazOrEmpty(tasm.hifzRating) ||
+      !isCleanMumtazOrEmpty(tasm.murajaaRating) ||
+      !isCleanMumtazOrEmpty(tasm.tilawaRating) ||
+      !isCleanMumtazOrEmpty(tasm.rating)
+    ) {
+      return false;
     }
   }
 
@@ -3443,7 +3484,9 @@ window.renderTamayuzBoard = function () {
       (c) => c.id === stu.circleId,
     );
     const circleName = circle ? circle.name : "جامع الهدى";
-    const isTrophyWinner = stu.id === window.appStore?.trophyStudentId;
+    const isTrophyWinner = (window.appStore?.trophyStudentIds || []).includes(
+      stu.id,
+    );
 
     html += `
       <tr>
@@ -3509,7 +3552,126 @@ document.addEventListener("fullscreenchange", () => {
 window.renderScreenView = function () {
   const grid = document.getElementById("mosque-screen-grid");
   const tbody = document.getElementById("screen-manage-table-body");
-  const qualifyingStudents = getQualifyingTamayuzStudents("current");
+  const qualifyingStudents = getQualifyingTamayuzStudents("screen_cycle");
+
+  // الطالب "الأول" في كل حلقة (أول من يظهر ضمن ترتيب المتميزين الخاص بتلك الحلقة تحديداً)
+  // هو وحده المؤهل لنيل كأس التميز - بقية طلاب نفس الحلقة غير مؤهلين للكأس مهما كان ترتيبهم
+  const circleLeaderIds = new Set();
+  {
+    const seenCircles = new Set();
+    qualifyingStudents.forEach((stu) => {
+      if (!seenCircles.has(stu.circleId)) {
+        seenCircles.add(stu.circleId);
+        circleLeaderIds.add(stu.id);
+      }
+    });
+  }
+
+  // الكأس لا يُمنح تلقائياً أبداً - فقط من حدّده المدير صراحةً عبر مربع الاختيار في
+  // جدول "التحكم في ترتيب ظهور فرسان التميز" (كأس واحد كحد أقصى لكل حلقة بما أن
+  // المؤهل الوحيد هو "الأول" فيها)
+  const trophyStudentIds = new Set(window.appStore?.trophyStudentIds || []);
+
+  // مرجع تاريخ واحد موحّد تُبنى عليه كل لوحات الشاشة (تميز / منجزون أولاً / إحصائيات)
+  // لضمان تطابق التاريخ المعروض في جميع الشرائح دائماً بدل حساب كل شريحة له بمعزل
+  // عن الأخرى (وهو ما كان يسبب اختلاف التاريخ بين اللوحات سابقاً)
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+
+  // اسم مختصر (٣ مقاطع كحد أقصى) ليتّسع الخط الأكبر داخل اللوحة دون كسر التنسيق
+  const shortenNameForScreen = (fullName) => {
+    const tokens = String(fullName || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    // "بن"/"ال" وصلات لا تُحتسب من الأجزاء الثلاثة حتى لا ينتهي الاسم المختصر
+    // بكلمة معلّقة بلا معنى (مثل "...عبدالله ال" بدل "...عبدالله ال مهدي")
+    const connectors = new Set(["بن", "ابن", "آل", "ال"]);
+    const result = [];
+    let contentCount = 0;
+    for (let i = 0; i < tokens.length && contentCount < 3; i++) {
+      result.push(tokens[i]);
+      if (!connectors.has(tokens[i])) contentCount++;
+    }
+    if (
+      connectors.has(result[result.length - 1]) &&
+      result.length < tokens.length
+    ) {
+      result.push(tokens[result.length]);
+    }
+    return result.join(" ");
+  };
+
+  // لاحقة "رضي الله عنه" تُضاف تلقائياً فقط عندما يحمل اسم الحلقة اسم صحابي معروف
+  // (تُترك فارغة لأي حلقة أخرى، مثل حلقة مؤسس المَجْمَع، تجنباً لأي خطأ لفظي)
+  const KNOWN_COMPANION_NAMES = [
+    "أبو بكر",
+    "عمر بن الخطاب",
+    "عثمان بن عفان",
+    "علي بن أبي طالب",
+    "أنس بن مالك",
+    "معاذ بن جبل",
+    "خالد بن الوليد",
+    "بلال بن رباح",
+    "سعد بن أبي وقاص",
+    "الزبير بن العوام",
+    "طلحة بن عبيدالله",
+    "عبدالرحمن بن عوف",
+    "أبو عبيدة",
+    "عبدالله بن عمر",
+    "عبدالله بن مسعود",
+    "أبي بن كعب",
+    "معاوية بن أبي سفيان",
+    "سعيد بن زيد",
+  ];
+  // توحيد أشكال الألف (أ/إ/آ) قبل المقارنة حتى لا يفوت التطابق بسبب اختلاف كتابة
+  // الهمزة بين اسم الحلقة المُدخَل يدوياً وقائمة أسماء الصحابة أعلاه
+  const normalizeArabicAlef = (str) =>
+    String(str || "").replace(/[أإآ]/g, "ا");
+  const companionHonorific = (circleName) => {
+    const name = normalizeArabicAlef(circleName);
+    return KNOWN_COMPANION_NAMES.some((c) => name.includes(normalizeArabicAlef(c)))
+      ? '<span class="honorific">رضي الله عنه</span>'
+      : "";
+  };
+
+  // تاريخ هجري كامل بصيغة "يوم/شهر/سنة" (تقويم أم القرى) + اسم اليوم بالعربي
+  const getHijriFullLabel = (dateObj) => {
+    try {
+      const parts = new Intl.DateTimeFormat("en-u-ca-islamic-umalqura", {
+        day: "numeric",
+        month: "numeric",
+        year: "numeric",
+      }).formatToParts(dateObj);
+      const day = parts.find((p) => p.type === "day")?.value || "";
+      const month = parts.find((p) => p.type === "month")?.value || "";
+      const year = parts.find((p) => p.type === "year")?.value || "";
+      const dayName = new Intl.DateTimeFormat("ar", {
+        weekday: "long",
+      }).format(dateObj);
+      return day && month && year
+        ? `يوم ${dayName} ${day} / ${month} / ${year}هـ`
+        : "";
+    } catch (e) {
+      return "";
+    }
+  };
+
+  // نطاق الأسبوع الميلادي المعروض في لوحة التميز (من الأحد إلى الأربعاء) مع رقم الأسبوع،
+  // محسوب من نفس يوم أحد "screen_cycle" المعروض فعلياً لضمان تطابق الرقم مع التاريخ دوماً
+  const SCREEN_TAMAYUZ_EPOCH_SUNDAY = new Date(2026, 7, 30);
+  const buildTamayuzWeekPeriodLabel = () => {
+    const days = getSundayToWednesdayDatesForWeek("screen_cycle");
+    if (!days || days.length < 4) return "";
+    const [sy, sm, sd] = days[0].split("-").map(Number);
+    const [, wm, wd] = days[3].split("-").map(Number);
+    const sundayDate = new Date(sy, sm - 1, sd);
+    const diffDays = Math.round(
+      (sundayDate - SCREEN_TAMAYUZ_EPOCH_SUNDAY) / (24 * 60 * 60 * 1000),
+    );
+    const weekNum = Math.max(1, Math.floor(diffDays / 7) + 1);
+    return `الأسبوع ${weekNum} من الأحد ${sd} / ${sm} إلى الأربعاء ${wd} / ${wm}`;
+  };
 
   const displayCurrentSlide = () => {
     if (!grid) return;
@@ -3518,47 +3680,158 @@ window.renderScreenView = function () {
       if (qualifyingStudents.length === 0) {
         grid.innerHTML = `
           <div class="empty-state-card" style="grid-column:1/-1; padding:3rem 1.5rem; text-align:center; background:#fff; border-radius:12px; border:2px dashed #d7ccc8;">
-            <h2 style="color:var(--primary-brown); font-size:1.8rem; font-weight:900; margin-bottom:0.6rem;">🌟 لوحة فرسان التميز الأسبوعي 🌟</h2>
+            <h2 style="color:var(--primary-brown); font-size:1.8rem; font-weight:900; margin-bottom:0.6rem;">🌟 المتميزون في الحلقات 🌟</h2>
             <p class="text-muted" style="font-size:1.1rem;">لا يوجد طلاب حققوا شروط التميز لهذا الأسبوع حتى الآن (حضور 4 أيام كاملة من الأحد للأربعاء وتقييم ممتاز)</p>
           </div>
         `;
       } else {
-        let cardsHtml = `
-          <div style="grid-column: 1 / -1; text-align: center; margin-bottom: 0.5rem;">
-            <h2 style="font-size: 1.8rem; font-weight: 900; color: var(--primary-brown); margin: 0;">
-              🌟 لوحة فرسان التميز الأسبوعي 🌟
-            </h2>
-            <p class="text-muted" style="font-size: 0.95rem; margin: 4px 0 0 0;">نخبة الطلاب المحققين لنسبة حضور 100% وإتقان التسميع (ممتاز)</p>
-          </div>
-        `;
+        // تجميع الطلاب المتميزين حسب الحلقة - أي حلقة ليس بها أي طالب متميز لا تظهر إطلاقاً
+        // وترتيب الأعمدة يتبع ترتيب الحلقات نفسه كما هو موضح في جدول "إدارة الحلقات"
+        // (وليس ترتيب ظهور أول طالب متميز، حتى لا يتغيّر ترتيب الحلقات من أسبوع لآخر)
+        const circleGroupsById = {};
+        qualifyingStudents.forEach((stu) => {
+          if (!circleGroupsById[stu.circleId]) {
+            const circle = (window.appStore?.circles || []).find(
+              (c) => c.id === stu.circleId,
+            );
+            circleGroupsById[stu.circleId] = {
+              circleId: stu.circleId,
+              circleName: circle ? circle.name : "جامع الهدى",
+              students: [],
+            };
+          }
+          circleGroupsById[stu.circleId].students.push(stu);
+        });
 
-        qualifyingStudents.forEach((stu, idx) => {
-          const circle = (window.appStore?.circles || []).find(
-            (c) => c.id === stu.circleId,
-          );
-          const circleName = circle ? circle.name : "جامع الهدى";
-          const isTrophyWinner = stu.id === window.appStore?.trophyStudentId;
+        const circleGroups = (window.appStore?.circles || [])
+          .map((c) => circleGroupsById[c.id])
+          .filter(Boolean);
+        // أي طالب متميز مرتبط بحلقة لم تعد موجودة في جدول الحلقات (حالة نادرة) يُضاف
+        // في النهاية بدل إسقاطه بالكامل من اللوحة
+        Object.keys(circleGroupsById).forEach((cid) => {
+          if (!circleGroups.some((g) => g.circleId === cid)) {
+            circleGroups.push(circleGroupsById[cid]);
+          }
+        });
 
-          cardsHtml += `
-            <div class="card" style="text-align: center; border: ${isTrophyWinner ? "2.5px solid var(--primary-brown)" : "1.5px solid var(--border-color)"}; background: ${isTrophyWinner ? "#faf3eb" : "#ffffff"}; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.06); transition: all 0.3s ease;">
-              <div style="font-size: 2rem; font-weight: 900; color: var(--primary-brown); margin-bottom: 0.4rem;">
-                #${idx + 1} ${isTrophyWinner ? "🏆" : "⭐"}
+        const colsHtml = circleGroups
+          .map((group, gIdx) => {
+            const isTeal = gIdx % 2 === 0;
+            const barClass = isTeal ? "teal" : "brown";
+            const pillClass = isTeal ? "gray" : "tan";
+            const topStudent = group.students[0];
+            const restHtml = group.students
+              .slice(1)
+              .map(
+                (stu) => `
+                  <div class="screen-pill ${pillClass}">${escapeHtml(shortenNameForScreen(stu.name))}</div>
+                `,
+              )
+              .join("");
+
+            const isTrophyWinner = trophyStudentIds.has(topStudent.id);
+            return `
+              <div class="screen-circle-col">
+                <div class="screen-circle-title">${escapeHtml(group.circleName)} ${companionHonorific(group.circleName)}</div>
+                <div class="screen-rank-bar ${barClass}${isTrophyWinner ? " trophy" : ""}">${isTrophyWinner ? "🏆 " : ""}${escapeHtml(shortenNameForScreen(topStudent.name))}</div>
+                ${restHtml}
               </div>
-              <h3 style="font-size: 1.3rem; font-weight: 900; color: var(--text-dark); margin-bottom: 6px;">${stu.name}</h3>
-              <p class="text-muted" style="font-size: 0.95rem; font-weight: 700; margin-bottom: 12px;">🕌 حلقة: ${circleName}</p>
-              <div style="display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap;">
-                <span class="badge badge-active" style="font-size: 0.82rem; padding: 0.4rem 0.8rem;">حضور 4 أيام كاملة</span>
-                <span class="badge badge-active" style="font-size: 0.82rem; padding: 0.4rem 0.8rem;">إتقان ممتاز</span>
+            `;
+          })
+          .join("");
+
+        grid.innerHTML = `
+          <div class="screen-board">
+            <div class="screen-board-rail"></div>
+            <div class="screen-board-body">
+              <div class="screen-board-header">
+                <img src="report_logo_right.png" alt="شعار المَجْمَع" />
+                <div class="screen-board-title">
+                  <h2>المتميزون في الحلقات</h2>
+                  <p>الحضور كامل الاسبوع وحصول الطالب على تقدير ممتاز على المنهج لكل الاسبوع</p>
+                  <p class="screen-board-period">${buildTamayuzWeekPeriodLabel()}</p>
+                </div>
+                <img src="report_logo_left.png" alt="شعار المَجْمَع" />
+              </div>
+              <div class="screen-circle-cols">${colsHtml}</div>
+              <div class="screen-board-footer">
+                <span style="color: var(--primary-teal);">الشاشة الالكترونية للمَجْمَع</span>
+                <span>إدارة المَجْمَع القرآني</span>
               </div>
             </div>
-          `;
-        });
-        grid.innerHTML = cardsHtml;
+          </div>
+        `;
       }
+    } else if (window.screenCurrentSlide === "topcompleted") {
+      const todayTasmeeaTop = (window.appStore?.tasmeea || []).filter(
+        (t) => t.date === todayStr,
+      );
+
+      const buildTopCompletedPills = (
+        fieldName,
+        ratingFieldName,
+        orderFieldName,
+        pillClass,
+      ) => {
+        const rows = todayTasmeeaTop
+          .filter((t) => t[fieldName] && String(t[fieldName]).trim() !== "")
+          .filter((t) => String(t[ratingFieldName] || "").trim() !== "يعيد")
+          .sort(
+            (a, b) =>
+              (a[orderFieldName] || a.updatedAt || 0) -
+              (b[orderFieldName] || b.updatedAt || 0),
+          )
+          .slice(0, 15);
+
+        if (rows.length === 0) {
+          return `<div class="screen-pill ${pillClass}" style="opacity:0.6;">لا يوجد بعد</div>`;
+        }
+
+        return rows
+          .map((t, idx) => {
+            const student = (window.appStore?.students || []).find(
+              (s) => s.id === t.studentId,
+            );
+            return `<div class="screen-pill ${pillClass}"><span class="rank-num">${idx + 1}</span>${escapeHtml(shortenNameForScreen(student ? student.name : "—"))}</div>`;
+          })
+          .join("");
+      };
+
+      grid.innerHTML = `
+        <div class="screen-board">
+          <div class="screen-board-rail"></div>
+          <div class="screen-board-body">
+            <div class="screen-board-header">
+              <img src="report_logo_right.png" alt="شعار المَجْمَع" />
+              <div class="screen-board-title">
+                <h2>المنجزون أولاً</h2>
+                <p>المنجزون في حلقات الدرس والمراجعة والتلاوة أولاً</p>
+                <p class="screen-board-period">${getHijriFullLabel(now)}</p>
+              </div>
+              <img src="report_logo_left.png" alt="شعار المَجْمَع" />
+            </div>
+            <div class="screen-circle-cols" style="grid-template-columns: repeat(3, 1fr);">
+              <div class="screen-circle-col">
+                <div class="screen-circle-title">حلقة الدرس الجديد</div>
+                ${buildTopCompletedPills("hifzSurah", "hifzRating", "hifzOrderAt", "gray")}
+              </div>
+              <div class="screen-circle-col">
+                <div class="screen-circle-title">حلقة المراجعة</div>
+                ${buildTopCompletedPills("murajaaSurah", "murajaaRating", "murajaaOrderAt", "tan")}
+              </div>
+              <div class="screen-circle-col">
+                <div class="screen-circle-title">حلقة التلاوة</div>
+                ${buildTopCompletedPills("tilawaSurah", "tilawaRating", "tilawaOrderAt", "gray")}
+              </div>
+            </div>
+            <div class="screen-board-footer">
+              <span style="color: var(--primary-teal);">الشاشة الالكترونية للمَجْمَع</span>
+              <span>إدارة المَجْمَع القرآني</span>
+            </div>
+          </div>
+        </div>
+      `;
     } else {
-      const todayStr =
-        document.getElementById("dashboard-date-select")?.value ||
-        new Date().toISOString().split("T")[0];
       const isWorkday =
         typeof isOfficialWorkday === "function"
           ? isOfficialWorkday(todayStr)
@@ -3591,69 +3864,6 @@ window.renderScreenView = function () {
           .filter((t) => t.hifzSurah || t.murajaaSurah || t.tilawaSurah)
           .map((t) => t.studentId),
       ).size;
-
-      // اسم مختصر (٣ مقاطع كحد أقصى) ليتّسع الخط الأكبر داخل الجدول دون كسر التنسيق
-      const shortenNameForScreen = (fullName) => {
-        const tokens = String(fullName || "")
-          .trim()
-          .split(/\s+/)
-          .filter(Boolean);
-        // "بن"/"ال" وصلات لا تُحتسب من الأجزاء الثلاثة حتى لا ينتهي الاسم المختصر
-        // بكلمة معلّقة بلا معنى (مثل "...عبدالله ال" بدل "...عبدالله ال مهدي")
-        const connectors = new Set(["بن", "ابن", "آل", "ال"]);
-        const result = [];
-        let contentCount = 0;
-        for (let i = 0; i < tokens.length && contentCount < 3; i++) {
-          result.push(tokens[i]);
-          if (!connectors.has(tokens[i])) contentCount++;
-        }
-        if (
-          connectors.has(result[result.length - 1]) &&
-          result.length < tokens.length
-        ) {
-          result.push(tokens[result.length]);
-        }
-        return result.join(" ");
-      };
-
-      // بناء جدول أول 15 طالباً أتموا قسماً معيناً اليوم (الأقدم اعتماداً أولاً)
-      const buildTopCompletedRows = (fieldName, ratingFieldName, orderFieldName) => {
-        // الترتيب يعتمد على "وقت أول اعتماد فعلي" لهذا القسم بعينه (orderFieldName) وليس
-        // وقت آخر تعديل - فبمجرد دخول الطالب ضمن أول 15 يثبت مكانه نهائياً طوال اليوم
-        // ولا يتغيّر حتى لو عُدِّل سجله لاحقاً (تصحيح تقدير، تعديل ملاحظة...)؛ السجلات
-        // القديمة التي لا تملك بعد هذا الحقل (قبل هذا التحديث) ترجع لوقت آخر تعديل احتياطياً
-        const rows = todayTasmeea
-          .filter((t) => t[fieldName] && String(t[fieldName]).trim() !== "")
-          .filter((t) => String(t[ratingFieldName] || "").trim() !== "يعيد")
-          .sort(
-            (a, b) =>
-              (a[orderFieldName] || a.updatedAt || 0) -
-              (b[orderFieldName] || b.updatedAt || 0),
-          )
-          .slice(0, 15);
-
-        if (rows.length === 0) {
-          return '<tr><td colspan="3" class="text-center text-muted p-2" style="font-size:0.85rem;">لا يوجد بعد</td></tr>';
-        }
-
-        return rows
-          .map((t, idx) => {
-            const student = (window.appStore?.students || []).find(
-              (s) => s.id === t.studentId,
-            );
-            const circle = (window.appStore?.circles || []).find(
-              (c) => c.id === t.circleId,
-            );
-            return `
-              <tr>
-                <td class="screen-rank-num" style="text-align:center; font-weight:800;">${idx + 1}</td>
-                <td class="screen-student-name" style="font-weight:800;">${escapeHtml(shortenNameForScreen(student ? student.name : "—"))}</td>
-                <td class="screen-circle-name">${escapeHtml(circle ? circle.name : "—")}</td>
-              </tr>
-            `;
-          })
-          .join("");
-      };
 
       grid.innerHTML = `
         <div style="grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.15rem;">
@@ -3720,51 +3930,28 @@ window.renderScreenView = function () {
             </div>
           </div>
         </div>
-
-        <div style="grid-column: 1 / -1; margin-top: 0.15rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem;">
-          <div class="card" style="padding: 0.4rem; margin-bottom: 0;">
-            <h3 style="font-size: 1rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 2px; text-align:center;">📖 أول 15 أتموا</h3>
-            <p style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin: 0 0 0.2rem 0; text-align:center;">(الدرس الجديد)</p>
-            <table class="data-table mini-report-table">
-              <thead><tr><th style="width:30px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
-              <tbody>${buildTopCompletedRows("hifzSurah", "hifzRating", "hifzOrderAt")}</tbody>
-            </table>
-          </div>
-          <div class="card" style="padding: 0.4rem; margin-bottom: 0;">
-            <h3 style="font-size: 0.72rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0; text-align:center;">🔄 أول 15 أتموا</h3>
-            <p style="font-size: 0.62rem; font-weight: 700; color: var(--text-muted); margin: 0 0 0.1rem 0; text-align:center;">(المراجعة)</p>
-            <table class="data-table mini-report-table">
-              <thead><tr><th style="width:30px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
-              <tbody>${buildTopCompletedRows("murajaaSurah", "murajaaRating", "murajaaOrderAt")}</tbody>
-            </table>
-          </div>
-          <div class="card" style="padding: 0.4rem; margin-bottom: 0;">
-            <h3 style="font-size: 0.72rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0; text-align:center;">🎧 أول 15 أتموا</h3>
-            <p style="font-size: 0.62rem; font-weight: 700; color: var(--text-muted); margin: 0 0 0.1rem 0; text-align:center;">(التلاوة)</p>
-            <table class="data-table mini-report-table">
-              <thead><tr><th style="width:30px;">م</th><th>الطالب</th><th>الحلقة</th></tr></thead>
-              <tbody>${buildTopCompletedRows("tilawaSurah", "tilawaRating", "tilawaOrderAt")}</tbody>
-            </table>
-          </div>
-        </div>
       `;
     }
   };
 
-  // التبديل بين لوحة التميز ولوحة الإحصائيات يتم فقط عند وجود طلاب متميزين لهذا الأسبوع
-  // وإلا تبقى شاشة الإحصائيات ظاهرة دائماً بدون تبديل لعدم إضاعة وقت العرض على لوحة فارغة
-  const hasTamayuzThisWeek = qualifyingStudents.length > 0;
-  if (!hasTamayuzThisWeek) {
-    window.screenCurrentSlide = "stats";
+  // التبديل بين لوحة التميز ولوحة المنجزون أولاً ولوحة الإحصائيات: لوحة التميز تُضاف
+  // للدورة فقط عند وجود طلاب متميزين لهذا الأسبوع، وإلا تُستبعد لعدم إضاعة وقت العرض
+  // على لوحة فارغة (بقية اللوحتين تبقيان ضمن الدورة دائماً)
+  const availableScreenSlides = ["stats", "topcompleted"];
+  if (qualifyingStudents.length > 0) availableScreenSlides.unshift("tamayuz");
+
+  if (!availableScreenSlides.includes(window.screenCurrentSlide)) {
+    window.screenCurrentSlide = availableScreenSlides[0];
   }
 
   displayCurrentSlide();
 
   if (window.screenFlipTimer) clearInterval(window.screenFlipTimer);
-  if (hasTamayuzThisWeek) {
+  if (availableScreenSlides.length > 1) {
     window.screenFlipTimer = setInterval(() => {
-      window.screenCurrentSlide =
-        window.screenCurrentSlide === "tamayuz" ? "stats" : "tamayuz";
+      const curIdx = availableScreenSlides.indexOf(window.screenCurrentSlide);
+      const nextIdx = (curIdx + 1) % availableScreenSlides.length;
+      window.screenCurrentSlide = availableScreenSlides[nextIdx];
       displayCurrentSlide();
     }, 30000);
   }
@@ -3805,13 +3992,19 @@ window.renderScreenView = function () {
           (c) => c.id === stu.circleId,
         );
         const circleName = circle ? circle.name : "جامع الهدى";
-        const isTrophyWinner = stu.id === window.appStore?.trophyStudentId;
+        const isTrophyWinner = trophyStudentIds.has(stu.id);
+        // الكأس متاح فقط لطالب "الأول" في حلقته - بقية طلاب الحلقة لا يظهر لهم مربع اختيار
+        const isTrophyEligible = circleLeaderIds.has(stu.id);
 
         tbodyHtml += `
           <tr>
             <td style="text-align: center; font-weight: 800;">${idx + 1} ${isTrophyWinner ? "🏆" : ""}</td>
             <td style="text-align: center;">
-              <input type="checkbox" title="منح الكأس لهذا الطالب" ${isTrophyWinner ? "checked" : ""} onchange="setTrophyStudent('${stu.id}')" style="width: 18px; height: 18px; cursor: pointer;">
+              ${
+                isTrophyEligible
+                  ? `<input type="checkbox" title="منح الكأس لهذا الطالب" ${isTrophyWinner ? "checked" : ""} onchange="setTrophyStudent('${stu.id}')" style="width: 18px; height: 18px; cursor: pointer;">`
+                  : `<span class="text-muted" style="font-size:0.8rem;" title="الكأس متاح فقط لأول طالب في كل حلقة">—</span>`
+              }
             </td>
             <td style="font-weight: 700;">${stu.name}</td>
             <td>${circleName}</td>
@@ -3829,7 +4022,7 @@ window.renderScreenView = function () {
 };
 
 window.moveScreenStudentUp = function (index) {
-  const students = getQualifyingTamayuzStudents("current");
+  const students = getQualifyingTamayuzStudents("screen_cycle");
   if (index <= 0 || index >= students.length) return;
 
   const currentIds = students.map((s) => s.id);
@@ -3845,7 +4038,7 @@ window.moveScreenStudentUp = function (index) {
 };
 
 window.moveScreenStudentDown = function (index) {
-  const students = getQualifyingTamayuzStudents("current");
+  const students = getQualifyingTamayuzStudents("screen_cycle");
   if (index < 0 || index >= students.length - 1) return;
 
   const currentIds = students.map((s) => s.id);
@@ -3865,23 +4058,29 @@ window.resetScreenStudentOrder = function () {
   if (typeof saveToCloud === "function")
     saveToCloud("screenOrder", "current_order", {
       order: [],
-      trophyStudentId: window.appStore.trophyStudentId || null,
+      trophyStudentIds: [...(window.appStore.trophyStudentIds || [])],
     });
   if (typeof saveLocalStore === "function") saveLocalStore();
   renderScreenView();
   alert("✅ تمت إعادة الترتيب التلقائي بنجاح!");
 };
 
-// تحديد/إلغاء الطالب الحاصل على كأس التميز لهذا الأسبوع (باختيار المدير فقط)
+// تحديد/إلغاء الطالب الحاصل على كأس التميز لحلقته (باختيار المدير فقط) - يمكن أن يحمل
+// كل حلقة كأسها الخاص في نفس الوقت (وليس كأساً واحداً لعموم المَجْمَع كما كان سابقاً)
 window.setTrophyStudent = function (studentId) {
-  const newTrophyId =
-    window.appStore.trophyStudentId === studentId ? null : studentId;
-  window.appStore.trophyStudentId = newTrophyId;
+  const current = new Set(window.appStore.trophyStudentIds || []);
+  if (current.has(studentId)) {
+    current.delete(studentId);
+  } else {
+    current.add(studentId);
+  }
+  const newTrophyIds = Array.from(current);
+  window.appStore.trophyStudentIds = newTrophyIds;
 
   if (typeof saveToCloud === "function") {
     saveToCloud("screenOrder", "current_order", {
       order: [...(window.appStore.screenOrder || [])],
-      trophyStudentId: newTrophyId,
+      trophyStudentIds: newTrophyIds,
     });
   }
   if (typeof saveLocalStore === "function") saveLocalStore();
@@ -4551,3 +4750,398 @@ function getCircleName(circleId) {
   const c = (window.appStore?.circles || []).find((x) => x.id === circleId);
   return c ? c.name : "—";
 }
+
+// ==========================================================================
+// القسم المالي: التقارير المالية (إيرادات/مصروفات) + مسير الرواتب
+// الصلاحيات: المدير يُعدّل كل شيء. المعلم المعيَّن "مسؤول مالي" (isFinance) يرى
+// الإيرادات/المصروفات بدون تعديل، ويستطيع فقط إضافة/تعديل "الزيادة" لبقية
+// المعلمين في مسير الرواتب (وليس لنفسه، ولا لمكافآتهم الأساسية)
+// ==========================================================================
+
+function isFinanceAdminUser() {
+  return Boolean(window.currentUser && window.currentUser.role === "admin");
+}
+
+function isFinanceTeacherUser() {
+  const user = window.currentUser;
+  if (!user || user.role !== "teacher") return false;
+  if (user.isFinance === true) return true;
+  const teacherId = user.teacherId || user.id;
+  if (window.appStore?.settings?.financialTeacherId === teacherId) return true;
+  return (window.appStore?.teachers || []).some(
+    (t) =>
+      (t.id === teacherId || t.userId === user.id) && t.isFinance === true,
+  );
+}
+
+window.switchFinanceSubTab = function (tab) {
+  const btnReports = document.getElementById("tab-btn-finance-reports");
+  const btnPayroll = document.getElementById("tab-btn-finance-payroll");
+  const boxReports = document.getElementById("box-finance-reports");
+  const boxPayroll = document.getElementById("box-finance-payroll");
+
+  if (tab === "payroll") {
+    btnPayroll?.classList.add("active");
+    btnReports?.classList.remove("active");
+    if (boxPayroll) {
+      boxPayroll.classList.remove("style-hidden");
+      boxPayroll.style.display = "block";
+    }
+    if (boxReports) {
+      boxReports.classList.add("style-hidden");
+      boxReports.style.display = "none";
+    }
+    renderPayrollTable();
+  } else {
+    btnReports?.classList.add("active");
+    btnPayroll?.classList.remove("active");
+    if (boxReports) {
+      boxReports.classList.remove("style-hidden");
+      boxReports.style.display = "block";
+    }
+    if (boxPayroll) {
+      boxPayroll.classList.add("style-hidden");
+      boxPayroll.style.display = "none";
+    }
+    renderFinanceReports();
+  }
+};
+
+window.renderFinanceReports = function () {
+  const revBody = document.getElementById("finance-revenues-tbody");
+  const expBody = document.getElementById("finance-expenses-tbody");
+  if (!revBody || !expBody) return;
+
+  const isAdmin = isFinanceAdminUser();
+  const fmt = (n) =>
+    (Math.round((n + Number.EPSILON) * 100) / 100).toLocaleString("ar-SA");
+
+  const revenues = (window.appStore.financeRevenues || [])
+    .slice()
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const expenses = (window.appStore.financeExpenses || [])
+    .slice()
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  const totalRevenue = revenues.reduce(
+    (sum, r) => sum + (parseFloat(r.amount) || 0),
+    0,
+  );
+  const totalExpense = expenses.reduce(
+    (sum, e) => sum + (parseFloat(e.amount) || 0),
+    0,
+  );
+  const netBalance = totalRevenue - totalExpense;
+
+  const totalRevenueEl = document.getElementById("finance-total-revenue");
+  const totalExpenseEl = document.getElementById("finance-total-expense");
+  const netBalanceEl = document.getElementById("finance-net-balance");
+  if (totalRevenueEl) totalRevenueEl.textContent = fmt(totalRevenue);
+  if (totalExpenseEl) totalExpenseEl.textContent = fmt(totalExpense);
+  if (netBalanceEl) netBalanceEl.textContent = fmt(netBalance);
+
+  revBody.innerHTML =
+    revenues.length === 0
+      ? '<tr><td colspan="4" class="text-center text-muted p-3">لا توجد إيرادات مسجلة</td></tr>'
+      : revenues
+          .map(
+            (r) => `
+        <tr>
+          <td>${escapeHtml(r.date) || "—"}</td>
+          <td>${escapeHtml(r.source) || "—"}</td>
+          <td style="color:#2e7d32; font-weight:800;">${fmt(parseFloat(r.amount) || 0)}</td>
+          <td class="nav-admin-only">${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="deleteFinanceRevenue('${r.id}')">حذف</button>` : ""}</td>
+        </tr>
+      `,
+          )
+          .join("");
+
+  expBody.innerHTML =
+    expenses.length === 0
+      ? '<tr><td colspan="5" class="text-center text-muted p-3">لا توجد مصروفات مسجلة</td></tr>'
+      : expenses
+          .map(
+            (e) => `
+        <tr>
+          <td>${escapeHtml(e.date) || "—"}</td>
+          <td>${escapeHtml(e.category) || "—"}</td>
+          <td>${escapeHtml(e.notes) || "—"}</td>
+          <td style="color:#c62828; font-weight:800;">${fmt(parseFloat(e.amount) || 0)}</td>
+          <td class="nav-admin-only">${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="deleteFinanceExpense('${e.id}')">حذف</button>` : ""}</td>
+        </tr>
+      `,
+          )
+          .join("");
+};
+
+window.handleAddFinanceRevenue = function (e) {
+  e.preventDefault();
+  if (!isFinanceAdminUser()) {
+    alert("⚠️ إضافة الإيرادات متاحة للمدير فقط.");
+    return;
+  }
+  const form = e.target;
+  const amount = parseFloat(form.elements["amount"].value);
+  const date = form.elements["date"].value;
+  const source = (form.elements["source"].value || "").trim();
+  if (!amount || amount <= 0 || !date) {
+    alert("⚠️ يرجى إدخال مبلغ وتاريخ صحيحين.");
+    return;
+  }
+
+  const record = {
+    id: "rev_" + Date.now(),
+    amount,
+    date,
+    source,
+    createdBy: window.currentUser.name,
+    createdAt: Date.now(),
+  };
+  if (!window.appStore.financeRevenues) window.appStore.financeRevenues = [];
+  window.appStore.financeRevenues.push(record);
+  if (typeof saveToCloud === "function")
+    saveToCloud("financeRevenues", record.id, record);
+  if (typeof saveLocalStore === "function") saveLocalStore();
+  form.reset();
+  renderFinanceReports();
+};
+
+window.handleAddFinanceExpense = function (e) {
+  e.preventDefault();
+  if (!isFinanceAdminUser()) {
+    alert("⚠️ إضافة المصروفات متاحة للمدير فقط.");
+    return;
+  }
+  const form = e.target;
+  const category = (form.elements["category"].value || "").trim();
+  const amount = parseFloat(form.elements["amount"].value);
+  const date = form.elements["date"].value;
+  const notes = (form.elements["notes"].value || "").trim();
+  if (!category || !amount || amount <= 0 || !date) {
+    alert("⚠️ يرجى إدخال الصنف والمبلغ والتاريخ بشكل صحيح.");
+    return;
+  }
+
+  const record = {
+    id: "exp_" + Date.now(),
+    category,
+    amount,
+    date,
+    notes,
+    createdBy: window.currentUser.name,
+    createdAt: Date.now(),
+  };
+  if (!window.appStore.financeExpenses) window.appStore.financeExpenses = [];
+  window.appStore.financeExpenses.push(record);
+  if (typeof saveToCloud === "function")
+    saveToCloud("financeExpenses", record.id, record);
+  if (typeof saveLocalStore === "function") saveLocalStore();
+  form.reset();
+  renderFinanceReports();
+};
+
+window.deleteFinanceRevenue = function (id) {
+  if (!isFinanceAdminUser()) return;
+  if (!confirm("هل أنت متأكد من حذف هذا الإيراد؟")) return;
+  window.appStore.financeRevenues = (
+    window.appStore.financeRevenues || []
+  ).filter((r) => r.id !== id);
+  if (typeof saveToCloud === "function")
+    saveToCloud("financeRevenues", id, null, true);
+  if (typeof saveLocalStore === "function") saveLocalStore();
+  renderFinanceReports();
+};
+
+window.deleteFinanceExpense = function (id) {
+  if (!isFinanceAdminUser()) return;
+  if (!confirm("هل أنت متأكد من حذف هذا المصروف؟")) return;
+  window.appStore.financeExpenses = (
+    window.appStore.financeExpenses || []
+  ).filter((e) => e.id !== id);
+  if (typeof saveToCloud === "function")
+    saveToCloud("financeExpenses", id, null, true);
+  if (typeof saveLocalStore === "function") saveLocalStore();
+  renderFinanceReports();
+};
+
+window.exportFinanceRevenuesExcel = function () {
+  const table = document.getElementById("finance-revenues-table");
+  if (!table || typeof XLSX === "undefined") {
+    alert("⚠️ لا توجد بيانات لتصديرها.");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "الإيرادات" });
+  XLSX.writeFile(
+    wb,
+    `سجل_الإيرادات_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+};
+
+window.exportFinanceExpensesExcel = function () {
+  const table = document.getElementById("finance-expenses-table");
+  if (!table || typeof XLSX === "undefined") {
+    alert("⚠️ لا توجد بيانات لتصديرها.");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "المصروفات" });
+  XLSX.writeFile(
+    wb,
+    `سجل_المصروفات_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+};
+
+// ---- مسير الرواتب ----
+
+function getPayrollRecord(teacherId, month) {
+  const id = `payroll_${teacherId}_${month}`;
+  return (
+    (window.appStore.payroll || []).find((p) => p.id === id) || {
+      id,
+      teacherId,
+      month,
+      baseSalary: 0,
+      bonus: 0,
+    }
+  );
+}
+
+// عدد أيام العمل الرسمية (أحد-أربعاء) خلال شهر ميلادي بصيغة YYYY-MM
+function countWorkdaysInMonth(month) {
+  const [y, m] = month.split("-").map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  let count = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const isWorkday =
+      typeof isOfficialWorkday === "function"
+        ? isOfficialWorkday(dateStr)
+        : true;
+    if (isWorkday) count++;
+  }
+  return count || 1;
+}
+
+window.renderPayrollTable = function () {
+  const tbody = document.getElementById("payroll-tbody");
+  const monthInput = document.getElementById("payroll-month-select");
+  if (!tbody || !monthInput) return;
+
+  if (!monthInput.value) {
+    const now = new Date();
+    monthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }
+  const month = monthInput.value;
+  const workdaysInMonth = countWorkdaysInMonth(month);
+
+  const isAdmin = isFinanceAdminUser();
+  const isFinTeacher = isFinanceTeacherUser();
+  const currentUserTeacherId = window.currentUser
+    ? window.currentUser.teacherId || window.currentUser.id
+    : null;
+
+  const teachers = (window.appStore.teachers || []).filter(
+    (t) => t.status !== "suspended",
+  );
+  const fmt = (n) =>
+    (Math.round((n + Number.EPSILON) * 100) / 100).toLocaleString("ar-SA");
+
+  tbody.innerHTML = teachers
+    .map((t) => {
+      const rec = getPayrollRecord(t.id, month);
+      const attRecords = (window.appStore.teacherAttendance || []).filter(
+        (a) => a.teacherId === t.id && a.date && a.date.startsWith(month),
+      );
+      const presentDays = attRecords.filter(
+        (a) => a.status === "present" || a.status === "late",
+      ).length;
+      const excusedDays = attRecords.filter(
+        (a) => a.status === "excused",
+      ).length;
+      const absentDays = Math.max(
+        0,
+        workdaysInMonth - presentDays - excusedDays,
+      );
+
+      const baseSalary = parseFloat(rec.baseSalary) || 0;
+      const bonus = parseFloat(rec.bonus) || 0;
+      const dailyRate = workdaysInMonth > 0 ? baseSalary / workdaysInMonth : 0;
+      const deduction = dailyRate * absentDays;
+      const total = Math.max(0, baseSalary - deduction + bonus);
+
+      const canEditBase = isAdmin;
+      const canEditBonus =
+        isAdmin || (isFinTeacher && t.id !== currentUserTeacherId);
+
+      return `
+      <tr>
+        <td style="font-weight:700; text-align:right;">${escapeHtml(t.name)}</td>
+        <td>${
+          canEditBase
+            ? `<input type="number" step="0.01" min="0" class="form-control" style="width:110px; display:inline-block;" value="${baseSalary}" onchange="savePayrollField('${t.id}', '${month}', 'baseSalary', this.value)">`
+            : fmt(baseSalary)
+        }</td>
+        <td>${fmt(dailyRate)}</td>
+        <td style="color:#2e7d32; font-weight:700;">${presentDays}</td>
+        <td style="color:#c62828; font-weight:700;">${absentDays}</td>
+        <td style="color:#1565c0; font-weight:700;">${excusedDays}</td>
+        <td>${
+          canEditBonus
+            ? `<input type="number" step="0.01" class="form-control" style="width:100px; display:inline-block;" value="${bonus}" onchange="savePayrollField('${t.id}', '${month}', 'bonus', this.value)">`
+            : fmt(bonus)
+        }</td>
+        <td style="font-weight:900; color:var(--primary-brown);">${fmt(total)}</td>
+      </tr>
+    `;
+    })
+    .join("");
+};
+
+window.savePayrollField = function (teacherId, month, field, value) {
+  const isAdmin = isFinanceAdminUser();
+  const isFinTeacher = isFinanceTeacherUser();
+  const currentUserTeacherId = window.currentUser
+    ? window.currentUser.teacherId || window.currentUser.id
+    : null;
+
+  if (field === "baseSalary" && !isAdmin) {
+    alert("⚠️ تعديل المكافأة الأساسية متاح للمدير فقط.");
+    renderPayrollTable();
+    return;
+  }
+  if (
+    field === "bonus" &&
+    !(isAdmin || (isFinTeacher && teacherId !== currentUserTeacherId))
+  ) {
+    alert("⚠️ غير مصرح لك بهذا التعديل.");
+    renderPayrollTable();
+    return;
+  }
+
+  const id = `payroll_${teacherId}_${month}`;
+  let rec = (window.appStore.payroll || []).find((p) => p.id === id);
+  if (!rec) {
+    rec = { id, teacherId, month, baseSalary: 0, bonus: 0 };
+    if (!window.appStore.payroll) window.appStore.payroll = [];
+    window.appStore.payroll.push(rec);
+  }
+  rec[field] = parseFloat(value) || 0;
+  rec.updatedBy = window.currentUser?.name || "";
+  rec.updatedAt = Date.now();
+
+  if (typeof saveToCloud === "function") saveToCloud("payroll", id, rec);
+  if (typeof saveLocalStore === "function") saveLocalStore();
+  renderPayrollTable();
+};
+
+window.exportPayrollExcel = function () {
+  const table = document.getElementById("payroll-table");
+  if (!table || typeof XLSX === "undefined") {
+    alert("⚠️ لا توجد بيانات لتصديرها.");
+    return;
+  }
+  const wb = XLSX.utils.table_to_book(table, { sheet: "مسير الرواتب" });
+  XLSX.writeFile(
+    wb,
+    `مسير_الرواتب_${new Date().toISOString().split("T")[0]}.xlsx`,
+  );
+};

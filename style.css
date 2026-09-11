@@ -1,36 +1,33 @@
 /* ==========================================================================
    style.css - الهوية البصرية الرسمية لمَجْمَع عبدالله بن مهدي القرآني
-   (أزرق بترولي + أخضر مائل للأزرق + لمسات ذهبية وبنّية ورصاصية أنيقة)
+   (أزرق بترولي ملكي + خطوط ذهبية عسلية ديكورية + أرضيات بيضاء نقية)
+   تنسيقات الواجهات، شاشة العرض، والتقارير الأربعة المعتمدة
    ========================================================================== */
 
 :root {
-  /* الأزرق البترولي المعتمد من قبة الشعار */
+  /* الأزرق البترولي الملكي المعتمد من قبة الشعار */
   --primary-teal: #0a5c71;
   --primary-teal-dark: #074352;
   --primary-teal-light: #eaf4f7;
-  --primary-teal-subtle: #f3f8fa;
+  --primary-teal-subtle: #f2f7f9;
 
-  /* أزرق فاتح زاهٍ يُستخدم كلمسة تزيينية إضافية (تدرّجات، حدود، تمييز عند التحويم) */
-  --accent-skyblue: #4fa3d1;
-  --accent-skyblue-dark: #2f7fab;
-  --accent-skyblue-light: #eaf6fc;
-
-  /* الذهبي العسلي المعتمد من قباب جامع الهدى وحامل المصحف والخطوط الديكورية */
+  /* الذهبي العسلي المعتمد للخطوط الديكورية وقباب جامع الهدى */
   --accent-gold: #c59b27;
   --accent-gold-dark: #9e7817;
   --accent-gold-light: #fdfaf2;
   --accent-gold-border: #ebd99f;
 
-  /* البني الخشبي الدافئ لغلاف المصحف - يُستخدم كلمسة تزيينية ثانية (تحويم/ضغط الأزرار) */
+  /* البني الخشبي الدافئ لحامل المصحف الشريف والتذييل */
   --wood-brown: #6b4226;
   --wood-brown-dark: #4a2c18;
   --wood-brown-light: #f7efe8;
 
-  /* الرصاصي الأنيق كلمسة تزيينية محايدة إضافية */
+  /* لمسات مائية ورصاصية محايدة */
+  --accent-skyblue: #4fa3d1;
   --accent-slate: #5b6472;
-  --accent-slate-light: #f1f3f5;
+  --accent-slate-light: #f1f5f9;
 
-  /* متغيرات التوافقية البرمجية لمنع أي تعارض مع ملفات الـ JS */
+  /* متغيرات التوافقية البرمجية التامة لمنع أي تعارض مع ملفات JS */
   --primary-brown: #0a5c71;
   --primary-dark: #074352;
   --primary-light: #eaf4f7;
@@ -41,20 +38,20 @@
   --primary-navy-dark: #074352;
   --primary-blue: #0a5c71;
 
-  /* الأرضيات البيضاء المشرقة (خالية تماماً من القتامة أو السواد) */
+  /* الأرضيات البيضاء النقية المشرقة (خالية تماماً من القتامة أو السواد) */
   --bg-main: #f8fafc;
   --bg-card: #ffffff;
   --bg-card-subtle: #fcfdfe;
   --border-color: #e2e8f0;
   --border-color-hover: #cbd5e1;
 
-  /* ألوان النصوص الواضحة والوقورة */
+  /* ألوان النصوص الوقورة عالية التباين والوضوح */
   --text-dark: #0f172a;
   --text-secondary: #334155;
   --text-muted: #64748b;
   --text-light: #ffffff;
 
-  /* شارات الحالات والإنجاز الفاخرة المعتمدة */
+  /* شارات الحالات والإنجاز (الأخضر محصور فقط بحالة حاضر 🟢) */
   --status-green-bg: #ecfdf5;
   --status-green-text: #047857;
   --status-green-border: #a7f3d0;
@@ -73,15 +70,15 @@
 
   --font-family: "Tajawal", "Cairo", sans-serif;
 
-  /* ظلال ناعمة متعددة المستويات تمنح عمقاً بصرياً راقياً */
+  /* نظام الظلال ثلاثي الأبعاد الانسيابي لإعطاء مظهر عائم فخم */
   --shadow-subtle:
     0 2px 4px rgba(10, 92, 113, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02);
   --shadow-card:
-    0 8px 20px -3px rgba(10, 92, 113, 0.05), 0 3px 6px -2px rgba(0, 0, 0, 0.02);
+    0 8px 24px -4px rgba(10, 92, 113, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
   --shadow-card-hover:
-    0 16px 32px -4px rgba(10, 92, 113, 0.09),
+    0 16px 32px -4px rgba(10, 92, 113, 0.12),
     0 6px 12px -2px rgba(0, 0, 0, 0.03);
-  --shadow-modal: 0 25px 50px -12px rgba(10, 92, 113, 0.16);
+  --shadow-modal: 0 25px 50px -12px rgba(10, 92, 113, 0.18);
 }
 
 * {
@@ -148,10 +145,10 @@ body {
 .login-title::after {
   content: "";
   display: block;
-  width: 55px;
+  width: 50px;
   height: 3.5px;
-  background: linear-gradient(90deg, var(--accent-gold) 0%, transparent 100%);
-  border-radius: 2px;
+  background: var(--accent-gold);
+  border-radius: 3px;
   margin-top: 6px;
 }
 
@@ -188,7 +185,7 @@ body {
 
 .login-right-panel {
   flex: 1.25;
-  background: linear-gradient(135deg, #0a5c71 0%, #4fa3d1 55%, #063945 100%);
+  background: linear-gradient(135deg, #0a5c71 0%, #084959 55%, #052c36 100%);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -207,7 +204,7 @@ body {
   height: 550px;
   background: radial-gradient(
     circle,
-    rgba(197, 155, 39, 0.2) 0%,
+    rgba(197, 155, 39, 0.22) 0%,
     transparent 70%
   );
   border-radius: 50%;
@@ -246,7 +243,7 @@ body {
 
 .brand-sub-big {
   font-size: 1.15rem;
-  color: #f7d296;
+  color: #fce7b8;
   font-weight: 700;
   margin-bottom: 1.5rem;
 }
@@ -289,41 +286,29 @@ body {
     var(--primary-teal-dark) 100%
   );
   color: #ffffff;
-  border-bottom: 2px solid var(--accent-gold);
-  box-shadow: 0 4px 10px rgba(10, 92, 113, 0.22);
+  border-bottom: 2.5px solid var(--accent-gold);
+  box-shadow: 0 4px 12px rgba(10, 92, 113, 0.22);
 }
 
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(10, 92, 113, 0.32);
-}
-
-.btn-primary:active {
-  transform: translateY(0);
-  background: linear-gradient(135deg, var(--wood-brown) 0%, var(--wood-brown-dark) 100%);
-  border-bottom-color: var(--accent-gold);
+  box-shadow: 0 6px 18px rgba(10, 92, 113, 0.32);
 }
 
 .btn-outline-brown,
 .btn-outline-custom {
   background-color: #ffffff;
   border-color: #cbd5e1;
-  border-right: 3px solid var(--wood-brown);
+  border-right: 3px solid var(--accent-gold);
   color: var(--text-secondary);
 }
 
 .btn-outline-brown:hover,
 .btn-outline-custom:hover {
-  background-color: var(--wood-brown-light);
-  border-color: var(--wood-brown);
-  color: var(--wood-brown-dark);
-}
-
-.btn-outline-brown:active,
-.btn-outline-custom:active {
-  background-color: var(--wood-brown);
-  border-color: var(--wood-brown-dark);
-  color: #ffffff;
+  background-color: var(--primary-teal-subtle);
+  border-color: var(--primary-teal);
+  border-right-color: var(--accent-gold-dark);
+  color: var(--primary-teal);
 }
 
 .btn-success {
@@ -390,7 +375,7 @@ body {
   bottom: 0;
   right: 1.1rem;
   width: 60px;
-  height: 2px;
+  height: 2.5px;
   background: var(--accent-gold);
 }
 
@@ -514,7 +499,7 @@ body {
   justify-content: center;
   font-weight: 800;
   font-size: 1.1rem;
-  box-shadow: 0 2px 6px rgba(179, 116, 38, 0.3);
+  box-shadow: 0 2px 6px rgba(197, 155, 39, 0.3);
 }
 
 .user-info h4 {
@@ -567,7 +552,7 @@ body {
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-card);
-  border-top: 2px solid var(--accent-gold);
+  border-top: 2.5px solid var(--accent-gold);
 }
 
 .menu-toggle-btn {
@@ -616,7 +601,7 @@ body {
 }
 
 /* ==========================================================================
-   5. البطاقات الإحصائية العائمة مع إطار وقوس ذهبي علوي (KPI Cards)
+   5. البطاقات الإحصائية العائمة مع القوس والخط الذهبي العلوي (KPI Cards)
    ========================================================================== */
 .stats-grid {
   display: grid;
@@ -628,7 +613,7 @@ body {
 .stat-card {
   background-color: #ffffff;
   border: 1px solid var(--border-color);
-  border-top: 3px solid var(--accent-gold);
+  border-top: 3.5px solid var(--accent-gold);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
   padding: 1.25rem 1.1rem;
@@ -699,7 +684,7 @@ body {
 }
 
 /* ==========================================================================
-   6. البطاقات العامة والحاويات (Cards & Complex Hub)
+   6. البطاقات العامة وحاويات الأقسام (Cards & Complex Hub)
    ========================================================================== */
 .card {
   background-color: #ffffff;
@@ -725,15 +710,15 @@ body {
   position: relative;
 }
 
-/* خط ذهبي أنيق تحت عناوين الصناديق */
+/* خط ديكوري ذهبي راقٍ أسفل عناوين البطاقات */
 .card-header h3::after {
   content: "";
   display: block;
-  width: 40px;
-  height: 2.5px;
+  width: 42px;
+  height: 3px;
   background: var(--accent-gold);
   border-radius: 2px;
-  margin-top: 4px;
+  margin-top: 5px;
 }
 
 .complex-hub-cards {
@@ -760,7 +745,7 @@ body {
 
 .hub-card.active {
   border-color: var(--primary-teal);
-  border-top: 3px solid var(--accent-gold);
+  border-top: 3.5px solid var(--accent-gold);
   background: var(--primary-teal-subtle);
   box-shadow: var(--shadow-subtle);
 }
@@ -776,7 +761,7 @@ body {
 }
 
 /* ==========================================================================
-   7. الجداول الرسمية المعتمدة (بترولي + خط فاصل ذهبي)
+   7. الجداول الرسمية المعتمدة (بترولي ملكي + خط فاصل ذهبي)
    ========================================================================== */
 .table-responsive {
   overflow-x: auto;
@@ -798,7 +783,7 @@ body {
   color: #ffffff;
   font-weight: 800;
   padding: 0.85rem 1rem;
-  border-bottom: 2.5px solid var(--accent-gold);
+  border-bottom: 3px solid var(--accent-gold);
   border-right: 1px solid rgba(255, 255, 255, 0.1);
   border-left: 1px solid rgba(255, 255, 255, 0.1);
   white-space: nowrap;
@@ -819,6 +804,20 @@ body {
 
 .data-table tbody tr:hover {
   background-color: var(--primary-teal-subtle);
+}
+
+/* جدول التقارير الرسمية تحديداً: النص الطويل ينتقل لسطر إضافي بدل الانحراف خارج
+   حدود عموده (table-layout: auto يوسّع العمود تلقائياً حسب الحاجة بدل قصّ المحتوى)،
+   باستثناء اسم الطالب الذي يبقى دائماً بسطر واحد بتصريح مباشر على كل خلية اسم */
+#report-results-table {
+  table-layout: auto;
+}
+
+#report-results-table th,
+#report-results-table td {
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* الشارات التوضيحية */
@@ -897,7 +896,7 @@ body {
   background-color: #ffffff;
   color: var(--primary-teal);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-  border-bottom: 2px solid var(--accent-gold);
+  border-bottom: 2.5px solid var(--accent-gold);
 }
 
 .bulk-actions-bar {
@@ -918,7 +917,7 @@ body {
 .circle-card {
   background-color: #ffffff;
   border: 1px solid var(--border-color);
-  border-top: 3px solid var(--accent-gold);
+  border-top: 3.5px solid var(--accent-gold);
   border-radius: var(--radius-md);
   padding: 1.25rem;
   box-shadow: var(--shadow-card);
@@ -954,7 +953,7 @@ body {
 }
 
 /* ==========================================================================
-   10. النوافذ المنبثقة الشفافة الفاخرة (Modals)
+   10. النوافذ المنبثقة والشاشة الكاملة (Modals)
    ========================================================================== */
 .modal-overlay {
   display: none;
@@ -999,49 +998,9 @@ body {
   background-color: #f8fafc;
 }
 
-/* نافذة بحجم صفحة كاملة (مثل متابعة الطلاب) - تعطي إحساس الدخول لصفحة/خانة جديدة كاملة */
+/* نافذة المتابعة الشاملة بحجم الشاشة الكاملة كواجهة مستقلة */
 .modal-fullscreen-overlay {
   padding: 0 !important;
-}
-
-/* جداول أول 15 (شاشة العرض) - عرض متوسط ومتمركز يتناسب مع صف الأيقونات بدلاً من امتداده لكامل البطاقة */
-.mini-report-table {
-  width: 82% !important;
-  margin: 0 auto;
-}
-
-/* جداول أول 15 (شاشة العرض) - صفوف مضغوطة قليلاً لإظهار الطلاب الخمسة عشر كاملين بدون تمرير */
-.mini-report-table th,
-.mini-report-table td {
-  padding: 0.1rem 0.25rem !important;
-  font-size: 0.68rem;
-  line-height: 1.15;
-}
-
-/* اسم الطالب أكبر وأوضح من بقية الأعمدة (وهو الأهم للعرض) دون التأثير على تنسيق
-   الجدول أو موضعه - يقابله تصغير طفيف بعمودي الترتيب والحلقة لتعويض المساحة */
-.mini-report-table td.screen-student-name {
-  font-size: 0.86rem !important;
-  font-weight: 800;
-}
-
-.mini-report-table td.screen-rank-num {
-  font-size: 0.62rem !important;
-}
-
-.mini-report-table td.screen-circle-name {
-  font-size: 0.56rem !important;
-  color: var(--text-muted);
-}
-
-/* لوحة العرض (التميز/الإحصائيات) عند وضع ملء الشاشة - تظهر هي فقط بدون أي عنصر آخر */
-#mosque-screen-grid:fullscreen,
-#mosque-screen-grid:-webkit-full-screen {
-  background: var(--bg-main);
-  padding: 1rem;
-  overflow-y: auto;
-  align-content: start;
-  cursor: pointer;
 }
 
 .modal-card.modal-fullscreen {
@@ -1052,6 +1011,7 @@ body {
   border-radius: 0 !important;
   border: none !important;
   border-top: 4px solid var(--accent-gold) !important;
+  background: var(--bg-main);
 }
 
 .modal-card form {
@@ -1244,19 +1204,204 @@ body {
 }
 
 /* ==========================================================================
-   12. تنسيقات الطباعة الرسمية المعتمدة
+   12. لوحات شاشة المسجد التفاعلية (التميز الأسبوعي / المنجزون أولاً)
+   ========================================================================== */
+.screen-board {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: stretch;
+  background: #fdfaf3;
+  border: 1.5px solid var(--accent-gold-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+.screen-board-rail {
+  flex-shrink: 0;
+  width: 34px;
+  background-color: var(--primary-teal);
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.14) 0,
+      rgba(255, 255, 255, 0.14) 2px,
+      transparent 2px,
+      transparent 12px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.14) 0,
+      rgba(255, 255, 255, 0.14) 2px,
+      transparent 2px,
+      transparent 12px
+    );
+}
+
+.screen-board-body {
+  flex: 1;
+  min-width: 0;
+  padding: 1.1rem 1.6rem 1.4rem;
+}
+
+.screen-board-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.screen-board-header img {
+  height: 62px;
+  width: auto;
+  object-fit: contain;
+}
+
+.screen-board-title {
+  flex: 1;
+  text-align: center;
+}
+
+.screen-board-title h2 {
+  font-size: 1.7rem;
+  font-weight: 900;
+  color: var(--primary-teal);
+  margin: 0;
+}
+
+.screen-board-title p {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--wood-brown);
+  margin: 0.25rem 0 0;
+}
+
+.screen-board-period {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--primary-teal-dark);
+  text-decoration: underline;
+  text-decoration-color: var(--accent-gold);
+  margin: 0.55rem 0 0;
+}
+
+.screen-circle-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1.4rem 1.1rem;
+}
+
+.screen-circle-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.screen-circle-title {
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: var(--primary-teal);
+  margin-bottom: 0.15rem;
+}
+
+.screen-circle-title .honorific {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-inline-start: 0.3rem;
+}
+
+.screen-rank-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  padding: 0.55rem 0.8rem;
+  font-weight: 900;
+  font-size: 0.98rem;
+  color: #ffffff;
+  text-align: center;
+}
+
+.screen-rank-bar.teal {
+  background: var(--primary-teal);
+}
+
+.screen-rank-bar.brown {
+  background: var(--wood-brown);
+}
+
+.screen-rank-bar.teal.trophy {
+  background: var(--primary-teal-dark);
+  box-shadow: inset 0 0 0 2px var(--accent-gold);
+}
+
+.screen-rank-bar.brown.trophy {
+  background: var(--wood-brown-dark);
+  box-shadow: inset 0 0 0 2px var(--accent-gold);
+}
+
+.screen-pill {
+  border-radius: 999px;
+  padding: 0.5rem 0.8rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+  text-align: center;
+  border: 1.5px solid transparent;
+}
+
+.screen-pill.gray {
+  background: var(--accent-slate-light);
+  color: var(--accent-slate);
+  border-color: #dfe3e8;
+}
+
+.screen-pill.tan {
+  background: var(--wood-brown-light);
+  color: var(--wood-brown);
+  border-color: var(--accent-gold-border);
+}
+
+.screen-pill .rank-num {
+  font-weight: 900;
+  margin-inline-end: 0.35rem;
+}
+
+.screen-board-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1.3rem;
+  padding-top: 0.7rem;
+  border-top: 1.5px solid var(--accent-gold-border);
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--wood-brown);
+}
+
+.screen-board-footer span:last-child {
+  color: var(--primary-teal);
+}
+
+/* ==========================================================================
+   13. تنسيقات الطباعة الرسمية ونماذج الـ PDF الأربعة
    ========================================================================== */
 @media print {
   @page {
     margin: 0.8cm !important;
-    size: A4 landscape !important;
+    size: auto !important;
   }
 
   body {
     background-color: #ffffff !important;
     color: #000000 !important;
+    font-size: 10pt !important;
   }
 
+  /* إخفاء واجهات النظام والأزرار أثناء استخراج التقرير */
   .sidebar,
   .top-header,
   .no-print,
@@ -1301,29 +1446,46 @@ body {
     margin: 0 !important;
   }
 
+  /* الإطار الملكي المزدوج المطابق للـ PDF */
   #report-results-wrapper > div {
-    border: 2px double var(--primary-teal) !important;
-    border-top: 4px solid var(--accent-gold) !important;
-    padding: 1.2cm 1cm !important;
+    border: 2.5px double #0a5c71 !important;
+    border-top: 4px solid #c59b27 !important;
+    border-radius: 4px !important;
+    padding: 1cm !important;
     background: #ffffff !important;
+    margin: 0 auto !important;
   }
 
+  /* الجداول الرسمية للتقارير الأربعة */
   #report-results-table {
     width: 100% !important;
     border-collapse: collapse !important;
+    border: 1.5px solid #0a5c71 !important;
+    font-size: 10pt !important;
   }
 
   #report-results-table th {
-    background-color: var(--primary-teal) !important;
+    background-color: #0a5c71 !important;
     color: #ffffff !important;
     border: 1px solid #cbd5e1 !important;
-    border-bottom: 2.5px solid var(--accent-gold) !important;
+    border-bottom: 2.5px solid #c59b27 !important;
     text-align: center !important;
     font-weight: 800 !important;
+    padding: 8px 6px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   #report-results-table td {
     border: 1px solid #cbd5e1 !important;
+    padding: 6px 4px !important;
+    color: #000000 !important;
     text-align: center !important;
+  }
+
+  .report-header-pdf,
+  .report-footer-pdf {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }

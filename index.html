@@ -448,7 +448,7 @@
             style="cursor: pointer"
             title="تعديل بياناتي الشخصية (كلمة المرور والصورة)"
           >
-            ص
+            أ
           </div>
           <div
             class="user-info"
@@ -456,7 +456,7 @@
             style="cursor: pointer"
             title="تعديل بياناتي الشخصية (كلمة المرور والصورة)"
           >
-            <h4 id="current-user-name">صالح ال ناشع</h4>
+            <h4 id="current-user-name">أحمد بن عبدالله آل مهدي</h4>
             <span id="current-user-role">المدير</span>
           </div>
           <button class="logout-btn" id="btn-logout" title="تسجيل الخروج">
@@ -636,7 +636,7 @@
 
             <!-- 5. سمّعوا اليوم -->
             <div
-              class="stat-card"
+              class="stat-card nav-admin-only"
               style="cursor: pointer"
               onclick="openTasmeeaDetailsModal('recited')"
               title="انقر لعرض تفاصيل الطلاب الذين سمّعوا وطباعتها"
@@ -664,7 +664,7 @@
 
             <!-- 6. لم يسمّعوا اليوم -->
             <div
-              class="stat-card"
+              class="stat-card nav-admin-only"
               style="cursor: pointer"
               onclick="openTasmeeaDetailsModal('not_recited')"
               title="انقر لعرض تفاصيل الطلاب الذين لم يسمّعوا وطباعتها"
@@ -1566,7 +1566,7 @@
           </div>
         </section>
 
-        <!-- 8. شاشة التقارير الرسمية -->
+        <!-- 8. شاشة التقارير الرسمية (محدثة بالنماذج الأربعة المعتمدة من الـ PDF) -->
         <section id="view-reports" class="content-view">
           <div class="card no-print">
             <div
@@ -1577,6 +1577,16 @@
                 gap: 1rem;
               "
             >
+              <div class="form-group" id="report-circle-group">
+                <label>الحلقة</label>
+                <select
+                  id="report-circle-select"
+                  class="form-control"
+                  onchange="populateReportStudentsDropdown()"
+                >
+                  <option value="all">كل الحلقات</option>
+                </select>
+              </div>
               <div class="form-group" id="report-student-group">
                 <label>الطالب</label>
                 <select id="report-student-select" class="form-control">
@@ -1590,26 +1600,15 @@
                   class="form-control"
                   onchange="handleReportTypeChange()"
                 >
-                  <option value="student_achievement">
-                    تقرير إنجاز الطالب اليومي
+                  <option value="circle_daily">تقرير إنجاز طلاب الحلقة اليومي</option>
+                  <option value="student_daily">
+                    تقرير إنجاز طالب محدد
                   </option>
-                  <option value="students">
-                    التقرير الإحصائي الشامل للطلاب
+                  <option value="curriculum_start_end">
+                    تقرير بداية ونهاية المنهج
                   </option>
-                  <option value="tasmeea">تقرير اخر ما وصلت اليه الطالب</option>
-                  <option value="tamayuz">
-                    تقرير التميز الأسبوعي (عدد البطاقات)
-                  </option>
-                </select>
-              </div>
-              <div class="form-group" id="report-circle-group">
-                <label>الحلقة</label>
-                <select
-                  id="report-circle-select"
-                  class="form-control"
-                  onchange="populateReportStudentsDropdown()"
-                >
-                  <option value="all">كل الحلقات</option>
+                  <option value="comprehensive">تقرير شامل</option>
+                  <option value="tamayuz">تقرير التميز الأسبوعي</option>
                 </select>
               </div>
               <div class="form-group style-hidden" id="report-week-range-group">
@@ -1626,6 +1625,50 @@
               <div class="form-group" id="report-date-to-group">
                 <label>إلى تاريخ</label>
                 <input type="date" id="report-date-to" class="form-control" />
+              </div>
+            </div>
+            <div class="mt-3 flex-align-gap" style="flex-wrap: wrap">
+              <div class="flex-align-gap" style="gap: 0.4rem">
+                <label style="font-weight: 700; font-size: 0.88rem"
+                  >اتجاه الطباعة:</label
+                >
+                <label
+                  style="
+                    font-weight: 600;
+                    font-size: 0.85rem;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.2rem;
+                    cursor: pointer;
+                  "
+                >
+                  <input
+                    type="radio"
+                    name="report-orientation"
+                    id="report-orientation-landscape"
+                    value="landscape"
+                    checked
+                  />
+                  أفقي
+                </label>
+                <label
+                  style="
+                    font-weight: 600;
+                    font-size: 0.85rem;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.2rem;
+                    cursor: pointer;
+                  "
+                >
+                  <input
+                    type="radio"
+                    name="report-orientation"
+                    id="report-orientation-portrait"
+                    value="portrait"
+                  />
+                  عمودي
+                </label>
               </div>
             </div>
             <div class="mt-3 flex-align-gap">
@@ -1654,6 +1697,12 @@
               </button>
               <button
                 class="btn btn-outline-brown"
+                onclick="downloadReportWord()"
+              >
+                📝 تنزيل Word
+              </button>
+              <button
+                class="btn btn-outline-brown"
                 onclick="printOfficialReport()"
               >
                 🖨️ طباعة
@@ -1666,74 +1715,372 @@
             id="report-results-wrapper"
             style="display: none"
           >
-            <div class="print-official-header">
-              <div class="print-header-center-logos">
-                <img
-                  id="print-logo-new"
-                  src="logo12.jpeg"
-                  alt="شعار المَجْمَع"
-                />
-                <img
-                  id="print-logo-old"
-                  src="logo_transparent_1.png"
-                  alt="شعار المَجْمَع"
-                />
-              </div>
-              <div class="print-header-title-box">
-                <h3
-                  id="print-report-title"
-                  style="
-                    margin: 0;
-                    font-size: 1.15rem;
-                    font-weight: 800;
-                    color: var(--primary-brown);
-                  "
-                >
-                  تقرير المَجْمَع القرآني
-                </h3>
-                <p
-                  id="print-report-period"
-                  style="
-                    margin: 3px 0 0 0;
-                    font-size: 0.88rem;
-                    color: #333;
-                    font-weight: 700;
-                  "
-                >
-                  كامل الفترة المسجلة
-                </p>
-              </div>
-            </div>
-
-            <div class="table-responsive">
-              <table class="data-table" id="report-results-table">
-                <thead id="report-thead"></thead>
-                <tbody id="report-tbody">
-                  <tr>
-                    <td class="text-center text-muted p-4">
-                      حدد خيارات التقرير ثم اضغط على "استخراج التقرير"
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <!-- الحاوية الديناميكية التي يُنشئ محرك reports.js التقرير والترويسة داخلها تلقائياً -->
           </div>
         </section>
 
         <!-- 9. شاشة التقارير المالية -->
         <section id="view-finance" class="content-view">
-          <div class="card">
-            <div class="card-header flex-between">
-              <h3
-                style="color: var(--primary-brown); font-weight: 800; margin: 0"
+          <div class="flex-between mb-3">
+            <div class="sub-tabs-bar" style="margin-bottom: 0; border: none">
+              <button
+                class="tab-btn active"
+                id="tab-btn-finance-reports"
+                onclick="switchFinanceSubTab('reports')"
               >
-                💼 التقارير المالية والمصروفات
-              </h3>
+                💼 التقارير المالية
+              </button>
+              <button
+                class="tab-btn"
+                id="tab-btn-finance-payroll"
+                onclick="switchFinanceSubTab('payroll')"
+              >
+                🧾 مسير الرواتب
+              </button>
             </div>
-            <div class="empty-state-card p-4 text-center">
-              <p class="text-muted">
-                قسم التقارير المالية قيد الإعداد والتجهيز...
-              </p>
+          </div>
+
+          <!-- أ. التقارير المالية (إيرادات / مصروفات / الباقي) -->
+          <div id="box-finance-reports">
+            <div class="student-stats-report-grid mb-3">
+              <div
+                class="stat-card"
+                style="
+                  padding: 0.9rem;
+                  text-align: center;
+                  flex-direction: column;
+                  justify-content: center;
+                "
+              >
+                <span class="stat-label">إجمالي الإيرادات</span>
+                <h3
+                  class="stat-value"
+                  id="finance-total-revenue"
+                  style="color: #2e7d32"
+                >
+                  0
+                </h3>
+              </div>
+              <div
+                class="stat-card"
+                style="
+                  padding: 0.9rem;
+                  text-align: center;
+                  flex-direction: column;
+                  justify-content: center;
+                "
+              >
+                <span class="stat-label">إجمالي المصروفات</span>
+                <h3
+                  class="stat-value"
+                  id="finance-total-expense"
+                  style="color: #c62828"
+                >
+                  0
+                </h3>
+              </div>
+              <div
+                class="stat-card"
+                style="
+                  padding: 0.9rem;
+                  text-align: center;
+                  flex-direction: column;
+                  justify-content: center;
+                "
+              >
+                <span class="stat-label">الباقي بعد الخصم</span>
+                <h3
+                  class="stat-value"
+                  id="finance-net-balance"
+                  style="color: var(--primary-brown)"
+                >
+                  0
+                </h3>
+              </div>
+            </div>
+
+            <div class="card mb-3 nav-admin-only" id="finance-add-forms-card">
+              <div
+                class="card-body"
+                style="
+                  display: grid;
+                  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                  gap: 1rem;
+                "
+              >
+                <form onsubmit="handleAddFinanceRevenue(event)">
+                  <h4
+                    style="
+                      color: #2e7d32;
+                      font-weight: 800;
+                      margin-bottom: 0.6rem;
+                    "
+                  >
+                    ➕ إضافة إيراد
+                  </h4>
+                  <div class="form-row">
+                    <div class="form-group flex-1">
+                      <label>المبلغ (ريال)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        class="form-control"
+                        name="amount"
+                        required
+                      />
+                    </div>
+                    <div class="form-group flex-1">
+                      <label>التاريخ</label>
+                      <input
+                        type="date"
+                        class="form-control"
+                        name="date"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label>المصدر / الوصف</label>
+                    <input
+                      type="text"
+                      class="form-control"
+                      name="source"
+                      placeholder="مثال: تبرع، رسوم..."
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    class="btn btn-success btn-sm btn-block"
+                  >
+                    حفظ الإيراد
+                  </button>
+                </form>
+
+                <form onsubmit="handleAddFinanceExpense(event)">
+                  <h4
+                    style="
+                      color: #c62828;
+                      font-weight: 800;
+                      margin-bottom: 0.6rem;
+                    "
+                  >
+                    ➖ إضافة مصروف
+                  </h4>
+                  <div class="form-row">
+                    <div class="form-group flex-1">
+                      <label>الصنف</label>
+                      <input
+                        type="text"
+                        class="form-control"
+                        name="category"
+                        placeholder="مثال: صيانة، مستلزمات..."
+                        required
+                      />
+                    </div>
+                    <div class="form-group flex-1">
+                      <label>المبلغ (ريال)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        class="form-control"
+                        name="amount"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group flex-1">
+                      <label>التاريخ</label>
+                      <input
+                        type="date"
+                        class="form-control"
+                        name="date"
+                        required
+                      />
+                    </div>
+                    <div class="form-group flex-1">
+                      <label>ملاحظة (اختياري)</label>
+                      <input type="text" class="form-control" name="notes" />
+                    </div>
+                  </div>
+                  <button type="submit" class="btn btn-danger btn-sm btn-block">
+                    حفظ المصروف
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <div class="card mb-3">
+              <div class="card-header flex-between">
+                <h3 style="color: #2e7d32; font-weight: 800; margin: 0">
+                  سجل الإيرادات
+                </h3>
+                <div class="flex-align-gap">
+                  <button
+                    class="btn btn-outline-brown btn-sm"
+                    onclick="
+                      printTableElement(
+                        'finance-revenues-table',
+                        'سجل الإيرادات',
+                      )
+                    "
+                  >
+                    🖨️ طباعة
+                  </button>
+                  <button
+                    class="btn btn-outline-brown btn-sm"
+                    onclick="
+                      directDownloadPDF(
+                        'finance-revenues-table',
+                        'سجل_الإيرادات',
+                        'سجل الإيرادات',
+                      )
+                    "
+                  >
+                    📄 PDF
+                  </button>
+                  <button
+                    class="btn btn-outline-brown btn-sm"
+                    onclick="exportFinanceRevenuesExcel()"
+                  >
+                    📤 Excel
+                  </button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="data-table" id="finance-revenues-table">
+                  <thead>
+                    <tr>
+                      <th>التاريخ</th>
+                      <th>المصدر / الوصف</th>
+                      <th>المبلغ</th>
+                      <th class="nav-admin-only">—</th>
+                    </tr>
+                  </thead>
+                  <tbody id="finance-revenues-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card mb-3">
+              <div class="card-header flex-between">
+                <h3 style="color: #c62828; font-weight: 800; margin: 0">
+                  سجل المصروفات
+                </h3>
+                <div class="flex-align-gap">
+                  <button
+                    class="btn btn-outline-brown btn-sm"
+                    onclick="
+                      printTableElement(
+                        'finance-expenses-table',
+                        'سجل المصروفات',
+                      )
+                    "
+                  >
+                    🖨️ طباعة
+                  </button>
+                  <button
+                    class="btn btn-outline-brown btn-sm"
+                    onclick="
+                      directDownloadPDF(
+                        'finance-expenses-table',
+                        'سجل_المصروفات',
+                        'سجل المصروفات',
+                      )
+                    "
+                  >
+                    📄 PDF
+                  </button>
+                  <button
+                    class="btn btn-outline-brown btn-sm"
+                    onclick="exportFinanceExpensesExcel()"
+                  >
+                    📤 Excel
+                  </button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="data-table" id="finance-expenses-table">
+                  <thead>
+                    <tr>
+                      <th>التاريخ</th>
+                      <th>الصنف</th>
+                      <th>ملاحظة</th>
+                      <th>المبلغ</th>
+                      <th class="nav-admin-only">—</th>
+                    </tr>
+                  </thead>
+                  <tbody id="finance-expenses-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ب. مسير الرواتب -->
+          <div id="box-finance-payroll" class="style-hidden">
+            <div class="card mb-3">
+              <div
+                class="card-header flex-between"
+                style="flex-wrap: wrap; gap: 0.6rem"
+              >
+                <div class="flex-align-gap">
+                  <label style="font-weight: 700; margin-inline-end: 0.4rem"
+                    >الشهر:</label
+                  >
+                  <input
+                    type="month"
+                    class="form-control"
+                    id="payroll-month-select"
+                    style="width: auto"
+                    onchange="renderPayrollTable()"
+                  />
+                </div>
+                <div class="flex-align-gap">
+                  <button
+                    class="btn btn-outline-brown btn-sm"
+                    onclick="printTableElement('payroll-table', 'مسير الرواتب')"
+                  >
+                    🖨️ طباعة
+                  </button>
+                  <button
+                    class="btn btn-outline-brown btn-sm"
+                    onclick="
+                      directDownloadPDF(
+                        'payroll-table',
+                        'مسير_الرواتب',
+                        'مسير الرواتب',
+                      )
+                    "
+                  >
+                    📄 PDF
+                  </button>
+                  <button
+                    class="btn btn-outline-brown btn-sm"
+                    onclick="exportPayrollExcel()"
+                  >
+                    📤 Excel
+                  </button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="data-table" id="payroll-table">
+                  <thead>
+                    <tr>
+                      <th>المعلم</th>
+                      <th>المكافأة الأساسية (شهرياً)</th>
+                      <th>اليومية</th>
+                      <th>أيام الحضور</th>
+                      <th>أيام الغياب</th>
+                      <th>أيام الاستئذان</th>
+                      <th>الزيادة</th>
+                      <th>الإجمالي المستحق</th>
+                    </tr>
+                  </thead>
+                  <tbody id="payroll-tbody"></tbody>
+                </table>
+              </div>
             </div>
           </div>
         </section>
@@ -1871,6 +2218,7 @@
                     type="text"
                     id="set-org-director"
                     class="form-control"
+                    value="أحمد بن عبدالله آل مهدي"
                     required
                   />
                 </div>
@@ -2574,8 +2922,8 @@
               </div>
             </div>
             <div class="form-group">
-              <label>رقم جوال ولي الأمر</label
-              ><input
+              <label>رقم جوال ولي الأمر</label>
+              <input
                 type="tel"
                 id="stu-parent-phone"
                 class="form-control"
@@ -2922,7 +3270,7 @@
                     flex-shrink: 0;
                   "
                 >
-                  <span id="edit-account-photo-letter">ص</span>
+                  <span id="edit-account-photo-letter">أ</span>
                   <img
                     id="edit-account-photo-preview"
                     src=""
@@ -3011,10 +3359,7 @@
             &times;
           </button>
         </div>
-        <form
-          id="form-edit-my-profile"
-          onsubmit="handleSaveMyProfile(event)"
-        >
+        <form id="form-edit-my-profile" onsubmit="handleSaveMyProfile(event)">
           <div class="modal-body">
             <div class="form-group">
               <label>صورة الحساب</label>
@@ -3026,7 +3371,11 @@
                     height: 64px;
                     border-radius: 50%;
                     overflow: hidden;
-                    background: linear-gradient(135deg, var(--accent-gold) 0%, var(--wood-brown) 100%);
+                    background: linear-gradient(
+                      135deg,
+                      var(--accent-gold) 0%,
+                      var(--wood-brown) 100%
+                    );
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -3036,7 +3385,7 @@
                     flex-shrink: 0;
                   "
                 >
-                  <span id="my-profile-photo-letter">ص</span>
+                  <span id="my-profile-photo-letter">أ</span>
                   <img
                     id="my-profile-photo-preview"
                     src=""

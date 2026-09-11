@@ -61,8 +61,12 @@ window.appStore = window.appStore || {
   screenOrder: [],
   circlesOrder: [],
   trophyStudentId: null,
+  trophyStudentIds: [],
   settings: { ...SAFE_DEFAULT_SETTINGS },
   logs: [],
+  financeRevenues: [],
+  financeExpenses: [],
+  payroll: [],
 };
 
 // تهيئة Firebase والاتصال بـ Firestore
@@ -118,6 +122,9 @@ function loadInitialData() {
         "messages",
         "screenOrder",
         "logs",
+        "financeRevenues",
+        "financeExpenses",
+        "payroll",
       ];
       expectedArrays.forEach((key) => {
         if (!Array.isArray(window.appStore[key])) {
@@ -308,6 +315,7 @@ function seedProductionAdminOnly() {
     screenOrder: [],
     circlesOrder: [],
     trophyStudentId: null,
+    trophyStudentIds: [],
     settings: { ...SAFE_DEFAULT_SETTINGS },
     logs: [
       {
@@ -317,6 +325,9 @@ function seedProductionAdminOnly() {
         timestamp: new Date().toLocaleDateString("ar-SA"),
       },
     ],
+    financeRevenues: [],
+    financeExpenses: [],
+    payroll: [],
   };
   saveLocalStore();
 }
@@ -347,10 +358,34 @@ async function syncAndPurgeDataFromCloud() {
     "notifications",
     "messages",
     "screenOrder",
+    "financeRevenues",
+    "financeExpenses",
+    "payroll",
   ];
 
   try {
+    // جلب "شواهد الحذف" أولاً لبناء قائمة استبعاد: بدونها، أي سجل حُذف فعلياً من جهاز
+    // ما كان "يعود من الموت" بمجرد مزامنة جهاز آخر (أو نفس الجهاز بتبويب قديم) لا يزال
+    // يحمل نسخة محلية قديمة منه - لأن دمج البيانات أدناه لا يحذف أي سجل محلي أبداً
+    // بتصميمه (لحماية البيانات غير المرفوعة بعد)، وهذا بالضبط سبب "عودة المحذوفات"
+    const deletedSets = {};
+    try {
+      const tombSnapshot = await dbFirestore
+        .collection("deletedTombstones")
+        .get();
+      tombSnapshot.docs.forEach((doc) => {
+        const d = doc.data();
+        if (d && d.collection && d.docId) {
+          if (!deletedSets[d.collection]) deletedSets[d.collection] = new Set();
+          deletedSets[d.collection].add(String(d.docId));
+        }
+      });
+    } catch (e) {
+      console.warn("تعذّر جلب سجل شواهد الحذف (deletedTombstones):", e);
+    }
+
     for (const col of allCollections) {
+      const deletedIds = deletedSets[col];
       const snapshot = await dbFirestore.collection(col).get();
       if (!snapshot.empty) {
         const cloudItems = snapshot.docs.map((doc) => ({
@@ -362,20 +397,38 @@ async function syncAndPurgeDataFromCloud() {
           window.appStore.settings = cloudItems[0] || SAFE_DEFAULT_SETTINGS;
         } else if (col === "screenOrder") {
           window.appStore.screenOrder = cloudItems[0]?.order || [];
-          window.appStore.trophyStudentId =
-            cloudItems[0]?.trophyStudentId || null;
+          // ترقية من حقل "الكأس المفرد" القديم إلى قائمة (كأس واحد لكل حلقة) دون فقدان
+          // أي اختيار سابق كان قد حدّده المدير قبل هذا التحديث
+          const cloudTrophyIds = cloudItems[0]?.trophyStudentIds;
+          window.appStore.trophyStudentIds = Array.isArray(cloudTrophyIds)
+            ? cloudTrophyIds
+            : cloudItems[0]?.trophyStudentId
+              ? [cloudItems[0].trophyStudentId]
+              : [];
+          window.appStore.trophyStudentId = null;
         } else {
-          // دمج البيانات السحابية مع المحلية بالمعرف (ID) لمنع ضياع أي سجل غير مرفوع
+          // دمج البيانات السحابية مع المحلية بالمعرف (ID) لمنع ضياع أي سجل غير مرفوع -
+          // باستثناء أي معرّف له "شاهد حذف" فيُستبعد نهائياً من الطرفين
           const localItems = Array.isArray(window.appStore[col])
             ? window.appStore[col]
             : [];
           const mergedMap = new Map();
 
           localItems.forEach((it) => {
-            if (it && it.id) mergedMap.set(String(it.id), it);
+            if (
+              it &&
+              it.id &&
+              !(deletedIds && deletedIds.has(String(it.id)))
+            ) {
+              mergedMap.set(String(it.id), it);
+            }
           });
           cloudItems.forEach((it) => {
-            if (it && it.id) {
+            if (
+              it &&
+              it.id &&
+              !(deletedIds && deletedIds.has(String(it.id)))
+            ) {
               const existing = mergedMap.get(String(it.id)) || {};
               mergedMap.set(String(it.id), { ...existing, ...it });
             }
@@ -383,6 +436,11 @@ async function syncAndPurgeDataFromCloud() {
 
           window.appStore[col] = Array.from(mergedMap.values());
         }
+      } else if (deletedIds && Array.isArray(window.appStore[col])) {
+        // المجموعة السحابية فارغة بالكامل لكن توجد شواهد حذف: نظّف المحلي منها احتياطاً
+        window.appStore[col] = window.appStore[col].filter(
+          (it) => !(it && it.id && deletedIds.has(String(it.id))),
+        );
       }
     }
 
@@ -438,6 +496,19 @@ async function saveToCloud(collectionName, docId, data, isDelete = false) {
     try {
       if (isDelete) {
         await dbFirestore.collection(collectionName).doc(validDocId).delete();
+        // تسجيل "شاهد حذف" دائم يمنع عودة هذا السجل مستقبلاً من أي جهاز/تبويب آخر لا
+        // يزال يحمل نسخة محلية قديمة منه عند مزامنته (راجع syncAndPurgeDataFromCloud)
+        if (collectionName !== "deletedTombstones") {
+          const tombId = `${collectionName}__${validDocId}`;
+          await dbFirestore
+            .collection("deletedTombstones")
+            .doc(tombId)
+            .set({
+              collection: collectionName,
+              docId: validDocId,
+              deletedAt: Date.now(),
+            });
+        }
       } else if (data) {
         // تنظيف البيانات من أي حقول غير معرّفة (undefined) لمنع خطأ Firestore الشائع
         const cleanData = JSON.parse(JSON.stringify(data));
@@ -448,6 +519,11 @@ async function saveToCloud(collectionName, docId, data, isDelete = false) {
       }
     } catch (e) {
       console.error(`خطأ أثناء الحفظ في Firestore [${collectionName}]:`, e);
+      // إظهار الخطأ فعلياً للمستخدم بدل فشل صامت لا يلاحظه أحد إلا لاحقاً عندما
+      // "يعود" التعديل لحالته القديمة بصمت تام - هذا كان سبب غموض مشكلة عدم الحفظ
+      alert(
+        `⚠️ تعذّر حفظ هذا التعديل على الخادم السحابي، وقد يعود لحالته السابقة لاحقاً!\n\nالسبب التقني: ${e?.message || e}\n\nيرجى التأكد من اتصال الإنترنت وإعادة المحاولة. إن تكرر ظهور هذه الرسالة أبلغ مطوّر النظام بنصها بالضبط.`,
+      );
     }
   }
 }

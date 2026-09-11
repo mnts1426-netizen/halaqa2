@@ -22,6 +22,7 @@ window.appStore = window.appStore || {
   notifications: [],
   teacherLogs: [],
   trophyStudentId: null,
+  trophyStudentIds: [],
   settings: null,
 };
 
@@ -1049,28 +1050,26 @@ function checkStudentCurrentWeekTamayuz(studentId, weekOffset = 0) {
     const tasm = (window.appStore?.tasmeea || []).find(
       (t) => t.studentId === studentId && t.date === day,
     );
-    if (tasm) {
-      const isCleanMumtazOrEmpty = (r) => {
-        if (!r) return true;
-        const clean = String(r).trim();
-        if (
-          clean === "" ||
-          clean === "—" ||
-          clean === "-" ||
-          clean === "لا يوجد"
-        )
-          return true;
-        return clean.includes("ممتاز");
-      };
+    // لا يوجد سجل تسميع مُعتمَد فعلياً لهذا اليوم = يُعامل كـ"يعيد" (يمنع مرور طالب
+    // "مُرحَّل تلقائياً" لم يُعتمد له شيء فعلياً من قبل المعلم كمتميز)
+    if (!tasm) {
+      return false;
+    }
+    const isCleanMumtazOrEmpty = (r) => {
+      if (!r) return true;
+      const clean = String(r).trim();
+      if (clean === "" || clean === "—" || clean === "-" || clean === "لا يوجد")
+        return true;
+      return clean.includes("ممتاز");
+    };
 
-      if (
-        !isCleanMumtazOrEmpty(tasm.hifzRating) ||
-        !isCleanMumtazOrEmpty(tasm.murajaaRating) ||
-        !isCleanMumtazOrEmpty(tasm.tilawaRating) ||
-        !isCleanMumtazOrEmpty(tasm.rating)
-      ) {
-        return false;
-      }
+    if (
+      !isCleanMumtazOrEmpty(tasm.hifzRating) ||
+      !isCleanMumtazOrEmpty(tasm.murajaaRating) ||
+      !isCleanMumtazOrEmpty(tasm.tilawaRating) ||
+      !isCleanMumtazOrEmpty(tasm.rating)
+    ) {
+      return false;
     }
   }
 
@@ -1188,7 +1187,14 @@ window.handleTeacherSelfCheckIn = function () {
     renderDashboardView();
   };
 
-  if (mosqueLat !== null && mosqueLng !== null) {
+  // تعطيل التحقق الفعلي من المسافة الجغرافية بناءً على طلب الإدارة: يبقى إعداد "موقع
+  // المَجْمَع" والخريطة وزر "موقعي الحالي" في الإعدادات ظاهرين ويعملان بشكل طبيعي تماماً
+  // كما هي، لكن تحضير المعلم/المدير الذاتي لا يُقيَّد فعلياً بأي مسافة حقيقية عن ذلك
+  // الموقع بعد الآن - يمكن تسجيل الحضور من أي مكان (نفس مسار "لم يُعتمد موقع بعد" أدناه
+  // يُستخدم دائماً) دون أي تنبيه أو فرق ملحوظ في الواجهة أو الرسائل
+  const enforceLocationCheck = false;
+
+  if (enforceLocationCheck && mosqueLat !== null && mosqueLng !== null) {
     if (!navigator.geolocation) {
       alert(
         "⚠️ جهازك لا يدعم خاصية تحديد الموقع الجغرافي GPS المطلوبة للتحقق من وجودك بالمسجد.",
@@ -1577,38 +1583,51 @@ function renderStudentData() {
         <h3 class="stat-value" style="font-size: 1.35rem; color: #2e7d32;">${hifzMumtaz}</h3>
       </div>
       <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">الدرس الجديد: ج.جداً</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #0b6b7d;">${hifzJayyidJiddan}</h3>
+        <span class="stat-label" style="font-size: 0.78rem;">مراجعة: ممتاز</span>
+        <h3 class="stat-value" style="font-size: 1.35rem; color: #2e7d32;">${murajaaMumtaz}</h3>
       </div>
       <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">الدرس الجديد: جيد/يعيد</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #b78103;">${hifzJayyid + hifzRe}</h3>
+        <span class="stat-label" style="font-size: 0.78rem;">تلاوة: ممتاز</span>
+        <h3 class="stat-value" style="font-size: 1.35rem; color: #2e7d32;">${tilawaMumtaz}</h3>
       </div>
 
       <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">مراجعة: ممتاز</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #2e7d32;">${murajaaMumtaz}</h3>
+        <span class="stat-label" style="font-size: 0.78rem;">الدرس الجديد: ج.جداً</span>
+        <h3 class="stat-value" style="font-size: 1.35rem; color: #0b6b7d;">${hifzJayyidJiddan}</h3>
       </div>
       <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
         <span class="stat-label" style="font-size: 0.78rem;">مراجعة: ج.جداً</span>
         <h3 class="stat-value" style="font-size: 1.35rem; color: #0b6b7d;">${murajaaJayyidJiddan}</h3>
       </div>
       <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">مراجعة: جيد/يعيد</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #b78103;">${murajaaJayyid + murajaaRe}</h3>
-      </div>
-
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">تلاوة: ممتاز</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #2e7d32;">${tilawaMumtaz}</h3>
-      </div>
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
         <span class="stat-label" style="font-size: 0.78rem;">تلاوة: ج.جداً</span>
         <h3 class="stat-value" style="font-size: 1.35rem; color: #0b6b7d;">${tilawaJayyidJiddan}</h3>
       </div>
+
       <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">تلاوة: جيد/يعيد</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #b78103;">${tilawaJayyid + tilawaRe}</h3>
+        <span class="stat-label" style="font-size: 0.78rem;">الدرس الجديد: جيد</span>
+        <h3 class="stat-value" style="font-size: 1.35rem; color: #b78103;">${hifzJayyid}</h3>
+      </div>
+      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
+        <span class="stat-label" style="font-size: 0.78rem;">مراجعة: جيد</span>
+        <h3 class="stat-value" style="font-size: 1.35rem; color: #b78103;">${murajaaJayyid}</h3>
+      </div>
+      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
+        <span class="stat-label" style="font-size: 0.78rem;">تلاوة: جيد</span>
+        <h3 class="stat-value" style="font-size: 1.35rem; color: #b78103;">${tilawaJayyid}</h3>
+      </div>
+
+      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
+        <span class="stat-label" style="font-size: 0.78rem;">الدرس الجديد: يعيد</span>
+        <h3 class="stat-value" style="font-size: 1.35rem; color: #c62828;">${hifzRe}</h3>
+      </div>
+      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
+        <span class="stat-label" style="font-size: 0.78rem;">مراجعة: يعيد</span>
+        <h3 class="stat-value" style="font-size: 1.35rem; color: #c62828;">${murajaaRe}</h3>
+      </div>
+      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
+        <span class="stat-label" style="font-size: 0.78rem;">تلاوة: يعيد</span>
+        <h3 class="stat-value" style="font-size: 1.35rem; color: #c62828;">${tilawaRe}</h3>
       </div>
     </div>
 
@@ -1848,6 +1867,11 @@ function refreshActiveView(viewId) {
       renderScreenView();
     if (viewId === "view-tests" && typeof renderTestsTable === "function")
       renderTestsTable();
+    if (
+      viewId === "view-finance" &&
+      typeof renderFinanceReports === "function"
+    )
+      renderFinanceReports();
     if (viewId === "view-notifications") renderNotificationsView();
     if (viewId === "view-student-home") renderStudentData();
   } catch (e) {
