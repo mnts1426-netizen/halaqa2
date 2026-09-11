@@ -425,10 +425,23 @@ window.directDownloadPDF = function (elementId, filename, title) {
         ? buildOfficialPrintChrome(title, "")
         : { header: "", footer: "" };
 
-    // بناء نسخة مؤقتة خارج الشاشة تحتوي الترويسة والجدول والتذييل معاً قبل تصديرها PDF
-    // ملاحظة: تكرار الترويسة بكل صفحة داخل PDF غير مضمون تقنياً (عكس الطباعة المباشرة)
-    // لأن مكتبة التصدير تُحوّل المحتوى لصورة واحدة طويلة ثم تقصّها، فتظهر الترويسة أول مرة فقط
     const isTableElement = element.tagName === "TABLE";
+
+    // تصدير متعدد الصفحات يكرر الترويسة الرسمية (الشعارات والعنوان) فعلياً أعلى كل
+    // صفحة كالصفحة الأولى تماماً - يحل محل الأسلوب القديم الذي كان يُظهرها في الصفحة
+    // الأولى فقط لأن مكتبة التصدير تُحوّل المحتوى لصورة واحدة طويلة ثم تقصّها
+    if (isTableElement && typeof window.generateMultiPagePDF === "function") {
+      window.generateMultiPagePDF(
+        chrome.header,
+        chrome.footer,
+        element,
+        filename,
+        "landscape",
+      );
+      return;
+    }
+
+    // مسار احتياطي فقط لعنصر ليس جدولاً (نادر الحدوث حالياً)
     const contentHtml =
       isTableElement && typeof buildRepeatingHeaderTableHtml === "function"
         ? buildRepeatingHeaderTableHtml(element, chrome.header)

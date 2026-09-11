@@ -429,8 +429,20 @@ async function syncAndPurgeDataFromCloud() {
               it.id &&
               !(deletedIds && deletedIds.has(String(it.id)))
             ) {
-              const existing = mergedMap.get(String(it.id)) || {};
-              mergedMap.set(String(it.id), { ...existing, ...it });
+              const existing = mergedMap.get(String(it.id));
+              // تفضيل السحابة افتراضياً كما كان، إلا إذا كانت النسخة المحلية موجودة
+              // وتحمل ختم وقت أحدث فعلياً من النسخة السحابية - فتُبقى المحلية كما هي
+              // بدل أن "تُرجعها" مزامنة قرأت نسخة سحابية لم تتحدّث بعد بتعديل المدير
+              // الأخير (وهو السبب الفعلي وراء ظهور التعديلات وكأنها "لا تُحفظ")
+              if (
+                existing &&
+                typeof existing.updatedAt === "number" &&
+                typeof it.updatedAt === "number" &&
+                existing.updatedAt > it.updatedAt
+              ) {
+                return;
+              }
+              mergedMap.set(String(it.id), { ...(existing || {}), ...it });
             }
           });
 
@@ -462,6 +474,13 @@ async function syncAndPurgeDataFromCloud() {
 async function saveToCloud(collectionName, docId, data, isDelete = false) {
   if (!collectionName || !docId) return;
   const validDocId = String(docId);
+
+  // ختم كل تعديل بوقت حفظه فعلياً - يُستخدم لاحقاً في دمج المزامنة السحابية لتفضيل
+  // أحدث نسخة (محلية كانت أو سحابية) بدل تفضيل السحابية دائماً بصورة قد "تُرجع" تعديلاً
+  // محلياً حديثاً جداً لحالته القديمة إن قرأت المزامنة الدورية نسخة سحابية لم تتحدّث بعد
+  if (!isDelete && data && typeof data === "object") {
+    data.updatedAt = Date.now();
+  }
 
   // تحديث المخزن المحلي فوراً
   // ملاحظة: "screenOrder" ليست مصفوفة سجلات {id,...} كباقي المجموعات، بل مصفوفة

@@ -575,7 +575,48 @@ function generateReport() {
         const excusedCount = attList.filter(
           (a) => a.status === "excused",
         ).length;
-        const absentCount = attList.filter((a) => a.status === "absent").length;
+
+        // أيام الغياب = كل يوم عمل رسمي ضمن الفترة لم يُسجَّل له حضور/تأخر/استئذان -
+        // سواء وُجد له سجل "غياب" صريح أو لم يُسجَّل له أي شيء إطلاقاً (وهو الغالب
+        // عملياً، لأن المعلم عادة لا يُسجِّل شيئاً للطالب الغائب). الاعتماد سابقاً على
+        // عدّ سجلات status="absent" فقط كان يُسقِط كل الأيام غير المسجَّلة من العدّ
+        // تماماً، فتظهر أيام الغياب أقل بكثير من الواقع (أو صفراً في الغالب)
+        const nonAbsentDatesSet = new Set(
+          (window.appStore.attendance || [])
+            .filter(
+              (a) =>
+                a.studentId === s.id &&
+                (a.status === "present" ||
+                  a.status === "late" ||
+                  a.status === "excused"),
+            )
+            .map((a) => a.date),
+        );
+        const allStudentDates = (window.appStore.attendance || [])
+          .filter((a) => a.studentId === s.id)
+          .map((a) => a.date);
+        const earliestRecordDate =
+          allStudentDates.length > 0
+            ? allStudentDates.reduce((min, d) => (d < min ? d : min))
+            : null;
+        const absenceRangeStart =
+          dateFrom || earliestRecordDate || toLocalDateStr(new Date());
+        const absenceRangeEnd = dateTo || toLocalDateStr(new Date());
+
+        let absentCount = 0;
+        const cur = new Date(absenceRangeStart + "T00:00:00");
+        const end = new Date(absenceRangeEnd + "T00:00:00");
+        while (cur <= end) {
+          const dStr = toLocalDateStr(cur);
+          if (
+            typeof isOfficialWorkday === "function" &&
+            isOfficialWorkday(dStr) &&
+            !nonAbsentDatesSet.has(dStr)
+          ) {
+            absentCount++;
+          }
+          cur.setDate(cur.getDate() + 1);
+        }
 
         // بطاقات التميز
         let tamayuzCount = 0;
