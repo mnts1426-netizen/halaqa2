@@ -1,6 +1,7 @@
 /**
  * ==========================================================================
  * admin.js - المحرك الإداري الشامل، عرض آخر 50 عملية للمعلمين، والفلترة بالأيام
+ * مَجْمَع عبدالله بن مهدي القرآني
  * ==========================================================================
  */
 
@@ -17,6 +18,9 @@ window.appStore = window.appStore || {
   screenOrder: [],
   notifications: [],
   teacherLogs: [],
+  payroll: [],
+  financeRevenues: [],
+  financeExpenses: [],
   settings: null,
 };
 
@@ -135,8 +139,7 @@ window.isOfficialWorkday = function (dateStr) {
   return day >= 0 && day <= 3;
 };
 
-// التأكد من توفر بطاقة سجل العمليات وبنائها برمجياً دون الحاجة لتعديل index.html
-// (سجل العمليات خاص بالمدير فقط - لا يُنشأ إطلاقاً لغيره)
+// التأكد من توفر بطاقة سجل العمليات وبنائها برمجياً
 function ensureTeacherLogsContainer() {
   if (!window.currentUser || window.currentUser.role !== "admin") return;
   if (document.getElementById("teacher-logs-card")) return;
@@ -195,7 +198,7 @@ function ensureTeacherLogsContainer() {
   dashboardView.appendChild(logsCard);
 }
 
-// عرض وتصفية آخر 50 عملية للمعلمين (خاص بالمدير فقط)
+// عرض وتصفية آخر 50 عملية للمعلمين
 window.renderTeacherLogsTable = function () {
   if (!window.currentUser || window.currentUser.role !== "admin") return;
   ensureTeacherLogsContainer();
@@ -275,8 +278,7 @@ window.exportTeacherLogsPDF = function () {
   );
 };
 
-// بناء ترويسة وتذييل الطباعة الرسمية الموحّدة (تُستخدم في كل ما يُطبع أو يُصدَّر PDF بالنظام)
-// rightSubText: نص اختياري يظهر تحت الشعار الأيمن (مثال: اسم الحلقة بالتقارير الرسمية)
+// بناء ترويسة وتذييل الطباعة الرسمية الموحّدة (تثبيت اسم أحمد بن عبدالله آل مهدي للتقارير الرسمية دائماً)
 window.buildOfficialPrintChrome = function (
   titleText,
   rightSubText,
@@ -329,13 +331,13 @@ window.buildOfficialPrintChrome = function (
   `;
 
   const footer = `
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px solid #ebd99f; padding-top: 1rem; margin-top: 1.5rem; font-size: 0.9rem;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px solid #ebd99f; padding-top: 1rem; margin-top: 1.2rem; font-size: 0.9rem; page-break-inside: avoid; break-inside: avoid; page-break-before: avoid; break-before: avoid;">
       <div style="text-align: right;">
         <strong style="color: #0a5c71;">المنصّة الإلكترونيّة للمَجْمَع القرآنيّ</strong>
       </div>
       <div style="text-align: center;">
         <div style="font-weight: 800; color: #6b4226;">مدير المَجْمَع القرآنيّ</div>
-        <div style="font-weight: 900; color: #0a5c71;">أحمد بن عبدالله ال مهدي</div>
+        <div style="font-weight: 900; color: #0a5c71;">أحمد بن عبدالله آل مهدي</div>
       </div>
     </div>
   `;
@@ -343,8 +345,7 @@ window.buildOfficialPrintChrome = function (
   return { header, footer };
 };
 
-// إدراج الترويسة كصف إضافي داخل thead الجدول حتى تتكرر تلقائياً بأعلى كل صفحة مطبوعة
-// (thead يتكرر أصلاً بكل المتصفحات عند الطباعة، بعكس أي عنصر خارج الجدول)
+// إدراج الترويسة كصف إضافي داخل thead الجدول
 window.buildRepeatingHeaderTableHtml = function (originalTable, headerHtml) {
   const clone = originalTable.cloneNode(true);
   let thead = clone.querySelector("thead");
@@ -390,9 +391,11 @@ window.printTableElement = function (tableId, title) {
         <meta charset="utf-8" />
         <title>${title}</title>
         <style>
-          @page { size: A4 landscape; margin: 10mm; }
-          body { font-family: 'Cairo', 'Tajawal', sans-serif; direction: rtl; padding: 15px; }
-          table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
+          @page { size: A4 landscape; margin: 8mm; }
+          body { font-family: 'Cairo', 'Tajawal', sans-serif; direction: rtl; padding: 10px; }
+          table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+          thead { display: table-header-group !important; }
+          tbody tr { page-break-inside: avoid !important; break-inside: avoid !important; }
           th, td { border: 1px solid #cbd5e1; padding: 5px 4px; text-align: center; word-wrap: break-word; overflow-wrap: break-word; }
           th { background-color: #0a5c71; color: #ffffff; font-weight: bold; }
           .no-print, button { display: none !important; }
@@ -427,9 +430,6 @@ window.directDownloadPDF = function (elementId, filename, title) {
 
     const isTableElement = element.tagName === "TABLE";
 
-    // تصدير متعدد الصفحات يكرر الترويسة الرسمية (الشعارات والعنوان) فعلياً أعلى كل
-    // صفحة كالصفحة الأولى تماماً - يحل محل الأسلوب القديم الذي كان يُظهرها في الصفحة
-    // الأولى فقط لأن مكتبة التصدير تُحوّل المحتوى لصورة واحدة طويلة ثم تقصّها
     if (isTableElement && typeof window.generateMultiPagePDF === "function") {
       window.generateMultiPagePDF(
         chrome.header,
@@ -441,7 +441,6 @@ window.directDownloadPDF = function (elementId, filename, title) {
       return;
     }
 
-    // مسار احتياطي فقط لعنصر ليس جدولاً (نادر الحدوث حالياً)
     const contentHtml =
       isTableElement && typeof buildRepeatingHeaderTableHtml === "function"
         ? buildRepeatingHeaderTableHtml(element, chrome.header)
@@ -449,12 +448,12 @@ window.directDownloadPDF = function (elementId, filename, title) {
 
     const wrapper = document.createElement("div");
     wrapper.style.cssText =
-      "position: fixed; top: -99999px; left: -99999px; background:#fff; padding: 1.5rem; width: 1200px; font-family: 'Cairo','Tajawal',sans-serif;";
+      "position: fixed; top: -99999px; left: -99999px; background:#fff; padding: 1.2rem; width: 1200px; font-family: 'Cairo','Tajawal',sans-serif;";
     wrapper.innerHTML = contentHtml + chrome.footer;
     document.body.appendChild(wrapper);
 
     const opt = {
-      margin: [8, 8, 8, 8],
+      margin: [6, 6, 6, 6],
       filename: `${filename}_${new Date().toISOString().split("T")[0]}.pdf`,
       image: { type: "jpeg", quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
@@ -475,11 +474,6 @@ window.directDownloadPDF = function (elementId, filename, title) {
   }
 };
 
-// تصدير PDF متعدد الصفحات مع تكرار الترويسة الرسمية (الشعارات + العنوان) أعلى كل
-// صفحة فعلياً - وليس فقط الصفحة الأولى. يُقسِّم صفوف الجدول إلى مجموعات بحسب المساحة
-// المتاحة فعلياً بعد قياس ارتفاع الترويسة وصف واحد من الجدول، ثم يبني كل صفحة على حدة
-// ويجمعها في ملف PDF واحد. (بديل عن downloadReportPDF/directDownloadPDF التي تكتفي
-// بترويسة الصفحة الأولى فقط بسبب أسلوب تصدير html2pdf بتحويل المحتوى لصورة طويلة)
 window.generateMultiPagePDF = async function (
   chromeHeader,
   chromeFooter,
@@ -500,11 +494,10 @@ window.generateMultiPagePDF = async function (
   const makeWrapper = () => {
     const w = document.createElement("div");
     w.style.cssText =
-      "position: fixed; top: -99999px; left: -99999px; background:#fff; padding: 1.5rem; width: 1200px; font-family: 'Cairo','Tajawal',sans-serif;";
+      "position: fixed; top: -99999px; left: -99999px; background:#fff; padding: 1.2rem; width: 1200px; font-family: 'Cairo','Tajawal',sans-serif;";
     return w;
   };
 
-  // قياس ارتفاع الترويسة وصف واحد من الجدول لتحديد كم صفاً يتسع بكل صفحة فعلياً
   const measureWrapper = makeWrapper();
   document.body.appendChild(measureWrapper);
   measureWrapper.innerHTML = chromeHeader;
@@ -544,19 +537,15 @@ window.generateMultiPagePDF = async function (
     const rowsHtml = pageChunks[pageIdx].map((r) => r.outerHTML).join("");
     pageWrapper.innerHTML =
       chromeHeader +
-      `<div class="table-responsive" style="margin-bottom: 1.5rem;"><table class="${tableClassAttr}" style="${tableStyleAttr}"><thead>${theadHtml}</thead><tbody>${rowsHtml}</tbody></table></div>` +
+      `<div class="table-responsive" style="margin-bottom: 0.8rem;"><table class="${tableClassAttr}" style="${tableStyleAttr}"><thead>${theadHtml}</thead><tbody>${rowsHtml}</tbody></table></div>` +
       (isLastPage ? chromeFooter : "");
     document.body.appendChild(pageWrapper);
-    // انتظار قصير لضمان اكتمال تخطيط (layout) العنصر الجديد قبل التقاطه بالصورة -
-    // بدون هذا التأخير البسيط يلتقط html2canvas أحياناً ارتفاعاً صفرياً للعنصر المُدرَج حديثاً
     await new Promise((r) => setTimeout(r, 30));
 
     const w = pageWrapper.scrollWidth,
       h = pageWrapper.scrollHeight;
     const opt = {
       image: { type: "jpeg", quality: 0.98 },
-      // تمرير الأبعاد صراحة لـ html2canvas ضروري هنا: بدونها يفشل التقاط أي عنصر
-      // ثانٍ يُضاف للصفحة بعد أول استدعاء ناجح لـ html2pdf (يلتقط ارتفاعاً صفرياً)
       html2canvas: {
         scale: 2,
         useCORS: true,
@@ -580,7 +569,14 @@ window.generateMultiPagePDF = async function (
       pdfDoc.addPage([pageWidthMm, pageHeightMm], orientation);
       const imgProps = pdfDoc.getImageProperties(imgData);
       const imgHeightMm = (imgProps.height * usableWidthMm) / imgProps.width;
-      pdfDoc.addImage(imgData, "JPEG", marginMm, marginMm, usableWidthMm, imgHeightMm);
+      pdfDoc.addImage(
+        imgData,
+        "JPEG",
+        marginMm,
+        marginMm,
+        usableWidthMm,
+        imgHeightMm,
+      );
     }
     document.body.removeChild(pageWrapper);
   }
@@ -793,7 +789,6 @@ window.openStudentsFollowupModal = function () {
     .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
   const todayAtt = window.appStore?.attendance || [];
   const todayTasm = window.appStore?.tasmeea || [];
-  const isWorkday = isOfficialWorkday(targetDateStr);
 
   const attMap = new Map();
   todayAtt
@@ -813,9 +808,8 @@ window.openStudentsFollowupModal = function () {
     const circleName = circle ? circle.name : "غير مسجل";
 
     const att = attMap.get(s.id);
-    let attText = isWorkday
-      ? '<span class="badge badge-danger">🔴 غائب (تلقائي)</span>'
-      : '<span class="badge" style="background:#e0e0e0; color:#555;">— غير محدد —</span>';
+    let attText =
+      '<span class="badge" style="background:#e0e0e0; color:#555;">— غير محدد —</span>';
 
     if (att) {
       if (att.status === "present")
@@ -2024,15 +2018,32 @@ window.updateTeacherAttendanceNotes = function (teacherId, notesVal) {
     new Date().toISOString().split("T")[0];
   const recordId = `t_att_${teacherId}_${dateVal}`;
 
+  if (!window.appStore.teacherAttendance)
+    window.appStore.teacherAttendance = [];
   let record = (window.appStore?.teacherAttendance || []).find(
     (a) => a.id === recordId,
   );
-  if (record) {
+
+  if (!record) {
+    record = {
+      id: recordId,
+      teacherId: teacherId,
+      date: dateVal,
+      time: "",
+      status: "",
+      notes: notesVal,
+      updatedBy: "admin",
+      createdAt: Date.now(),
+    };
+    window.appStore.teacherAttendance.push(record);
+  } else {
     record.notes = notesVal;
-    if (typeof saveToCloud === "function")
-      saveToCloud("teacherAttendance", record.id, record);
-    if (typeof saveLocalStore === "function") saveLocalStore();
+    record.updatedBy = "admin";
   }
+
+  if (typeof saveToCloud === "function")
+    saveToCloud("teacherAttendance", record.id, record);
+  if (typeof saveLocalStore === "function") saveLocalStore();
 };
 
 window.markAllTeachersPresent = function () {
@@ -2388,8 +2399,6 @@ window.deleteStudent = async function (studentId) {
   if (typeof saveLocalStore === "function") saveLocalStore();
   renderStudentsTable();
 
-  // ننتظر تأكيد الحذف الفعلي من الخادم قبل إعلان النجاح (بدل إعلانه فوراً ثم اكتشاف
-  // الفشل لاحقاً بصمت) - saveToCloud نفسها تعرض تنبيهاً واضحاً تلقائياً إن فشلت
   if (typeof saveToCloud === "function") {
     await saveToCloud("students", studentId, null, true);
     await saveToCloud("users", studentId, null, true);
@@ -2711,9 +2720,6 @@ window.renderAccountsTable = function () {
   tbody.innerHTML = html;
 };
 
-// تصغير الصورة المرفوعة إلى مربع صغير (200×200) وتحويلها لنص Base64 مباشرة
-// (بدلاً من رفعها لـ Firebase Storage) لضمان حفظها بنفس آلية Firestore الموثوقة
-// أصلاً بهذا النظام، وتفادي أي مشاكل صلاحيات محتملة في تخزين الصور
 function resizeImageFileToDataUrl(file, maxSize, quality) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -2885,7 +2891,6 @@ window.handleSaveUserAccount = function (e) {
   if (typeof saveToCloud === "function") saveToCloud("users", user.id, user);
   if (typeof saveLocalStore === "function") saveLocalStore();
 
-  // تحديث صورة/اسم الشريط الجانبي فوراً لو كان الحساب المعدَّل هو المستخدم الحالي نفسه
   if (window.currentUser && window.currentUser.id === user.id) {
     window.currentUser.name = user.name;
     window.currentUser.photoURL = user.photoURL;
@@ -2939,7 +2944,7 @@ window.toggleUserAccountStatus = function (userId) {
   renderAccountsTable();
 };
 
-// التحضير
+// التحضير: لا غياب تلقائي مسبق، ولكن بمجرد رصد أول طالب يتم تغييب البقية تلقائياً
 window.renderAttendanceTable = function () {
   const tbody = document.getElementById("attendance-table-body");
   if (!tbody) return;
@@ -2977,7 +2982,6 @@ window.renderAttendanceTable = function () {
 
   const currentUser = window.currentUser;
   const isTeacher = currentUser && currentUser.role === "teacher";
-  const isWorkday = isOfficialWorkday(dateVal);
 
   let html = "";
   students.forEach((s) => {
@@ -2986,29 +2990,15 @@ window.renderAttendanceTable = function () {
         (a) => a.studentId === s.id && a.date === dateVal,
       ) || {};
 
-    let effectiveStatus = record.status || "";
-    if (!effectiveStatus && isWorkday) {
-      effectiveStatus = "absent";
-    }
+    const effectiveStatus = record.status || "";
 
-    let selectOptionsHtml = "";
-    if (isTeacher) {
-      selectOptionsHtml = `
-        <option value="" ${effectiveStatus === "" ? "selected" : ""}>— غير محدد —</option>
-        <option value="present" ${effectiveStatus === "present" ? "selected" : ""}>🟢 حاضر</option>
-        <option value="late" ${effectiveStatus === "late" ? "selected" : ""}>🟡 متأخر</option>
-        ${effectiveStatus === "absent" ? '<option value="absent" selected disabled>🔴 غائب (تلقائي)</option>' : ""}
-        ${effectiveStatus === "excused" ? '<option value="excused" selected disabled>🔵 مستأذن (إدارة)</option>' : ""}
-      `;
-    } else {
-      selectOptionsHtml = `
-        <option value="" ${effectiveStatus === "" ? "selected" : ""}>— غير محدد —</option>
-        <option value="present" ${effectiveStatus === "present" ? "selected" : ""}>🟢 حاضر</option>
-        <option value="absent" ${effectiveStatus === "absent" ? "selected" : ""}>🔴 غائب</option>
-        <option value="late" ${effectiveStatus === "late" ? "selected" : ""}>🟡 متأخر</option>
-        <option value="excused" ${effectiveStatus === "excused" ? "selected" : ""}>🔵 مستأذن</option>
-      `;
-    }
+    const selectOptionsHtml = `
+      <option value="" ${effectiveStatus === "" ? "selected" : ""}>— غير محدد —</option>
+      <option value="present" ${effectiveStatus === "present" ? "selected" : ""}>🟢 حاضر</option>
+      <option value="late" ${effectiveStatus === "late" ? "selected" : ""}>🟡 متأخر</option>
+      <option value="absent" ${effectiveStatus === "absent" ? "selected" : ""}>🔴 غائب</option>
+      <option value="excused" ${effectiveStatus === "excused" ? "selected" : ""}>🔵 مستأذن</option>
+    `;
 
     html += `
       <tr>
@@ -3029,20 +3019,33 @@ window.renderAttendanceTable = function () {
   tbody.innerHTML = html;
 };
 
-window.setStudentAttendance = function (studentId, status) {
+// رسالة تأكيد صغيرة تختفي تلقائياً (بدون حجب الشاشة كالـ alert) - تُستخدم لتأكيد
+// حفظ تعديل بسيط ومتكرر (مثل تغيير حالة تحضير طالب) دون إزعاج المدير بنافذة
+// منبثقة يجب إغلاقها يدوياً في كل مرة
+function showQuickSaveConfirmation(message) {
+  let el = document.getElementById("quick-save-confirmation-toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "quick-save-confirmation-toast";
+    el.style.cssText =
+      "position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1b5e20; color: #fff; padding: 10px 20px; border-radius: 8px; font-weight: 700; font-size: 0.9rem; z-index: 99999; box-shadow: 0 4px 14px rgba(0,0,0,0.25); transition: opacity 0.3s;";
+    document.body.appendChild(el);
+  }
+  el.textContent = message;
+  el.style.opacity = "1";
+  clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(() => {
+    el.style.opacity = "0";
+  }, 1800);
+}
+
+// رصد التحضير وتفعيل تغييب غير المحضرين فور تحضير أول طالب
+window.setStudentAttendance = async function (studentId, status) {
   const dateVal = document.getElementById("attendance-date-select")?.value;
   const circleId = document.getElementById("attendance-circle-select")?.value;
   const recordId = `att_${studentId}_${dateVal}`;
   const currentUser = window.currentUser;
   const isTeacher = currentUser && currentUser.role === "teacher";
-
-  if (isTeacher && status !== "present" && status !== "late" && status !== "") {
-    alert(
-      "⚠️ غير مصرح للمعلم باختيار هذه الحالة. التعديلات محصورة بإدارة المَجْمَع.",
-    );
-    renderAttendanceTable();
-    return;
-  }
 
   if (!window.appStore.attendance) window.appStore.attendance = [];
   let record = window.appStore.attendance.find((a) => a.id === recordId);
@@ -3065,9 +3068,65 @@ window.setStudentAttendance = function (studentId, status) {
     record.updatedBy = isTeacher ? "teacher" : "admin";
   }
 
-  if (typeof saveToCloud === "function")
-    saveToCloud("attendance", record.id, record);
+  // ننتظر هنا فعلياً نتيجة الحفظ السحابي (بدل إطلاقه دون انتظار) لنعرف بشكل مؤكد
+  // هل وصل التعديل فعلاً للخادم أم لا، بدل افتراض النجاح دائماً بصمت
+  let saveOk = true;
+  if (typeof saveToCloud === "function") {
+    saveOk = await saveToCloud("attendance", record.id, record);
+  }
+
+  // إذا تم تحضير طالب بحالة (حاضر / متأخر / غائب): يتم تلقائياً تغييب بقية طلاب الحلقة لذلك اليوم ممن هم بدون تحضير
+  if (status && status !== "" && circleId) {
+    const circleStudents = (window.appStore?.students || []).filter(
+      (s) =>
+        s.circleId === circleId && s.status === "active" && s.id !== studentId,
+    );
+
+    circleStudents.forEach((otherStu) => {
+      const otherRecId = `att_${otherStu.id}_${dateVal}`;
+      let otherRec = window.appStore.attendance.find(
+        (a) => a.id === otherRecId,
+      );
+
+      if (!otherRec || !otherRec.status || otherRec.status === "") {
+        if (!otherRec) {
+          otherRec = {
+            id: otherRecId,
+            studentId: otherStu.id,
+            circleId: circleId,
+            date: dateVal,
+            status: "absent",
+            notes: "غياب تلقائي",
+            updatedBy: isTeacher ? "teacher" : "admin",
+            createdAt: Date.now(),
+          };
+          window.appStore.attendance.push(otherRec);
+        } else {
+          otherRec.status = "absent";
+          if (!otherRec.notes) otherRec.notes = "غياب تلقائي";
+          otherRec.updatedBy = isTeacher ? "teacher" : "admin";
+        }
+
+        if (typeof saveToCloud === "function") {
+          saveToCloud("attendance", otherRec.id, otherRec);
+        }
+      }
+    });
+  }
+
   if (typeof saveLocalStore === "function") saveLocalStore();
+  renderAttendanceTable();
+
+  // تأكيد صريح وبسيط للمدير أن التعديل وصل فعلاً للخادم (بدل الصمت الذي كان يجعل
+  // فشل الحفظ - إن حدث - غير ملحوظ إلا لاحقاً حين "يعود" التحضير لحالته القديمة).
+  // تنبيه فشل الحفظ نفسه يظهر أصلاً من داخل saveToCloud عند حدوث خطأ فعلي.
+  if (!isTeacher && saveOk) {
+    const student = (window.appStore?.students || []).find(
+      (s) => s.id === studentId,
+    );
+    const stuName = student ? student.name : "الطالب";
+    showQuickSaveConfirmation(`✅ تم حفظ تحضير (${stuName}) بنجاح`);
+  }
 
   if (isTeacher && typeof window.logTeacherActivity === "function") {
     const student = (window.appStore?.students || []).find(
@@ -3079,7 +3138,9 @@ window.setStudentAttendance = function (studentId, status) {
         ? "حاضر 🟢"
         : status === "late"
           ? "متأخر 🟡"
-          : "إلغاء التحضير";
+          : status === "absent"
+            ? "غائب 🔴"
+            : "إلغاء التحضير";
     window.logTeacherActivity(
       "تحضير طالب",
       `رصد حالة الطالب (${stuName}) كـ (${statusText})`,
@@ -3098,17 +3159,35 @@ window.updateAttendanceNotes = function (studentId, notesVal) {
   }
 
   const dateVal = document.getElementById("attendance-date-select")?.value;
+  const circleId =
+    document.getElementById("attendance-circle-select")?.value || "";
   const recordId = `att_${studentId}_${dateVal}`;
 
+  if (!window.appStore.attendance) window.appStore.attendance = [];
   let record = (window.appStore?.attendance || []).find(
     (a) => a.id === recordId,
   );
-  if (record) {
+
+  if (!record) {
+    record = {
+      id: recordId,
+      studentId: studentId,
+      circleId: circleId,
+      date: dateVal,
+      status: "",
+      notes: notesVal,
+      updatedBy: "admin",
+      createdAt: Date.now(),
+    };
+    window.appStore.attendance.push(record);
+  } else {
     record.notes = notesVal;
-    if (typeof saveToCloud === "function")
-      saveToCloud("attendance", record.id, record);
-    if (typeof saveLocalStore === "function") saveLocalStore();
+    record.updatedBy = "admin";
   }
+
+  if (typeof saveToCloud === "function")
+    saveToCloud("attendance", record.id, record);
+  if (typeof saveLocalStore === "function") saveLocalStore();
 };
 
 window.markAllAbsent = function () {
@@ -3133,7 +3212,6 @@ window.markAllAbsent = function () {
 
 // ملاحظات المعلمين
 window.renderTeacherNotesTable = function () {
-  // ملاحظات المعلمين للإدارة خاصة بالمدير فقط
   if (!window.currentUser || window.currentUser.role !== "admin") return;
   const tbody = document.getElementById("teacher-notes-table-body");
   if (!tbody) return;
@@ -3364,12 +3442,8 @@ function getSundayToWednesdayDatesForWeek(weekOption = "current") {
   const now = new Date();
   const dayOfWeek = now.getDay();
 
-  // دورة عرض شاشة العرض فقط: نتيجة الأسبوع لا تُعرف فعلياً إلا يوم الأربعاء (اكتمال
-  // الأيام الأربعة أحد-أربعاء)، فتُعرض من ذلك الأربعاء وتبقى ثابتة أسبوعاً كاملاً حتى
-  // الأربعاء التالي - بحيث لا تفرغ الشاشة أبداً بين الأسبوعين (بخلاف "current" العادي
-  // المستخدم بصفحة إدارة التميز والذي يعني الأسبوع التقويمي الجاري كما هو)
   if (weekOption === "screen_cycle") {
-    const offsetFromWednesday = (dayOfWeek + 4) % 7; // الأربعاء = يوم 3
+    const offsetFromWednesday = (dayOfWeek + 4) % 7;
     const referenceWednesday = new Date(now);
     referenceWednesday.setDate(now.getDate() - offsetFromWednesday);
     const sunday = new Date(referenceWednesday);
@@ -3430,8 +3504,6 @@ function isStudentTamayuzForWeek(studentId, weekOption = "current") {
     const tasm = (window.appStore?.tasmeea || []).find(
       (t) => t.studentId === studentId && t.date === day,
     );
-    // لا يوجد سجل تسميع مُعتمَد فعلياً لهذا اليوم = يُعامل كـ"يعيد" ويُسقط الطالب من
-    // التميز (يمنع مرور طالب "مُرحَّل تلقائياً" لم يُعتمد له شيء فعلياً من قبل المعلم)
     if (!tasm) {
       return false;
     }
@@ -3515,7 +3587,6 @@ window.renderTamayuzBoard = function () {
   tbody.innerHTML = html;
 };
 
-// تفعيل/إلغاء وضع ملء الشاشة للوحة العرض المتحركة فقط (بدون أي عناصر أخرى من الصفحة)
 function exitScreenFullscreenIfActive() {
   const exit =
     document.exitFullscreen ||
@@ -3544,7 +3615,6 @@ window.toggleScreenFullscreen = function () {
   }
 };
 
-// الضغط في أي مكان على اللوحة نفسها أثناء ملء الشاشة يخرج منها مباشرة
 document.addEventListener("click", () => {
   if (
     document.fullscreenElement &&
@@ -3567,8 +3637,6 @@ window.renderScreenView = function () {
   const tbody = document.getElementById("screen-manage-table-body");
   const qualifyingStudents = getQualifyingTamayuzStudents("screen_cycle");
 
-  // الطالب "الأول" في كل حلقة (أول من يظهر ضمن ترتيب المتميزين الخاص بتلك الحلقة تحديداً)
-  // هو وحده المؤهل لنيل كأس التميز - بقية طلاب نفس الحلقة غير مؤهلين للكأس مهما كان ترتيبهم
   const circleLeaderIds = new Set();
   {
     const seenCircles = new Set();
@@ -3580,25 +3648,15 @@ window.renderScreenView = function () {
     });
   }
 
-  // الكأس لا يُمنح تلقائياً أبداً - فقط من حدّده المدير صراحةً عبر مربع الاختيار في
-  // جدول "التحكم في ترتيب ظهور فرسان التميز" (كأس واحد كحد أقصى لكل حلقة بما أن
-  // المؤهل الوحيد هو "الأول" فيها)
   const trophyStudentIds = new Set(window.appStore?.trophyStudentIds || []);
-
-  // مرجع تاريخ واحد موحّد تُبنى عليه كل لوحات الشاشة (تميز / منجزون أولاً / إحصائيات)
-  // لضمان تطابق التاريخ المعروض في جميع الشرائح دائماً بدل حساب كل شريحة له بمعزل
-  // عن الأخرى (وهو ما كان يسبب اختلاف التاريخ بين اللوحات سابقاً)
   const now = new Date();
   const todayStr = now.toISOString().split("T")[0];
 
-  // اسم مختصر (٣ مقاطع كحد أقصى) ليتّسع الخط الأكبر داخل اللوحة دون كسر التنسيق
   const shortenNameForScreen = (fullName) => {
     const tokens = String(fullName || "")
       .trim()
       .split(/\s+/)
       .filter(Boolean);
-    // "بن"/"ال" وصلات لا تُحتسب من الأجزاء الثلاثة حتى لا ينتهي الاسم المختصر
-    // بكلمة معلّقة بلا معنى (مثل "...عبدالله ال" بدل "...عبدالله ال مهدي")
     const connectors = new Set(["بن", "ابن", "آل", "ال"]);
     const result = [];
     let contentCount = 0;
@@ -3615,8 +3673,6 @@ window.renderScreenView = function () {
     return result.join(" ");
   };
 
-  // لاحقة "رضي الله عنه" تُضاف تلقائياً فقط عندما يحمل اسم الحلقة اسم صحابي معروف
-  // (تُترك فارغة لأي حلقة أخرى، مثل حلقة مؤسس المَجْمَع، تجنباً لأي خطأ لفظي)
   const KNOWN_COMPANION_NAMES = [
     "أبو بكر",
     "عمر بن الخطاب",
@@ -3637,18 +3693,17 @@ window.renderScreenView = function () {
     "معاوية بن أبي سفيان",
     "سعيد بن زيد",
   ];
-  // توحيد أشكال الألف (أ/إ/آ) قبل المقارنة حتى لا يفوت التطابق بسبب اختلاف كتابة
-  // الهمزة بين اسم الحلقة المُدخَل يدوياً وقائمة أسماء الصحابة أعلاه
-  const normalizeArabicAlef = (str) =>
-    String(str || "").replace(/[أإآ]/g, "ا");
+
+  const normalizeArabicAlef = (str) => String(str || "").replace(/[أإآ]/g, "ا");
   const companionHonorific = (circleName) => {
     const name = normalizeArabicAlef(circleName);
-    return KNOWN_COMPANION_NAMES.some((c) => name.includes(normalizeArabicAlef(c)))
+    return KNOWN_COMPANION_NAMES.some((c) =>
+      name.includes(normalizeArabicAlef(c)),
+    )
       ? '<span class="honorific">رضي الله عنه</span>'
       : "";
   };
 
-  // تاريخ هجري كامل بصيغة "يوم/شهر/سنة" (تقويم أم القرى) + اسم اليوم بالعربي
   const getHijriFullLabel = (dateObj) => {
     try {
       const parts = new Intl.DateTimeFormat("en-u-ca-islamic-umalqura", {
@@ -3670,8 +3725,6 @@ window.renderScreenView = function () {
     }
   };
 
-  // نطاق الأسبوع الميلادي المعروض في لوحة التميز (من الأحد إلى الأربعاء) مع رقم الأسبوع،
-  // محسوب من نفس يوم أحد "screen_cycle" المعروض فعلياً لضمان تطابق الرقم مع التاريخ دوماً
   const SCREEN_TAMAYUZ_EPOCH_SUNDAY = new Date(2026, 7, 30);
   const buildTamayuzWeekPeriodLabel = () => {
     const days = getSundayToWednesdayDatesForWeek("screen_cycle");
@@ -3694,13 +3747,10 @@ window.renderScreenView = function () {
         grid.innerHTML = `
           <div class="empty-state-card" style="grid-column:1/-1; padding:3rem 1.5rem; text-align:center; background:#fff; border-radius:12px; border:2px dashed #d7ccc8;">
             <h2 style="color:var(--primary-brown); font-size:1.8rem; font-weight:900; margin-bottom:0.6rem;">🌟 المتميزون في الحلقات 🌟</h2>
-            <p class="text-muted" style="font-size:1.1rem;">لا يوجد طلاب حققوا شروط التميز لهذا الأسبوع حتى الآن (حضور 4 أيام كاملة من الأحد للأربعاء وتقييم ممتاز)</p>
+            <p class="text-muted" style="font-size:1.1rem;">لا يوجد طلاب حققوا شروط التميز لهذا الأسبوع حتى الآن</p>
           </div>
         `;
       } else {
-        // تجميع الطلاب المتميزين حسب الحلقة - أي حلقة ليس بها أي طالب متميز لا تظهر إطلاقاً
-        // وترتيب الأعمدة يتبع ترتيب الحلقات نفسه كما هو موضح في جدول "إدارة الحلقات"
-        // (وليس ترتيب ظهور أول طالب متميز، حتى لا يتغيّر ترتيب الحلقات من أسبوع لآخر)
         const circleGroupsById = {};
         qualifyingStudents.forEach((stu) => {
           if (!circleGroupsById[stu.circleId]) {
@@ -3719,8 +3769,7 @@ window.renderScreenView = function () {
         const circleGroups = (window.appStore?.circles || [])
           .map((c) => circleGroupsById[c.id])
           .filter(Boolean);
-        // أي طالب متميز مرتبط بحلقة لم تعد موجودة في جدول الحلقات (حالة نادرة) يُضاف
-        // في النهاية بدل إسقاطه بالكامل من اللوحة
+
         Object.keys(circleGroupsById).forEach((cid) => {
           if (!circleGroups.some((g) => g.circleId === cid)) {
             circleGroups.push(circleGroupsById[cid]);
@@ -3848,7 +3897,8 @@ window.renderScreenView = function () {
       const isWorkday =
         typeof isOfficialWorkday === "function"
           ? isOfficialWorkday(todayStr)
-          : new Date(todayStr).getDay() >= 0 && new Date(todayStr).getDay() <= 3;
+          : new Date(todayStr).getDay() >= 0 &&
+            new Date(todayStr).getDay() <= 3;
 
       const activeStudents = (window.appStore?.students || []).filter(
         (s) => s.status === "active",
@@ -3947,9 +3997,6 @@ window.renderScreenView = function () {
     }
   };
 
-  // التبديل بين لوحة التميز ولوحة المنجزون أولاً ولوحة الإحصائيات: لوحة التميز تُضاف
-  // للدورة فقط عند وجود طلاب متميزين لهذا الأسبوع، وإلا تُستبعد لعدم إضاعة وقت العرض
-  // على لوحة فارغة (بقية اللوحتين تبقيان ضمن الدورة دائماً)
   const availableScreenSlides = ["stats", "topcompleted"];
   if (qualifyingStudents.length > 0) availableScreenSlides.unshift("tamayuz");
 
@@ -3969,7 +4016,6 @@ window.renderScreenView = function () {
     }, 30000);
   }
 
-  // تحديث بيانات الشاشة دورياً كل 5 دقائق (كانت الدالة المستدعاة سابقاً غير معرّفة فعلياً)
   if (window.screenDataRefreshTimer)
     clearInterval(window.screenDataRefreshTimer);
   window.screenDataRefreshTimer = setInterval(async () => {
@@ -3979,9 +4025,6 @@ window.renderScreenView = function () {
     renderScreenView();
   }, 300000);
 
-  // مراقبة تغيّر اليوم بشكل سريع (كل 30 ثانية): جداول "أول 15 أتموا" مبنية أصلاً
-  // على بيانات اليوم الحالي فقط، فبمجرد دخول يوم جديد يعاد بناؤها فارغة تلقائياً
-  // دون انتظار دورة التحديث الكاملة كل 5 دقائق - لضمان تصفير الأسماء فور منتصف الليل
   if (!window.screenCurrentDateStr) {
     window.screenCurrentDateStr = new Date().toISOString().split("T")[0];
   }
@@ -4006,7 +4049,6 @@ window.renderScreenView = function () {
         );
         const circleName = circle ? circle.name : "جامع الهدى";
         const isTrophyWinner = trophyStudentIds.has(stu.id);
-        // الكأس متاح فقط لطالب "الأول" في حلقته - بقية طلاب الحلقة لا يظهر لهم مربع اختيار
         const isTrophyEligible = circleLeaderIds.has(stu.id);
 
         tbodyHtml += `
@@ -4078,8 +4120,6 @@ window.resetScreenStudentOrder = function () {
   alert("✅ تمت إعادة الترتيب التلقائي بنجاح!");
 };
 
-// تحديد/إلغاء الطالب الحاصل على كأس التميز لحلقته (باختيار المدير فقط) - يمكن أن يحمل
-// كل حلقة كأسها الخاص في نفس الوقت (وليس كأساً واحداً لعموم المَجْمَع كما كان سابقاً)
 window.setTrophyStudent = function (studentId) {
   const current = new Set(window.appStore.trophyStudentIds || []);
   if (current.has(studentId)) {
@@ -4100,8 +4140,6 @@ window.setTrophyStudent = function (studentId) {
   renderScreenView();
 };
 
-// التقاط موقع المدير الحالي فعلياً عبر GPS الجهاز وتعبئته في حقل موقع المَجْمَع
-// (كان هذا الزر معطلاً تماماً بسبب دالة غير معرّفة - تم اكتشافه وإصلاحه أثناء الفحص)
 window.getCurrentLocationCoords = function () {
   if (!navigator.geolocation) {
     alert("⚠️ جهازك لا يدعم خاصية تحديد الموقع الجغرافي GPS.");
@@ -4387,8 +4425,6 @@ window.renderPendingRequestsTable = function () {
     return;
   }
 
-  // ملاحظة أمنية: هذه البيانات مصدرها استمارة عامة لا تتطلب تسجيل دخول، لذا يجب
-  // تحصينها دائماً (escapeHtml) قبل عرضها هنا لمنع أي محاولة حقن كود ضار
   let html = "";
   pendingList.forEach((stu) => {
     html += `
@@ -4550,7 +4586,6 @@ window.renderNotificationsView = function () {
 
     let allNotifs = window.appStore?.notifications || [];
 
-    // المعلم لا يستقبل إلا إشعارات صادرة فعلياً من إدارة المَجْمَع وموجهة له
     if (isTeacherViewer) {
       const teacherObj = (window.appStore?.teachers || []).find(
         (t) =>
@@ -4617,7 +4652,8 @@ window.openModalSendUnifiedMessage = function () {
   const isTeacherSender =
     window.currentUser && window.currentUser.role === "teacher";
   const teacherNote = document.getElementById("msg-teacher-target-note");
-  if (teacherNote) teacherNote.style.display = isTeacherSender ? "block" : "none";
+  if (teacherNote)
+    teacherNote.style.display = isTeacherSender ? "block" : "none";
 
   const titleEl = document.getElementById("msg-title");
   const bodyEl = document.getElementById("msg-body");
@@ -4673,7 +4709,8 @@ window.handleSendUnifiedMessage = function (e) {
   };
   const isTeacherSender = currentUser.role === "teacher";
 
-  let recipient = document.getElementById("msg-target-recipient")?.value || "all";
+  let recipient =
+    document.getElementById("msg-target-recipient")?.value || "all";
   const specificSelect = document.getElementById("msg-specific-select");
   let targetId = specificSelect?.value || "";
   const selectedOption = specificSelect?.options[specificSelect.selectedIndex];
@@ -4681,7 +4718,6 @@ window.handleSendUnifiedMessage = function (e) {
     ? selectedOption.getAttribute("data-name") || ""
     : "";
 
-  // المعلم يرسل فقط إلى إدارة المَجْمَع بغض النظر عن أي قيمة أخرى بالنموذج
   if (isTeacherSender) {
     recipient = "admin";
     targetId = "";
@@ -4739,7 +4775,10 @@ window.handleSendUnifiedMessage = function (e) {
   );
   if (typeof renderNotificationsView === "function") renderNotificationsView();
 
-  if (isTeacherSender && typeof window.sendAdminPushNotification === "function") {
+  if (
+    isTeacherSender &&
+    typeof window.sendAdminPushNotification === "function"
+  ) {
     window.sendAdminPushNotification(
       `💬 رسالة من المعلم ${currentUser.name}`,
       `${title}: ${body}`,
@@ -4766,13 +4805,14 @@ function getCircleName(circleId) {
 
 // ==========================================================================
 // القسم المالي: التقارير المالية (إيرادات/مصروفات) + مسير الرواتب
-// الصلاحيات: المدير يُعدّل كل شيء. المعلم المعيَّن "مسؤول مالي" (isFinance) يرى
-// الإيرادات/المصروفات بدون تعديل، ويستطيع فقط إضافة/تعديل "الزيادة" لبقية
-// المعلمين في مسير الرواتب (وليس لنفسه، ولا لمكافآتهم الأساسية)
 // ==========================================================================
 
 function isFinanceAdminUser() {
-  return Boolean(window.currentUser && window.currentUser.role === "admin");
+  const user = window.currentUser;
+  if (!user) return false;
+  return (
+    user.role === "admin" || user.role === "director" || Boolean(user.isAdmin)
+  );
 }
 
 function isFinanceTeacherUser() {
@@ -4782,8 +4822,7 @@ function isFinanceTeacherUser() {
   const teacherId = user.teacherId || user.id;
   if (window.appStore?.settings?.financialTeacherId === teacherId) return true;
   return (window.appStore?.teachers || []).some(
-    (t) =>
-      (t.id === teacherId || t.userId === user.id) && t.isFinance === true,
+    (t) => (t.id === teacherId || t.userId === user.id) && t.isFinance === true,
   );
 }
 
@@ -5003,8 +5042,7 @@ window.exportFinanceExpensesExcel = function () {
   );
 };
 
-// ---- مسير الرواتب ----
-
+// مسير الرواتب: يضم المدير (صالح ال ناشع) مع المعلمين
 function getPayrollRecord(teacherId, month) {
   const id = `payroll_${teacherId}_${month}`;
   return (
@@ -5018,7 +5056,6 @@ function getPayrollRecord(teacherId, month) {
   );
 }
 
-// عدد أيام العمل الرسمية (أحد-أربعاء) خلال شهر ميلادي بصيغة YYYY-MM
 function countWorkdaysInMonth(month) {
   const [y, m] = month.split("-").map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
@@ -5052,13 +5089,25 @@ window.renderPayrollTable = function () {
     ? window.currentUser.teacherId || window.currentUser.id
     : null;
 
+  const directorName =
+    window.appStore?.settings?.directorName || "صالح ال ناشع";
+  const directorObj = {
+    id: "admin_main",
+    name: `${directorName} (المدير)`,
+    isDirector: true,
+    status: "active",
+  };
+
   const teachers = (window.appStore.teachers || []).filter(
     (t) => t.status !== "suspended",
   );
+
+  const allStaff = [directorObj, ...teachers];
+
   const fmt = (n) =>
     (Math.round((n + Number.EPSILON) * 100) / 100).toLocaleString("ar-SA");
 
-  tbody.innerHTML = teachers
+  tbody.innerHTML = allStaff
     .map((t) => {
       const rec = getPayrollRecord(t.id, month);
       const attRecords = (window.appStore.teacherAttendance || []).filter(
@@ -5086,8 +5135,10 @@ window.renderPayrollTable = function () {
         isAdmin || (isFinTeacher && t.id !== currentUserTeacherId);
 
       return `
-      <tr>
-        <td style="font-weight:700; text-align:right;">${escapeHtml(t.name)}</td>
+      <tr style="${t.isDirector ? "background: #fdfbf7;" : ""}">
+        <td style="font-weight:800; text-align:right; color:${t.isDirector ? "var(--primary-brown)" : "inherit"};">
+          ${escapeHtml(t.name)}
+        </td>
         <td>${
           canEditBase
             ? `<input type="number" step="0.01" min="0" class="form-control" style="width:110px; display:inline-block;" value="${baseSalary}" onchange="savePayrollField('${t.id}', '${month}', 'baseSalary', this.value)">`

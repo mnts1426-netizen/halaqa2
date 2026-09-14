@@ -1,6 +1,7 @@
 /**
  * ==========================================================================
  * tasmeea.js - محرك التسميع اليومي، إتاحة التسميع للمدير، وتوثيق عمليات المعلمين
+ * مَجْمَع عبدالله بن مهدي القرآني
  * ==========================================================================
  */
 
@@ -18,7 +19,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const dateSelect = document.getElementById("tasmeea-date-select");
 
   if (dateSelect && !dateSelect.value) {
-    dateSelect.value = new Date().toISOString().split("T")[0];
+    // تاريخ اليوم بالتوقيت المحلي - وليس عبر toISOString() التي تحوّل للتوقيت العالمي
+    // UTC فتُظهر أحياناً تاريخ الأمس (بين منتصف الليل والثالثة فجراً بتوقيت السعودية
+    // UTC+3)، فيُحفظ اعتماد المعلم/المدير تحت تاريخ خاطئ ويبدو أن التعديل "لم يُحفظ"
+    // عند البحث عنه لاحقاً تحت تاريخ اليوم الصحيح
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    dateSelect.value = `${y}-${m}-${d}`;
   }
 
   if (circleSelect) {
@@ -41,10 +50,7 @@ function getCircleNameTasmeea(circleId) {
   return c ? c.name : "—";
 }
 
-// ترحيل تلقائي لمقرر اليوم: يبقى نفس آخر مقرر معروف (سواء كان محدداً صراحة كـ"مقرر الغد"
-// أو كان مجرد "مقرر اليوم" الذي لم يُتبع بتحديد مقرر غدٍ له) ويتكرر يوماً بعد يوم - حتى لو
-// تخللته أيام غياب متعددة أو أيام لم يُسجَّل بها شيء إطلاقاً لهذا القسم بعينه - إلى أن يسجّل
-// المعلم أو المدير قيمة صريحة جديدة (لنفس اليوم أو كـ"مقرر غد") فتحل محل القديمة فوراً
+// ترحيل تلقائي لمقرر اليوم: يبقى نفس آخر مقرر معروف ويتكرر يوماً بعد يوم
 window.getCarriedForwardLessonValue = function (
   studentId,
   dateVal,
@@ -55,14 +61,11 @@ window.getCarriedForwardLessonValue = function (
     .filter((t) => t.studentId === studentId)
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
-  // 1. قيمة صريحة مسجّلة لهذا اليوم بالذات - لها الأولوية دائماً مهما وُجد غيرها
   const todayRecord = allTasm.find((t) => t.date === dateVal);
   if (todayRecord && todayRecord[todayField]) {
     return todayRecord[todayField];
   }
 
-  // 2. ابحث للخلف يوماً فيوماً (متجاهلاً الأيام التي لم يُسجَّل بها شيء لهذا القسم بعينه)
-  //    عن آخر قيمة معروفة - أولوية لِما حُدِّد صراحة كـ"مقرر غد"، وإلا فآخر "مقرر يوم" يتكرر تلقائياً
   for (const t of allTasm) {
     if (t.date >= dateVal) continue;
     if (t[nextFieldName]) return t[nextFieldName];
@@ -80,10 +83,8 @@ function renderTasmeeaStudents() {
   if (!container) return;
 
   const user = window.currentUser;
-  const isAdmin = user && user.role === "admin";
   const isTeacher = user && user.role === "teacher";
 
-  // التحقق الأمني: المعلم يُقيد بحلقاته فقط، بينما يُتاح للمدير فحص أي حلقة
   if (isTeacher) {
     const teacherObj = (window.appStore?.teachers || []).find(
       (t) =>
@@ -183,14 +184,10 @@ function buildStudentAccordionCard(
 
   const isSaved = Boolean(record.id);
   const user = window.currentUser;
-  const isTeacher = user && user.role === "teacher";
   const isAdmin = user && user.role === "admin";
-  const isWorkday = isOfficialWorkdayTasmeea(currentDateVal);
 
-  let currentAtt = attRecord.status || "";
-  if (!currentAtt && isWorkday) {
-    currentAtt = "absent";
-  }
+  // الحالة تكون غير محددة افتراضياً حتى يسجل المعلم أي طالب
+  const currentAtt = attRecord.status || "";
 
   const initialHifz = getCarriedForwardLessonValue(
     student.id,
@@ -211,24 +208,14 @@ function buildStudentAccordionCard(
     "nextTilawa",
   );
 
-  let quickAttOptions = "";
-  if (isTeacher) {
-    quickAttOptions = `
-      <option value="" ${currentAtt === "" ? "selected" : ""}>— غير محدد —</option>
-      <option value="present" ${currentAtt === "present" ? "selected" : ""}>🟢 حاضر</option>
-      <option value="late" ${currentAtt === "late" ? "selected" : ""}>🟡 متأخر</option>
-      ${currentAtt === "absent" ? '<option value="absent" selected disabled>🔴 غائب (تلقائي)</option>' : ""}
-      ${currentAtt === "excused" ? '<option value="excused" selected disabled>🔵 مستأذن (إدارة)</option>' : ""}
-    `;
-  } else {
-    quickAttOptions = `
-      <option value="" ${currentAtt === "" ? "selected" : ""}>— غير محدد —</option>
-      <option value="present" ${currentAtt === "present" ? "selected" : ""}>🟢 حاضر</option>
-      <option value="absent" ${currentAtt === "absent" ? "selected" : ""}>🔴 غائب</option>
-      <option value="late" ${currentAtt === "late" ? "selected" : ""}>🟡 متأخر</option>
-      <option value="excused" ${currentAtt === "excused" ? "selected" : ""}>🔵 مستأذن</option>
-    `;
-  }
+  // إتاحة تعديل التحضير للمعلم والمدير بحرية في نفس اليوم
+  const quickAttOptions = `
+    <option value="" ${currentAtt === "" ? "selected" : ""}>— غير محدد —</option>
+    <option value="present" ${currentAtt === "present" ? "selected" : ""}>🟢 حاضر</option>
+    <option value="late" ${currentAtt === "late" ? "selected" : ""}>🟡 متأخر</option>
+    <option value="absent" ${currentAtt === "absent" ? "selected" : ""}>🔴 غائب</option>
+    <option value="excused" ${currentAtt === "excused" ? "selected" : ""}>🔵 مستأذن</option>
+  `;
 
   return `
     <div class="card mb-3" style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;" id="tasmeea-card-${student.id}">
@@ -266,7 +253,7 @@ function buildStudentAccordionCard(
         <form onsubmit="saveStudentTasmeea(event, '${student.id}')">
           <div class="tasmeea-sections-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
             
-            <!-- 1. الدرس الجديد (اليوم وغداً معاً كعمود واحد مستقل) -->
+            <!-- 1. الدرس الجديد -->
             <div class="tasmeea-section-box p-3" style="background: #faf8f5; border: 1px solid var(--border-color); border-radius: 8px;">
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">📖 الدرس الجديد</h4>
               <div class="form-group mb-2">
@@ -285,7 +272,7 @@ function buildStudentAccordionCard(
               ${isAdmin ? `<button type="button" class="btn btn-danger btn-sm mt-1" style="width: 100%;" onclick="cancelTasmeeaSection('${student.id}', 'hifz')">↩️ إلغاء الاعتماد</button>` : ""}
             </div>
 
-            <!-- 2. المراجعة (اليوم وغداً معاً كعمود واحد مستقل) -->
+            <!-- 2. المراجعة -->
             <div class="tasmeea-section-box p-3" style="background: #faf8f5; border: 1px solid var(--border-color); border-radius: 8px;">
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">🔄 المراجعة</h4>
               <div class="form-group mb-2">
@@ -304,7 +291,7 @@ function buildStudentAccordionCard(
               ${isAdmin ? `<button type="button" class="btn btn-danger btn-sm mt-1" style="width: 100%;" onclick="cancelTasmeeaSection('${student.id}', 'murajaa')">↩️ إلغاء الاعتماد</button>` : ""}
             </div>
 
-            <!-- 3. التلاوة (اليوم وغداً معاً كعمود واحد مستقل) -->
+            <!-- 3. التلاوة -->
             <div class="tasmeea-section-box p-3" style="background: #faf8f5; border: 1px solid var(--border-color); border-radius: 8px;">
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">🎧 التلاوة</h4>
               <div class="form-group mb-2">
@@ -337,7 +324,7 @@ function buildStudentAccordionCard(
             </div>
           </div>
 
-          <!-- زر الحفظ والاعتماد الشامل (يحفظ كل الأقسام والملاحظات وخطة الغد دفعة واحدة) -->
+          <!-- زر الحفظ والاعتماد -->
           <div class="mt-3 text-left" style="display: flex; justify-content: flex-end;">
             <button type="submit" class="btn btn-primary">اعتماد الملاحظات</button>
           </div>
@@ -360,7 +347,7 @@ function toggleTasmeeaAccordion(studentId) {
   }
 }
 
-// التحضير السريع مع توثيق العملية في سجل المعلم
+// التحضير السريع: تفعيل تغييب غير المحضرين تلقائياً فور تحضير أول طالب
 function saveQuickAttendance(studentId, status) {
   const dateVal = document.getElementById("tasmeea-date-select")?.value;
   const circleId = document.getElementById("tasmeea-circle-select")?.value;
@@ -373,14 +360,6 @@ function saveQuickAttendance(studentId, status) {
   const user = window.currentUser;
   const isTeacher = user && user.role === "teacher";
   const isAdmin = user && user.role === "admin";
-
-  if (isTeacher && status !== "present" && status !== "late" && status !== "") {
-    alert(
-      "⚠️ غير مصرح للمعلم باختيار هذه الحالة. التعديلات محصورة بإدارة المَجْمَع.",
-    );
-    renderTasmeeaStudents();
-    return;
-  }
 
   const recordId = `att_${studentId}_${dateVal}`;
   if (!window.appStore.attendance) window.appStore.attendance = [];
@@ -407,9 +386,51 @@ function saveQuickAttendance(studentId, status) {
   if (typeof saveToCloud === "function") {
     saveToCloud("attendance", record.id, record);
   }
+
+  // عند تحضير طالب واحد: يتم تلقائياً تغييب بقية طلاب الحلقة لذلك اليوم ممن هم بدون تحضير
+  if (status && status !== "" && circleId) {
+    const circleStudents = (window.appStore?.students || []).filter(
+      (s) =>
+        s.circleId === circleId && s.status === "active" && s.id !== studentId,
+    );
+
+    circleStudents.forEach((otherStu) => {
+      const otherRecId = `att_${otherStu.id}_${dateVal}`;
+      let otherRec = window.appStore.attendance.find(
+        (a) => a.id === otherRecId,
+      );
+
+      if (!otherRec || !otherRec.status || otherRec.status === "") {
+        if (!otherRec) {
+          otherRec = {
+            id: otherRecId,
+            studentId: otherStu.id,
+            circleId: circleId,
+            date: dateVal,
+            status: "absent",
+            notes: "غياب تلقائي",
+            updatedBy: isTeacher ? "teacher" : "admin",
+            createdAt: Date.now(),
+          };
+          window.appStore.attendance.push(otherRec);
+        } else {
+          otherRec.status = "absent";
+          if (!otherRec.notes) otherRec.notes = "غياب تلقائي";
+          otherRec.updatedBy = isTeacher ? "teacher" : "admin";
+        }
+
+        if (typeof saveToCloud === "function") {
+          saveToCloud("attendance", otherRec.id, otherRec);
+        }
+      }
+    });
+  }
+
   if (typeof saveLocalStore === "function") saveLocalStore();
 
-  // توثيق حركة التحضير في سجل العمليات
+  // تحديث فوري لكروت التسميع ليظهر التغييب التلقائي لبقية الطلاب مباشرة
+  renderTasmeeaStudents();
+
   if (typeof window.logTeacherActivity === "function") {
     const student = (window.appStore?.students || []).find(
       (s) => s.id === studentId,
@@ -430,13 +451,13 @@ function saveQuickAttendance(studentId, status) {
     window.logTeacherActivity(
       "تحضير سريع",
       `رصد حضور الطالب (${stuName}) كـ (${statusText}) بواسطة (${actorTitle})`,
-      user.name,
+      user?.name || actorTitle,
       getCircleNameTasmeea(circleId),
     );
   }
 }
 
-// اعتماد قسم واحد فقط (الدرس الجديد / المراجعة / التلاوة) بشكل مستقل دون التأثير على باقي الأقسام
+// اعتماد قسم واحد فقط
 function saveTasmeeaSection(studentId, section) {
   const dateVal = document.getElementById("tasmeea-date-select")?.value;
   const circleId = document.getElementById("tasmeea-circle-select")?.value;
@@ -531,9 +552,7 @@ function saveTasmeeaSection(studentId, section) {
   record[cfg.recordSurah] = surahVal;
   record[cfg.recordRating] = ratingVal;
   record[cfg.recordNext] = nextVal;
-  // وقت "أول اعتماد" لهذا القسم بعينه - يُسجَّل مرة واحدة فقط ولا يتغيّر أبداً بعد
-  // ذلك مهما عُدِّل القسم لاحقاً، حتى يبقى ترتيب "أول 15" في شاشة العرض ثابتاً طوال
-  // اليوم (لا يعتمد على وقت آخر تعديل، بل وقت أول اعتماد فعلي فقط)
+
   if (surahVal) {
     if (!record[cfg.recordOrder]) record[cfg.recordOrder] = Date.now();
   } else {
@@ -558,7 +577,7 @@ function saveTasmeeaSection(studentId, section) {
     window.logTeacherActivity(
       `اعتماد ${cfg.label}`,
       `تم اعتماد (${cfg.label}) للطالب (${stuName}) - اليوم: ${surahVal || "—"} (${ratingVal || "—"}) | الغد: ${nextVal || "—"} بواسطة (${actorTitle})`,
-      user.name,
+      user?.name || actorTitle,
       getCircleNameTasmeea(circleId),
     );
   }
@@ -567,7 +586,7 @@ function saveTasmeeaSection(studentId, section) {
   renderTasmeeaStudents();
 }
 
-// إلغاء اعتماد قسم مُعتمد سابقاً (اليوم والغد معاً) - متاح للمدير فقط لتصحيح خطأ اعتماد سابق
+// إلغاء اعتماد قسم مُعتمد سابقاً
 function cancelTasmeeaSection(studentId, section) {
   const user = window.currentUser;
   if (!user || user.role !== "admin") {
@@ -580,9 +599,27 @@ function cancelTasmeeaSection(studentId, section) {
   if (!dateVal || !circleId) return;
 
   const fieldMap = {
-    hifz: { recordSurah: "hifzSurah", recordRating: "hifzRating", recordNext: "nextHifz", recordOrder: "hifzOrderAt", label: "الدرس الجديد" },
-    murajaa: { recordSurah: "murajaaSurah", recordRating: "murajaaRating", recordNext: "nextMurajaa", recordOrder: "murajaaOrderAt", label: "المراجعة" },
-    tilawa: { recordSurah: "tilawaSurah", recordRating: "tilawaRating", recordNext: "nextTilawa", recordOrder: "tilawaOrderAt", label: "التلاوة" },
+    hifz: {
+      recordSurah: "hifzSurah",
+      recordRating: "hifzRating",
+      recordNext: "nextHifz",
+      recordOrder: "hifzOrderAt",
+      label: "الدرس الجديد",
+    },
+    murajaa: {
+      recordSurah: "murajaaSurah",
+      recordRating: "murajaaRating",
+      recordNext: "nextMurajaa",
+      recordOrder: "murajaaOrderAt",
+      label: "المراجعة",
+    },
+    tilawa: {
+      recordSurah: "tilawaSurah",
+      recordRating: "tilawaRating",
+      recordNext: "nextTilawa",
+      recordOrder: "tilawaOrderAt",
+      label: "التلاوة",
+    },
   };
   const cfg = fieldMap[section];
   if (!cfg) return;
@@ -594,7 +631,8 @@ function cancelTasmeeaSection(studentId, section) {
     return;
   }
 
-  if (!confirm(`هل أنت متأكد من إلغاء اعتماد (${cfg.label}) لهذا الطالب؟`)) return;
+  if (!confirm(`هل أنت متأكد من إلغاء اعتماد (${cfg.label}) لهذا الطالب؟`))
+    return;
 
   record[cfg.recordSurah] = "";
   record[cfg.recordRating] = "";
@@ -618,7 +656,7 @@ function cancelTasmeeaSection(studentId, section) {
     window.logTeacherActivity(
       `إلغاء اعتماد ${cfg.label}`,
       `تم إلغاء اعتماد (${cfg.label}) للطالب (${stuName}) بواسطة (المدير)`,
-      user.name,
+      user?.name || "المدير",
       getCircleNameTasmeea(circleId),
     );
   }
@@ -660,8 +698,6 @@ function saveStudentTasmeea(e, studentId) {
     existingIndex > -1 ? window.appStore.tasmeea[existingIndex] : null;
   const previousAdminNotes = oldRecord ? oldRecord.adminNotes || "" : "";
 
-  // وقت "أول اعتماد" لكل قسم يُحفَظ مرة واحدة فقط ولا يتغيّر بتعديل لاحق (انظر نفس
-  // المنطق في saveTasmeeaSection) - حتى لا يتأثر ترتيب "أول 15" في شاشة العرض
   const carryOrderAt = (oldVal, newVal, oldOrderAt) => {
     if (!newVal) return null;
     if (oldVal && oldOrderAt) return oldOrderAt;
@@ -715,7 +751,6 @@ function saveStudentTasmeea(e, studentId) {
   }
   if (typeof saveLocalStore === "function") saveLocalStore();
 
-  // توثيق حركة رصد/تعديل المقرر والتسميع
   if (typeof window.logTeacherActivity === "function") {
     const student = (window.appStore?.students || []).find(
       (s) => s.id === studentId,
@@ -726,7 +761,7 @@ function saveStudentTasmeea(e, studentId) {
     window.logTeacherActivity(
       actionName,
       `رصد وتحديث مقرر الطالب (${stuName}) - حفظ: ${tasmeeaData.hifzSurah || "—"} (${tasmeeaData.hifzRating || "—"}) | مراجعة: ${tasmeeaData.murajaaSurah || "—"} | تلاوة: ${tasmeeaData.tilawaSurah || "—"}`,
-      user.name,
+      user?.name || actionName,
       getCircleNameTasmeea(circleId),
     );
   }

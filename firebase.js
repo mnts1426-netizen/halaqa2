@@ -543,8 +543,10 @@ async function saveToCloud(collectionName, docId, data, isDelete = false) {
       alert(
         `⚠️ تعذّر حفظ هذا التعديل على الخادم السحابي، وقد يعود لحالته السابقة لاحقاً!\n\nالسبب التقني: ${e?.message || e}\n\nيرجى التأكد من اتصال الإنترنت وإعادة المحاولة. إن تكرر ظهور هذه الرسالة أبلغ مطوّر النظام بنصها بالضبط.`,
       );
+      return false;
     }
   }
+  return true;
 }
 
 // تسجيل العمليات

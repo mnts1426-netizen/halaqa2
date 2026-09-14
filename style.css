@@ -336,7 +336,7 @@ body {
 }
 
 /* ==========================================================================
-   3. القائمة الجانبية البيضاء الأنيقة (White & Petroleum Sidebar)
+   3. القائمة الجانبية البيضاء الأنيقة
    ========================================================================== */
 .app-layout {
   display: flex;
@@ -601,7 +601,7 @@ body {
 }
 
 /* ==========================================================================
-   5. البطاقات الإحصائية العائمة مع القوس والخط الذهبي العلوي (KPI Cards)
+   5. البطاقات الإحصائية العائمة مع القوس والخط الذهبي العلوي
    ========================================================================== */
 .stats-grid {
   display: grid;
@@ -684,7 +684,7 @@ body {
 }
 
 /* ==========================================================================
-   6. البطاقات العامة وحاويات الأقسام (Cards & Complex Hub)
+   6. البطاقات العامة وحاويات الأقسام
    ========================================================================== */
 .card {
   background-color: #ffffff;
@@ -710,7 +710,6 @@ body {
   position: relative;
 }
 
-/* خط ديكوري ذهبي راقٍ أسفل عناوين البطاقات */
 .card-header h3::after {
   content: "";
   display: block;
@@ -761,7 +760,7 @@ body {
 }
 
 /* ==========================================================================
-   7. الجداول الرسمية المعتمدة (بترولي ملكي + خط فاصل ذهبي)
+   7. الجداول الرسمية المعتمدة
    ========================================================================== */
 .table-responsive {
   overflow-x: auto;
@@ -806,9 +805,6 @@ body {
   background-color: var(--primary-teal-subtle);
 }
 
-/* جدول التقارير الرسمية تحديداً: النص الطويل ينتقل لسطر إضافي بدل الانحراف خارج
-   حدود عموده (table-layout: auto يوسّع العمود تلقائياً حسب الحاجة بدل قصّ المحتوى)،
-   باستثناء اسم الطالب الذي يبقى دائماً بسطر واحد بتصريح مباشر على كل خلية اسم */
 #report-results-table {
   table-layout: auto;
 }
@@ -820,7 +816,6 @@ body {
   overflow-wrap: break-word;
 }
 
-/* الشارات التوضيحية */
 .badge {
   padding: 0.35rem 0.85rem;
   border-radius: 20px;
@@ -851,7 +846,7 @@ body {
 }
 
 /* ==========================================================================
-   8. أشرطة التبويب والبحث المضيئة
+   8. أشرطة التبويب والبحث
    ========================================================================== */
 .card-filter-bar {
   display: flex;
@@ -906,7 +901,7 @@ body {
 }
 
 /* ==========================================================================
-   9. بطاقات الحلقات وشبكات التميز
+   9. بطاقات الحلقات
    ========================================================================== */
 .circles-grid {
   display: grid;
@@ -953,7 +948,7 @@ body {
 }
 
 /* ==========================================================================
-   10. النوافذ المنبثقة والشاشة الكاملة (Modals)
+   10. النوافذ المنبثقة
    ========================================================================== */
 .modal-overlay {
   display: none;
@@ -998,7 +993,6 @@ body {
   background-color: #f8fafc;
 }
 
-/* نافذة المتابعة الشاملة بحجم الشاشة الكاملة كواجهة مستقلة */
 .modal-fullscreen-overlay {
   padding: 0 !important;
 }
@@ -1090,7 +1084,7 @@ body {
 }
 
 /* ==========================================================================
-   11. استمارة التسجيل وقواعد المَجْمَع (مع الإطار والقوس الذهبي)
+   11. استمارة التسجيل وقواعد المَجْمَع
    ========================================================================== */
 .word-page-container {
   background: #ffffff;
@@ -1204,7 +1198,7 @@ body {
 }
 
 /* ==========================================================================
-   12. لوحات شاشة المسجد التفاعلية (التميز الأسبوعي / المنجزون أولاً)
+   12. لوحات شاشة المسجد التفاعلية
    ========================================================================== */
 .screen-board {
   grid-column: 1 / -1;
@@ -1391,7 +1385,7 @@ body {
    ========================================================================== */
 @media print {
   @page {
-    margin: 0.8cm !important;
+    margin: 6mm 8mm !important;
     size: auto !important;
   }
 
@@ -1399,6 +1393,8 @@ body {
     background-color: #ffffff !important;
     color: #000000 !important;
     font-size: 10pt !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   /* إخفاء واجهات النظام والأزرار أثناء استخراج التقرير */
@@ -1451,17 +1447,28 @@ body {
     border: 2.5px double #0a5c71 !important;
     border-top: 4px solid #c59b27 !important;
     border-radius: 4px !important;
-    padding: 1cm !important;
+    padding: 6mm 8mm !important;
     background: #ffffff !important;
     margin: 0 auto !important;
+    box-sizing: border-box !important;
   }
 
-  /* الجداول الرسمية للتقارير الأربعة */
+  /* تكرار الترويسة في كل صفحة */
   #report-results-table {
     width: 100% !important;
     border-collapse: collapse !important;
     border: 1.5px solid #0a5c71 !important;
     font-size: 10pt !important;
+    margin-bottom: 6px !important;
+  }
+
+  #report-results-table thead {
+    display: table-header-group !important;
+  }
+
+  #report-results-table tbody tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   #report-results-table th {
@@ -1471,21 +1478,39 @@ body {
     border-bottom: 2.5px solid #c59b27 !important;
     text-align: center !important;
     font-weight: 800 !important;
-    padding: 8px 6px !important;
+    padding: 6px 4px !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
   #report-results-table td {
     border: 1px solid #cbd5e1 !important;
-    padding: 6px 4px !important;
+    padding: 5px 3px !important;
     color: #000000 !important;
     text-align: center !important;
   }
 
-  .report-header-pdf,
-  .report-footer-pdf {
+  .report-header-pdf {
+    width: 100% !important;
+    box-sizing: border-box !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* تثبيت تذييل التقرير واسم المدير (صالح ال ناشع) في نفس الصفحة الأخيرة ومنع انفصاله في صفحة مستقلة عند الطباعة عبر الجوال */
+  .report-footer-pdf,
+  .report-footer-print,
+  [style*="border-top: 1.5px solid #ebd99f"],
+  [style*="border-top: 2px solid #ebd99f"] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-before: avoid !important;
+    break-before: avoid !important;
+    margin-top: 6px !important;
+    padding-top: 6px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 }

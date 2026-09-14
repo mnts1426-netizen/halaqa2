@@ -232,7 +232,7 @@ function buildPdfTemplateChrome(titleText, circleName, centerSubHtml) {
   `;
 
   const footer = `
-    <div class="report-footer-pdf" style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 2px solid #ebd99f; padding-top: 1.2rem; margin-top: 1.8rem; font-size: 0.95rem;">
+    <div class="report-footer-pdf" style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 2px solid #ebd99f; padding-top: 1rem; margin-top: 1.2rem; font-size: 0.95rem; page-break-inside: avoid; break-inside: avoid; page-break-before: auto; break-before: auto;">
       <div style="text-align: right;">
         <strong style="color: #0a5c71; font-size: 1rem;">المنصة الإلكترونية للمجمع القرآني</strong>
       </div>
@@ -276,12 +276,10 @@ function generateReport() {
   let bodyHtml = "";
   let reportTitle = "";
   let centerSubHtml = "";
-  // نص الفترة الذي يحل محل التاريخ يسار الترويسة
   let headerLeftText = "";
-  // النص الظاهر يمين الترويسة: اسم الحلقة افتراضياً
   let headerRightText = selectedCircleName;
 
-  // 1. تقرير إنجاز يوم الحلقة (لا تعديل نهائياً - كما هو بالضبط)
+  // 1. تقرير إنجاز يوم الحلقة
   if (reportType === "circle_daily" || reportType === "student_achievement") {
     reportTitle = "تقرير إنجاز طلاب الحلقة اليومي";
     const targetDate = dateFrom || dateTo || toLocalDateStr(new Date());
@@ -349,7 +347,7 @@ function generateReport() {
     }
   }
 
-  // 2. تقرير الإنجاز اليومي لطالب (إزاحة نص الفترة يميناً ليكون قريباً من الاسم وداخل التصميم)
+  // 2. تقرير الإنجاز اليومي لطالب
   else if (reportType === "student_daily") {
     reportTitle = "تقرير إنجاز طالب محدد";
     if (selectedStudentId === "all") {
@@ -434,7 +432,7 @@ function generateReport() {
     }
   }
 
-  // 3. تقرير بداية ونهاية المنهج (إزاحة نص الفترة يميناً ليكون قريباً من الاسم وداخل التصميم)
+  // 3. تقرير بداية ونهاية المنهج
   else if (reportType === "curriculum_start_end" || reportType === "tasmeea") {
     reportTitle = "تقرير بداية ونهاية المنهج";
     const periodText =
@@ -520,7 +518,7 @@ function generateReport() {
     }
   }
 
-  // 4. تقرير شامل (إزاحة نص الفترة يميناً ليكون قريباً من الاسم وداخل التصميم)
+  // 4. تقرير شامل
   else if (reportType === "comprehensive" || reportType === "students") {
     reportTitle = "تقرير شامل";
     const periodText =
@@ -576,11 +574,6 @@ function generateReport() {
           (a) => a.status === "excused",
         ).length;
 
-        // أيام الغياب = كل يوم عمل رسمي ضمن الفترة لم يُسجَّل له حضور/تأخر/استئذان -
-        // سواء وُجد له سجل "غياب" صريح أو لم يُسجَّل له أي شيء إطلاقاً (وهو الغالب
-        // عملياً، لأن المعلم عادة لا يُسجِّل شيئاً للطالب الغائب). الاعتماد سابقاً على
-        // عدّ سجلات status="absent" فقط كان يُسقِط كل الأيام غير المسجَّلة من العدّ
-        // تماماً، فتظهر أيام الغياب أقل بكثير من الواقع (أو صفراً في الغالب)
         const nonAbsentDatesSet = new Set(
           (window.appStore.attendance || [])
             .filter(
@@ -618,7 +611,6 @@ function generateReport() {
           cur.setDate(cur.getDate() + 1);
         }
 
-        // بطاقات التميز
         let tamayuzCount = 0;
         for (let w = 0; w < 16; w++) {
           if (
@@ -629,12 +621,10 @@ function generateReport() {
           }
         }
 
-        // مرحليات (عدد الاختبارات)
         const testsCount = (window.appStore.tests || []).filter(
           (t) => t.studentId === s.id,
         ).length;
 
-        // التقديرات (ممتاز / جيد جداً / يعيد) في كل المقررات
         let tasmList = (window.appStore.tasmeea || []).filter(
           (t) => t.studentId === s.id,
         );
@@ -676,7 +666,7 @@ function generateReport() {
     }
   }
 
-  // 5. تقرير التميز الأسبوعي (إزاحة نص الفترة يميناً ليكون قريباً من الاسم وداخل التصميم)
+  // 5. تقرير التميز الأسبوعي
   else if (reportType === "tamayuz") {
     reportTitle = "تقرير التميز الأسبوعي";
     const weekFromVal = document.getElementById("report-week-from")?.value;
@@ -742,19 +732,28 @@ function generateReport() {
     "",
     headerLeftText,
   );
+
+  // تعديل موضع هوامش التذييل ليحافظ على اتصاله بالجدول في نفس الصفحة الأخيرة
+  const adjustedFooter = chrome.footer
+    ? chrome.footer.replace(
+        /margin-top:\s*[^;"]+;/i,
+        "margin-top: 12px; page-break-inside: avoid; break-inside: avoid; page-break-before: auto; break-before: auto;",
+      )
+    : "";
+
   wrapper._chromeHeader = chrome.header;
-  wrapper._chromeFooter = chrome.footer;
+  wrapper._chromeFooter = adjustedFooter;
 
   wrapper.innerHTML = `
     <div style="border: 2.5px double #0a5c71; border-radius: 8px; padding: 1.5rem; background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-top: 1rem; margin-right: 12px;">
       ${chrome.header}
-      <div class="table-responsive" style="margin-bottom: 1.5rem;">
+      <div class="table-responsive" style="margin-bottom: 0.8rem;">
         <table class="data-table" id="report-results-table" style="width: 100%; border-collapse: collapse; border: 1.5px solid #0a5c71;">
           <thead id="report-thead">${headHtml}</thead>
           <tbody id="report-tbody">${bodyHtml}</tbody>
         </table>
       </div>
-      ${chrome.footer}
+      ${adjustedFooter}
     </div>
   `;
 }
@@ -919,6 +918,8 @@ function printOfficialReport() {
   const chromeHeader = wrapper._chromeHeader || "";
   const chromeFooter = wrapper._chromeFooter || "";
 
+  // تُدرَج الترويسة كصف إضافي داخل thead الجدول حتى تتكرر تلقائياً أعلى كل صفحة
+  // مطبوعة (thead يتكرر أصلاً في كل المتصفحات عند الطباعة) بدل ظهورها أول صفحة فقط
   const printableHtml =
     table && typeof window.buildRepeatingHeaderTableHtml === "function"
       ? window.buildRepeatingHeaderTableHtml(table, chromeHeader)
@@ -933,12 +934,12 @@ function printOfficialReport() {
         <style>
           @page {
             size: A4 ${orientation};
-            margin: 10mm;
+            margin: 8mm 10mm;
           }
           body {
             font-family: 'Cairo', 'Tajawal', sans-serif;
             direction: rtl;
-            padding: 15px;
+            padding: 10px 12px;
             background: #fff;
             color: #000;
             -webkit-print-color-adjust: exact !important;
@@ -948,8 +949,16 @@ function printOfficialReport() {
             width: 100%;
             table-layout: auto;
             border-collapse: collapse;
-            margin-top: 10px;
+            margin-top: 5px;
+            margin-bottom: 8px;
             font-size: 10.5px;
+          }
+          thead {
+            display: table-header-group !important;
+          }
+          tbody tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
           th, td {
             border: 1px solid #cbd5e1;
@@ -963,6 +972,20 @@ function printOfficialReport() {
             color: #ffffff !important;
             font-weight: bold;
           }
+          /* تثبيت تذييل التقرير واسم المدير في الصفحة الأخيرة ومنع انفصاله */
+          .report-footer-print,
+          [style*="border-top: 1.5px solid #ebd99f"],
+          [style*="border-top: 2px solid #ebd99f"],
+          .report-footer-pdf {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            page-break-before: auto !important;
+            break-before: auto !important;
+            margin-top: 8px !important;
+            padding-top: 6px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
           .no-print, button {
             display: none !important;
           }
@@ -970,7 +993,9 @@ function printOfficialReport() {
       </head>
       <body>
         ${printableHtml}
-        ${chromeFooter}
+        <div class="report-footer-print">
+          ${chromeFooter}
+        </div>
       </body>
     </html>
   `);
