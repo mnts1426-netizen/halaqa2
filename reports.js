@@ -121,6 +121,10 @@ function populateReportStudentsDropdown() {
     students = students.filter((s) => s.circleId === circleId);
   }
 
+  students = students
+    .slice()
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
+
   let optionsHtml = '<option value="all">كل الطلاب</option>';
   students.forEach((s) => {
     optionsHtml += `<option value="${s.id}">${escapeHtml(s.name)}</option>`;

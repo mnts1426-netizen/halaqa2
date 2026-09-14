@@ -2991,8 +2991,15 @@ window.renderAttendanceTable = function () {
       ) || {};
 
     const effectiveStatus = record.status || "";
+    const isLockedForTeacher = isTeacher && effectiveStatus !== "";
 
-    const selectOptionsHtml = `
+    const selectOptionsHtml = isTeacher
+      ? `
+      <option value="" ${effectiveStatus === "" ? "selected" : ""}>— غير محدد —</option>
+      <option value="present" ${effectiveStatus === "present" ? "selected" : ""}>🟢 حاضر</option>
+      <option value="absent" ${effectiveStatus === "absent" ? "selected" : ""}>🔴 غائب</option>
+    `
+      : `
       <option value="" ${effectiveStatus === "" ? "selected" : ""}>— غير محدد —</option>
       <option value="present" ${effectiveStatus === "present" ? "selected" : ""}>🟢 حاضر</option>
       <option value="late" ${effectiveStatus === "late" ? "selected" : ""}>🟡 متأخر</option>
@@ -3005,7 +3012,7 @@ window.renderAttendanceTable = function () {
         <td style="font-weight: 700;">${escapeHtml(s.name)}</td>
         <td>${escapeHtml(getCircleName(s.circleId))}</td>
         <td>
-          <select class="form-control" style="font-weight: 700;" onchange="setStudentAttendance('${s.id}', this.value)">
+          <select class="form-control" style="font-weight: 700;" onchange="setStudentAttendance('${s.id}', this.value)" ${isLockedForTeacher ? 'disabled title="لا يمكن تعديل حالة مسجّلة مسبقاً - متاح لمدير المَجْمَع فقط"' : ""}>
             ${selectOptionsHtml}
           </select>
         </td>
@@ -3039,7 +3046,104 @@ function showQuickSaveConfirmation(message) {
   }, 1800);
 }
 
-// رصد التحضير وتفعيل تغييب غير المحضرين فور تحضير أول طالب
+// سجل تاريخ التحضير: يحفظ لقطة من حالة السجل قبل أي تعديل عليها (وليس بعدها) -
+// حتى لو حصل خطأ مستقبلي (بشري أو تقني) يقدر المدير يرجع يشوف الحالة قبل آخر تعديل
+window.logAttendanceHistorySnapshot = function (previousRecord, actor) {
+  if (!previousRecord || !previousRecord.id) return;
+  const entry = {
+    id: `hist_${previousRecord.id}_${Date.now()}`,
+    recordId: previousRecord.id,
+    studentId: previousRecord.studentId,
+    circleId: previousRecord.circleId || "",
+    date: previousRecord.date,
+    previousStatus: previousRecord.status || "",
+    previousNotes: previousRecord.notes || "",
+    changedByName: actor ? actor.name : "غير معروف",
+    changedByRole: actor ? actor.role : "",
+    savedAt: Date.now(),
+  };
+  if (!window.appStore.attendanceHistory) window.appStore.attendanceHistory = [];
+  window.appStore.attendanceHistory.push(entry);
+  if (typeof saveToCloud === "function") {
+    saveToCloud("attendanceHistory", entry.id, entry);
+  }
+};
+
+// نافذة سجل تاريخ التحضير - متاحة للمدير فقط، تعرض كل تغيير سابق على حضور
+// الحلقة/التاريخ المحدَّدين حالياً بشاشة التحضير (القيمة قبل كل تعديل ومن قام به)
+window.openAttendanceHistoryModal = async function () {
+  const currentUser = window.currentUser;
+  if (!currentUser || currentUser.role !== "admin") {
+    alert("⚠️ سجل تاريخ التحضير متاح لمدير المَجْمَع فقط.");
+    return;
+  }
+
+  const circleId = document.getElementById("attendance-circle-select")?.value;
+  const dateVal = document.getElementById("attendance-date-select")?.value;
+  if (!circleId || !dateVal) {
+    alert("⚠️ يرجى اختيار الحلقة والتاريخ أولاً.");
+    return;
+  }
+
+  const modal = document.getElementById("modal-attendance-history");
+  const tbody = document.getElementById("attendance-history-tbody");
+  if (!modal || !tbody) return;
+
+  tbody.innerHTML =
+    '<tr><td colspan="5" class="text-center text-muted p-3">جاري التحميل...</td></tr>';
+  modal.classList.add("active");
+
+  let entries = [];
+  try {
+    const snap = await dbFirestore
+      .collection("attendanceHistory")
+      .where("circleId", "==", circleId)
+      .where("date", "==", dateVal)
+      .get();
+    entries = snap.docs.map((d) => d.data());
+  } catch (e) {
+    console.error("تعذر جلب سجل تاريخ التحضير:", e);
+  }
+
+  entries.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+
+  const statusLabels = {
+    present: "🟢 حاضر",
+    absent: "🔴 غائب",
+    late: "🟡 متأخر",
+    excused: "🔵 مستأذن",
+    "": "— غير محدد —",
+  };
+
+  if (entries.length === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="5" class="text-center text-muted p-3">لا يوجد أي تعديل مسجّل على تحضير هذا اليوم لهذه الحلقة</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = entries
+    .map((e) => {
+      const student = (window.appStore?.students || []).find(
+        (s) => s.id === e.studentId,
+      );
+      const stuName = student ? escapeHtml(student.name) : e.studentId;
+      const when = new Date(e.savedAt).toLocaleString("ar-SA");
+      return `
+        <tr>
+          <td style="font-weight:700;">${stuName}</td>
+          <td>${statusLabels[e.previousStatus] || e.previousStatus || "—"}</td>
+          <td>${escapeHtml(e.changedByName) || "—"}</td>
+          <td>${e.changedByRole === "admin" ? "المدير" : e.changedByRole === "teacher" ? "المعلم" : "—"}</td>
+          <td style="white-space:nowrap;">${when}</td>
+        </tr>
+      `;
+    })
+    .join("");
+};
+
+// رصد التحضير - كل طالب مستقل تماماً بحاله، لا يُغيَّر أي طالب آخر تلقائياً أبداً
+// بمجرد تحضير طالب واحد. المعلم مقيَّد بثلاث حالات فقط (غير محدد/حاضر/غائب) ولا
+// يقدر يعدّل حالة سبق تسجيلها إطلاقاً - المدير فقط له كل الحالات والتعديل دائماً
 window.setStudentAttendance = async function (studentId, status) {
   const dateVal = document.getElementById("attendance-date-select")?.value;
   const circleId = document.getElementById("attendance-circle-select")?.value;
@@ -3049,6 +3153,32 @@ window.setStudentAttendance = async function (studentId, status) {
 
   if (!window.appStore.attendance) window.appStore.attendance = [];
   let record = window.appStore.attendance.find((a) => a.id === recordId);
+
+  if (isTeacher) {
+    if (status !== "" && status !== "present" && status !== "absent") {
+      alert("⚠️ المعلم يقدر يسجّل فقط (حاضر) أو (غائب).");
+      renderAttendanceTable();
+      return;
+    }
+    if (record && record.status && record.status !== "") {
+      alert(
+        "⚠️ لا يمكن تعديل حالة حضور مسجّلة مسبقاً - هذا متاح لمدير المَجْمَع فقط.",
+      );
+      renderAttendanceTable();
+      return;
+    }
+  }
+
+  // حفظ لقطة من القيمة قبل التعديل (سجل تاريخ التحضير) - فقط عند تعديل سجل موجود
+  // فعلاً وله حالة سابقة، حتى يقدر المدير يرجع لها لاحقاً لو احتاج
+  if (
+    record &&
+    typeof record.status !== "undefined" &&
+    record.status !== status &&
+    typeof window.logAttendanceHistorySnapshot === "function"
+  ) {
+    window.logAttendanceHistorySnapshot(record, currentUser);
+  }
 
   if (!record) {
     record = {
@@ -3073,45 +3203,6 @@ window.setStudentAttendance = async function (studentId, status) {
   let saveOk = true;
   if (typeof saveToCloud === "function") {
     saveOk = await saveToCloud("attendance", record.id, record);
-  }
-
-  // إذا تم تحضير طالب بحالة (حاضر / متأخر / غائب): يتم تلقائياً تغييب بقية طلاب الحلقة لذلك اليوم ممن هم بدون تحضير
-  if (status && status !== "" && circleId) {
-    const circleStudents = (window.appStore?.students || []).filter(
-      (s) =>
-        s.circleId === circleId && s.status === "active" && s.id !== studentId,
-    );
-
-    circleStudents.forEach((otherStu) => {
-      const otherRecId = `att_${otherStu.id}_${dateVal}`;
-      let otherRec = window.appStore.attendance.find(
-        (a) => a.id === otherRecId,
-      );
-
-      if (!otherRec || !otherRec.status || otherRec.status === "") {
-        if (!otherRec) {
-          otherRec = {
-            id: otherRecId,
-            studentId: otherStu.id,
-            circleId: circleId,
-            date: dateVal,
-            status: "absent",
-            notes: "غياب تلقائي",
-            updatedBy: isTeacher ? "teacher" : "admin",
-            createdAt: Date.now(),
-          };
-          window.appStore.attendance.push(otherRec);
-        } else {
-          otherRec.status = "absent";
-          if (!otherRec.notes) otherRec.notes = "غياب تلقائي";
-          otherRec.updatedBy = isTeacher ? "teacher" : "admin";
-        }
-
-        if (typeof saveToCloud === "function") {
-          saveToCloud("attendance", otherRec.id, otherRec);
-        }
-      }
-    });
   }
 
   if (typeof saveLocalStore === "function") saveLocalStore();
@@ -3208,6 +3299,54 @@ window.markAllAbsent = function () {
   students.forEach((s) => setStudentAttendance(s.id, "absent"));
   renderAttendanceTable();
   alert("✅ تم تحديد جميع طلاب الحلقة كـ (غائب)!");
+};
+
+// تحديد حالة تحضير واحدة (أي حالة من الأربع) لكل طلاب الحلقة دفعة واحدة - متاح
+// للمدير فقط، بنفس فكرة "الكل غائب" لكن بأي حالة يختارها بدل الغياب فقط
+window.markAllAttendanceStatus = async function (status) {
+  if (!status) return;
+
+  const currentUser = window.currentUser;
+  if (currentUser && currentUser.role === "teacher") {
+    alert("⚠️ هذه الخاصية متاحة لمدير المَجْمَع فقط.");
+    return;
+  }
+
+  const circleId = document.getElementById("attendance-circle-select")?.value;
+  if (!circleId) {
+    alert("⚠️ يرجى اختيار الحلقة أولاً!");
+    return;
+  }
+
+  const statusLabels = {
+    present: "حاضر",
+    absent: "غائب",
+    late: "متأخر",
+    excused: "مستأذن",
+  };
+
+  const students = (window.appStore?.students || []).filter(
+    (s) => s.circleId === circleId && s.status === "active",
+  );
+
+  if (students.length === 0) {
+    alert("⚠️ لا يوجد طلاب نشطون بهذه الحلقة.");
+    return;
+  }
+
+  if (
+    !confirm(
+      `هل أنت متأكد من تحديد جميع طلاب الحلقة (${students.length}) كـ (${statusLabels[status] || status})؟`,
+    )
+  ) {
+    return;
+  }
+
+  await Promise.all(students.map((s) => setStudentAttendance(s.id, status)));
+  renderAttendanceTable();
+  alert(
+    `✅ تم تحديد جميع طلاب الحلقة (${students.length}) كـ (${statusLabels[status] || status}) بنجاح!`,
+  );
 };
 
 // ملاحظات المعلمين

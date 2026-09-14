@@ -1315,6 +1315,25 @@
                 >
                   الكل غائب
                 </button>
+                <select
+                  id="attendance-bulk-status-select"
+                  class="form-control select-input btn-sm"
+                  style="width: auto"
+                  onchange="markAllAttendanceStatus(this.value); this.value='';"
+                >
+                  <option value="">— تحديد حالة للجميع —</option>
+                  <option value="present">🟢 الكل حاضر</option>
+                  <option value="absent">🔴 الكل غائب</option>
+                  <option value="late">🟡 الكل متأخر</option>
+                  <option value="excused">🔵 الكل مستأذن</option>
+                </select>
+                <button
+                  class="btn btn-outline-brown btn-sm nav-admin-only"
+                  onclick="openAttendanceHistoryModal()"
+                  title="سجل تاريخ التحضير (المدير فقط)"
+                >
+                  🕘 سجل التعديلات
+                </button>
               </div>
             </div>
             <div class="table-responsive" id="attendance-table-wrapper">
@@ -2787,6 +2806,52 @@
             type="button"
             class="btn btn-outline-brown"
             onclick="closeModal('modal-tasmeea-status-details')"
+          >
+            إغلاق
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- نافذة سجل تاريخ التحضير (المدير فقط) -->
+    <div id="modal-attendance-history" class="modal-overlay">
+      <div class="modal-card modal-lg">
+        <div class="modal-header">
+          <h3>🕘 سجل تاريخ تعديلات التحضير (الحلقة والتاريخ المحدَّدان)</h3>
+          <button
+            class="modal-close"
+            onclick="closeModal('modal-attendance-history')"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="table-responsive">
+            <table class="data-table" id="attendance-history-table">
+              <thead>
+                <tr>
+                  <th>اسم الطالب</th>
+                  <th>الحالة قبل التعديل</th>
+                  <th>من قام بالتعديل</th>
+                  <th>الصفة</th>
+                  <th>الوقت</th>
+                </tr>
+              </thead>
+              <tbody id="attendance-history-tbody">
+                <tr>
+                  <td colspan="5" class="text-center text-muted p-3">
+                    جاري التحميل...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-outline-brown"
+            onclick="closeModal('modal-attendance-history')"
           >
             إغلاق
           </button>

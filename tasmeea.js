@@ -140,7 +140,34 @@ function renderTasmeeaStudents() {
     return;
   }
 
+  // لا تُفتح شاشة تسجيل المقررات (الحفظ/المراجعة/التلاوة) إلا بعد تحضير جميع طلاب
+  // الحلقة لهذا اليوم (كل طالب له حالة غير فارغة) - يبقى التحضير نفسه متاحاً دائماً
+  // حتى تكتمل الشرط. المدير مستثنى دائماً بصلاحيته الكاملة على كل شيء بالنظام.
+  const allAttendanceTaken = circleStudents.every((s) => {
+    const rec = (window.appStore.attendance || []).find(
+      (a) => a.studentId === s.id && a.date === dateVal,
+    );
+    return rec && rec.status && rec.status !== "";
+  });
+  const isAdminUser = user && user.role === "admin";
+  const curriculumLocked = !isAdminUser && !allAttendanceTaken;
+
   let html = "";
+  if (curriculumLocked) {
+    const remaining = circleStudents.filter((s) => {
+      const rec = (window.appStore.attendance || []).find(
+        (a) => a.studentId === s.id && a.date === dateVal,
+      );
+      return !(rec && rec.status && rec.status !== "");
+    }).length;
+    html += `
+      <div class="empty-state-card" style="margin-bottom: 1rem; background: #fff3e0; border: 1px solid #ffcc80;">
+        <h3>⚠️ سجّل حضور جميع الطالب أولاً</h3>
+        <p class="text-muted">تسجيل المقررات (الحفظ/المراجعة/التلاوة) يُفتح تلقائياً بعد تحضير كل طلاب الحلقة لهذا اليوم. متبقٍ (${remaining}) طالباً بدون تحضير.</p>
+      </div>
+    `;
+  }
+
   circleStudents.forEach((student, index) => {
     const existingRecord =
       (window.appStore.tasmeea || []).find(
@@ -158,6 +185,7 @@ function renderTasmeeaStudents() {
       attRecord,
       index + 1,
       dateVal,
+      curriculumLocked,
     );
   });
 
@@ -170,6 +198,7 @@ function buildStudentAccordionCard(
   attRecord,
   index,
   currentDateVal,
+  curriculumLocked,
 ) {
   const ratings = ["ممتاز", "جيد جداً", "جيد", "يعيد"];
 
@@ -208,13 +237,21 @@ function buildStudentAccordionCard(
     "nextTilawa",
   );
 
-  // إتاحة تعديل التحضير للمعلم والمدير بحرية في نفس اليوم
-  const quickAttOptions = `
+  // المعلم: ثلاث حالات فقط (غير محدد/حاضر/غائب)، ولا يقدر يعدّل حالة سبق تسجيلها
+  // (القائمة تُقفَل بعدها). المدير: كل الحالات الأربع دائماً وقابلة للتعديل دوماً
+  const isLockedForTeacher = !isAdmin && currentAtt !== "";
+  const quickAttOptions = isAdmin
+    ? `
     <option value="" ${currentAtt === "" ? "selected" : ""}>— غير محدد —</option>
     <option value="present" ${currentAtt === "present" ? "selected" : ""}>🟢 حاضر</option>
     <option value="late" ${currentAtt === "late" ? "selected" : ""}>🟡 متأخر</option>
     <option value="absent" ${currentAtt === "absent" ? "selected" : ""}>🔴 غائب</option>
     <option value="excused" ${currentAtt === "excused" ? "selected" : ""}>🔵 مستأذن</option>
+  `
+    : `
+    <option value="" ${currentAtt === "" ? "selected" : ""}>— غير محدد —</option>
+    <option value="present" ${currentAtt === "present" ? "selected" : ""}>🟢 حاضر</option>
+    <option value="absent" ${currentAtt === "absent" ? "selected" : ""}>🔴 غائب</option>
   `;
 
   return `
@@ -238,7 +275,7 @@ function buildStudentAccordionCard(
         </div>
 
         <div class="flex-align-gap" onclick="event.stopPropagation();">
-          <select class="form-control" style="width: auto; min-width: 135px; font-weight: 700;" onchange="saveQuickAttendance('${student.id}', this.value)">
+          <select class="form-control" style="width: auto; min-width: 135px; font-weight: 700;" onchange="saveQuickAttendance('${student.id}', this.value)" ${isLockedForTeacher ? 'disabled title="لا يمكن تعديل حالة مسجّلة مسبقاً - متاح لمدير المَجْمَع فقط"' : ""}>
             ${quickAttOptions}
           </select>
 
@@ -250,6 +287,15 @@ function buildStudentAccordionCard(
 
       <!-- تفاصيل التسميع وتعديل المقررات المتاحة للمدير والمعلم -->
       <div id="tasmeea-details-${student.id}" style="display: none; padding: 1.25rem; border-top: 1px solid var(--border-color); background: #ffffff;">
+        ${
+          curriculumLocked
+            ? `
+        <div class="empty-state-card" style="margin: 0; background: #fff3e0; border: 1px solid #ffcc80;">
+          <h3>🔒 مقفل مؤقتاً</h3>
+          <p class="text-muted">يجب تحضير جميع طلاب الحلقة أولاً قبل فتح تسجيل المقررات لهذا الطالب.</p>
+        </div>
+        `
+            : `
         <form onsubmit="saveStudentTasmeea(event, '${student.id}')">
           <div class="tasmeea-sections-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
             
@@ -329,6 +375,8 @@ function buildStudentAccordionCard(
             <button type="submit" class="btn btn-primary">اعتماد الملاحظات</button>
           </div>
         </form>
+        `
+        }
       </div>
     </div>
   `;
@@ -365,6 +413,31 @@ function saveQuickAttendance(studentId, status) {
   if (!window.appStore.attendance) window.appStore.attendance = [];
 
   let record = window.appStore.attendance.find((a) => a.id === recordId);
+
+  if (isTeacher) {
+    if (status !== "" && status !== "present" && status !== "absent") {
+      alert("⚠️ المعلم يقدر يسجّل فقط (حاضر) أو (غائب).");
+      renderTasmeeaStudents();
+      return;
+    }
+    if (record && record.status && record.status !== "") {
+      alert(
+        "⚠️ لا يمكن تعديل حالة حضور مسجّلة مسبقاً - هذا متاح لمدير المَجْمَع فقط.",
+      );
+      renderTasmeeaStudents();
+      return;
+    }
+  }
+
+  if (
+    record &&
+    typeof record.status !== "undefined" &&
+    record.status !== status &&
+    typeof window.logAttendanceHistorySnapshot === "function"
+  ) {
+    window.logAttendanceHistorySnapshot(record, user);
+  }
+
   if (!record) {
     record = {
       id: recordId,
@@ -385,45 +458,6 @@ function saveQuickAttendance(studentId, status) {
 
   if (typeof saveToCloud === "function") {
     saveToCloud("attendance", record.id, record);
-  }
-
-  // عند تحضير طالب واحد: يتم تلقائياً تغييب بقية طلاب الحلقة لذلك اليوم ممن هم بدون تحضير
-  if (status && status !== "" && circleId) {
-    const circleStudents = (window.appStore?.students || []).filter(
-      (s) =>
-        s.circleId === circleId && s.status === "active" && s.id !== studentId,
-    );
-
-    circleStudents.forEach((otherStu) => {
-      const otherRecId = `att_${otherStu.id}_${dateVal}`;
-      let otherRec = window.appStore.attendance.find(
-        (a) => a.id === otherRecId,
-      );
-
-      if (!otherRec || !otherRec.status || otherRec.status === "") {
-        if (!otherRec) {
-          otherRec = {
-            id: otherRecId,
-            studentId: otherStu.id,
-            circleId: circleId,
-            date: dateVal,
-            status: "absent",
-            notes: "غياب تلقائي",
-            updatedBy: isTeacher ? "teacher" : "admin",
-            createdAt: Date.now(),
-          };
-          window.appStore.attendance.push(otherRec);
-        } else {
-          otherRec.status = "absent";
-          if (!otherRec.notes) otherRec.notes = "غياب تلقائي";
-          otherRec.updatedBy = isTeacher ? "teacher" : "admin";
-        }
-
-        if (typeof saveToCloud === "function") {
-          saveToCloud("attendance", otherRec.id, otherRec);
-        }
-      }
-    });
   }
 
   if (typeof saveLocalStore === "function") saveLocalStore();

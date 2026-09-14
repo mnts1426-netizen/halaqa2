@@ -430,16 +430,19 @@ async function syncAndPurgeDataFromCloud() {
               !(deletedIds && deletedIds.has(String(it.id)))
             ) {
               const existing = mergedMap.get(String(it.id));
-              // تفضيل السحابة افتراضياً كما كان، إلا إذا كانت النسخة المحلية موجودة
-              // وتحمل ختم وقت أحدث فعلياً من النسخة السحابية - فتُبقى المحلية كما هي
-              // بدل أن "تُرجعها" مزامنة قرأت نسخة سحابية لم تتحدّث بعد بتعديل المدير
-              // الأخير (وهو السبب الفعلي وراء ظهور التعديلات وكأنها "لا تُحفظ")
-              if (
-                existing &&
-                typeof existing.updatedAt === "number" &&
+              // تفضيل النسخة المحلية افتراضياً عند أي التباس (بدل تفضيل السحابة كما كان
+              // سابقاً): تُستبدَل المحلية بالسحابية فقط إذا كانت السحابية تحمل ختم وقت
+              // "أحدث فعلياً وبشكل مؤكد" من المحلية. أي حالة غموض (ختم وقت مفقود من أي
+              // طرف، تساوي الختمين، إلخ) تُبقي المحلية كما هي - لأن تفضيل السحابة
+              // افتراضياً كان يُرجع تعديلات المدير الأخيرة لحالتها القديمة بصمت كلما
+              // قرأت المزامنة الدورية نسخة سحابية لم تتحدّث بعد بتعديله (وهو السبب
+              // الفعلي وراء ظهور التعديلات وكأنها "لا تُحفظ")
+              const cloudIsConfirmedNewer =
                 typeof it.updatedAt === "number" &&
-                existing.updatedAt > it.updatedAt
-              ) {
+                (!existing ||
+                  typeof existing.updatedAt !== "number" ||
+                  it.updatedAt > existing.updatedAt);
+              if (existing && !cloudIsConfirmedNewer) {
                 return;
               }
               mergedMap.set(String(it.id), { ...(existing || {}), ...it });
