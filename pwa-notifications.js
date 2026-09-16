@@ -8,6 +8,31 @@
 
 let deferredInstallPrompt = null;
 
+// علامة دائمة (بالجهاز/المتصفح) لإخفاء بطاقة "ثبّت التطبيق" نهائياً من صفحة الطالب
+// بعد أول تفعيل ناجح (تثبيت أو تفعيل إشعارات) بدل ظهورها في كل زيارة بلا داعٍ
+const PWA_BANNER_DISMISSED_KEY = "halaqat_pwa_banner_dismissed_v1";
+function isPwaInstallBannerDismissed() {
+  try {
+    return localStorage.getItem(PWA_BANNER_DISMISSED_KEY) === "1";
+  } catch (e) {
+    return false;
+  }
+}
+function dismissPwaInstallBannerPermanently() {
+  try {
+    localStorage.setItem(PWA_BANNER_DISMISSED_KEY, "1");
+  } catch (e) {
+    // تجاهل بأمان لو تعذّر الوصول للتخزين المحلي - البطاقة تبقى تظهر فقط، بلا كسر لأي شيء
+  }
+  if (
+    window.currentUser &&
+    window.currentUser.role === window.ROLES?.STUDENT &&
+    typeof renderStudentData === "function"
+  ) {
+    renderStudentData();
+  }
+}
+
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
@@ -16,6 +41,7 @@ window.addEventListener("beforeinstallprompt", (e) => {
 window.addEventListener("appinstalled", () => {
   deferredInstallPrompt = null;
   updateInstallNotifyStatus("✅ التطبيق مثبت على هذا الجهاز");
+  dismissPwaInstallBannerPermanently();
 });
 
 // تحديث كل نسخ زر/شريط التثبيت الموجودة بالصفحة (شريط جانبي للمدير/المعلم + بطاقة صفحة الطالب)
@@ -89,6 +115,7 @@ window.handleInstallAndEnableNotifications = async function () {
       if (OneSignal.Notifications.permission) {
         OneSignal.User.addTag("role", currentRole);
         updateInstallNotifyStatus("✅ تم تفعيل الإشعارات الفورية بنجاح");
+        dismissPwaInstallBannerPermanently();
       } else {
         updateInstallNotifyStatus("⚠️ لم يتم منح إذن الإشعارات من المتصفح");
       }

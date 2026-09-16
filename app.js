@@ -1250,6 +1250,61 @@ window.handleTeacherSelfCheckIn = function () {
 };
 
 // بناء وعرض شاشة وبوابة الطالب
+// بطاقة إشعار واحدة بصفحة الطالب - دالة مشتركة لعرض إشعارات اليوم والقديمة بنفس الشكل
+function studentNotifCardHtml(n) {
+  return `
+    <div class="mb-2 p-2" style="background:#f4f9f9; border: 1px solid var(--border-color); border-radius: 6px;">
+      <div class="flex-between">
+        <strong style="color:var(--primary-brown); font-size:0.92rem;">${escapeHtml(n.title) || "تنبيه"}</strong>
+        <small class="text-muted">${escapeHtml(n.date) || ""}</small>
+      </div>
+      <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #333;">${escapeHtml(n.body) || ""}</p>
+      <div style="font-size:0.75rem; color:#777; margin-top:3px;">المرسل: ${escapeHtml(n.sender) || "إدارة المَجْمَع"}</div>
+    </div>
+  `;
+}
+
+// كشف/إخفاء قائمة الإشعارات القديمة بصفحة الطالب (محفوظة مسبقاً بالصفحة، لا تحتاج
+// إعادة قراءة أو حساب - فقط تبديل عرض القسمين المُجهَّزين أصلاً)
+window.toggleOldStudentNotifs = function () {
+  const el = document.getElementById("student-old-notifs-section");
+  const btn = document.getElementById("student-old-notifs-toggle-btn");
+  if (!el) return;
+  const isHidden = el.style.display === "none";
+  el.style.display = isHidden ? "block" : "none";
+  if (btn) btn.textContent = isHidden ? "🔼 إخفاء القديمة" : "📜 إظهار الإشعارات القديمة";
+};
+
+// كشف/إخفاء سجل حضور الأيام السابقة بصفحة الطالب (نفس مبدأ الإشعارات القديمة)
+window.toggleStudentAttendanceHistory = function () {
+  const el = document.getElementById("student-att-history-section");
+  const btn = document.getElementById("student-att-history-toggle-btn");
+  if (!el) return;
+  const isHidden = el.style.display === "none";
+  el.style.display = isHidden ? "block" : "none";
+  if (btn) btn.textContent = isHidden ? "🔼 إخفاء السجل" : "📜 عرض حضور الأيام السابقة";
+};
+
+// كشف/إخفاء سجل التسميع للأيام السابقة بصفحة الطالب (نفس المبدأ)
+window.toggleStudentTasmeeaHistory = function () {
+  const el = document.getElementById("student-tasmeea-history-section");
+  const btn = document.getElementById("student-tasmeea-history-toggle-btn");
+  if (!el) return;
+  const isHidden = el.style.display === "none";
+  el.style.display = isHidden ? "block" : "none";
+  if (btn) btn.textContent = isHidden ? "🔼 إخفاء السجل" : "📜 إظهار سجل الأيام السابقة";
+};
+
+// صندوق إحصائية واحد بصفحة الطالب - دالة مشتركة لتفادي تكرار نفس القالب 16 مرة
+function studentStatBox(label, value, color) {
+  return `
+      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
+        <span class="stat-label" style="font-size: 0.78rem;">${label}</span>
+        <h3 class="stat-value" style="font-size: 1.35rem; color: ${color};">${value}</h3>
+      </div>
+  `;
+}
+
 function renderStudentData() {
   if (!window.currentUser || window.currentUser.role !== window.ROLES.STUDENT)
     return;
@@ -1274,6 +1329,9 @@ function renderStudentData() {
     (a) => a.status === "present" || a.status === "late",
   ).length;
   const absentCount = studentAtt.filter((a) => a.status === "absent").length;
+  const excusedCount = studentAtt.filter(
+    (a) => a.status === "excused",
+  ).length;
 
   const tamayuzCount = calculateActualQualifiedTamayuzWeeksCount(studentId);
 
@@ -1372,6 +1430,29 @@ function renderStudentData() {
         '<span class="badge" style="background:#e3f2fd; color:#1565c0;">🔵 مستأذن</span>';
   }
 
+  // آخر 60 يوماً فقط من سجل حضور الطالب لعرضها عند الطلب (سجل الحضور يتراكم يومياً
+  // طوال السنة، فلا يصح تحميل كل التاريخ دفعة واحدة كلما فُتحت صفحة الطالب)
+  const ATT_HISTORY_DISPLAY_CAP = 60;
+  const attHistorySorted = studentAtt
+    .slice()
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+    .slice(0, ATT_HISTORY_DISPLAY_CAP);
+  const attStatusLabels = {
+    present: "🟢 حاضر",
+    absent: "🔴 غائب",
+    late: "🟡 متأخر",
+    excused: "🔵 مستأذن",
+    "": "— غير محدد —",
+  };
+
+  // آخر 30 يوماً فقط من سجل التسميع (باستثناء اليوم الحالي المعروض أصلاً بشكل دائم)
+  // لنفس سبب تقييد سجل الحضور أعلاه - تراكم سنوات من البيانات لا يجوز عرضه دفعة واحدة
+  const TASMEEA_HISTORY_DISPLAY_CAP = 30;
+  const tasmeeaHistorySorted = studentTasmeea
+    .filter((t) => t.date && t.date !== todayStr)
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+    .slice(0, TASMEEA_HISTORY_DISPLAY_CAP);
+
   const directNotifs = (window.appStore?.notifications || []).filter((n) => {
     if (!n) return false;
     const rec = String(n.recipient || "").trim();
@@ -1419,6 +1500,16 @@ function renderStudentData() {
       (b.createdAt || 0) - (a.createdAt || 0) ||
       (b.date || "").localeCompare(a.date || ""),
   );
+
+  // إشعارات اليوم فقط تُعرض افتراضياً؛ "القديمة" تُكشف عند الطلب فقط، ومحدودة بحد
+  // أقصى (لا تُعرض كل تاريخ الحساب دفعة واحدة مهما تراكم مع مرور الشهور والسنوات)
+  const isSameCalendarDay = (ts) =>
+    ts && new Date(ts).toDateString() === new Date().toDateString();
+  const OLD_ITEMS_DISPLAY_CAP = 50;
+  const todayNotifs = studentNotifs.filter((n) => isSameCalendarDay(n.createdAt));
+  const olderNotifs = studentNotifs
+    .filter((n) => !isSameCalendarDay(n.createdAt))
+    .slice(0, OLD_ITEMS_DISPLAY_CAP);
 
   const studentTests = (window.appStore?.tests || []).filter(
     (t) => t.studentId === student.id || t.studentId === studentId,
@@ -1548,7 +1639,13 @@ function renderStudentData() {
       </div>
     </div>
 
-    <!-- تثبيت التطبيق وتفعيل الإشعارات (نسخة خاصة بصفحة الطالب) -->
+    <!-- تثبيت التطبيق وتفعيل الإشعارات (نسخة خاصة بصفحة الطالب) - تختفي نهائياً بعد
+         أول تفعيل ناجح (راجع pwa-notifications.js) بدل الظهور دائماً بلا داعٍ -->
+    ${
+      typeof isPwaInstallBannerDismissed === "function" &&
+      isPwaInstallBannerDismissed()
+        ? ""
+        : `
     <div class="card mb-3" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; padding: 0.9rem 1.25rem;">
       <div>
         <strong style="color: var(--primary-teal-dark); font-size: 0.92rem;">📲 ثبّت التطبيق وفعّل الإشعارات</strong>
@@ -1558,76 +1655,80 @@ function renderStudentData() {
         تثبيت + تفعيل
       </button>
     </div>
+    `
+    }
 
     <!-- 1. الصف الأول: التميز والاختبارات التفاعلي المشروط -->
     ${row1ConditionalHtml}
 
     <!-- 2. الصف الثاني: الإحصائيات الشاملة للإنجاز والحضور -->
     <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">📊 الإحصائيات الشاملة للإنجاز والحضور:</h3>
-    <div class="student-stats-report-grid">
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">أيام الحضور</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #2e7d32;">${presentCount}</h3>
-      </div>
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">أيام الغياب</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #c62828;">${absentCount}</h3>
-      </div>
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">مرات التميز</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: var(--primary-brown);">${tamayuzCount}</h3>
-      </div>
+    <div class="student-stats-report-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem;">
+      ${studentStatBox("أيام الحضور", presentCount, "#2e7d32")}
+      ${studentStatBox("أيام الغياب", absentCount, "#c62828")}
+      ${studentStatBox("أيام الاستئذان", excusedCount, "#1565c0")}
+      ${studentStatBox("مرات التميز", tamayuzCount, "var(--primary-brown)")}
 
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">الدرس الجديد: ممتاز</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #2e7d32;">${hifzMumtaz}</h3>
-      </div>
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">مراجعة: ممتاز</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #2e7d32;">${murajaaMumtaz}</h3>
-      </div>
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">تلاوة: ممتاز</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #2e7d32;">${tilawaMumtaz}</h3>
-      </div>
+      ${studentStatBox("الدرس الجديد: ممتاز", hifzMumtaz, "#2e7d32")}
+      ${studentStatBox("الدرس الجديد: ج.جداً", hifzJayyidJiddan, "#0b6b7d")}
+      ${studentStatBox("الدرس الجديد: جيد", hifzJayyid, "#b78103")}
+      ${studentStatBox("الدرس الجديد: يعيد", hifzRe, "#c62828")}
 
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">الدرس الجديد: ج.جداً</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #0b6b7d;">${hifzJayyidJiddan}</h3>
-      </div>
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">مراجعة: ج.جداً</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #0b6b7d;">${murajaaJayyidJiddan}</h3>
-      </div>
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">تلاوة: ج.جداً</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #0b6b7d;">${tilawaJayyidJiddan}</h3>
-      </div>
+      ${studentStatBox("المراجعة: ممتاز", murajaaMumtaz, "#2e7d32")}
+      ${studentStatBox("المراجعة: ج.جداً", murajaaJayyidJiddan, "#0b6b7d")}
+      ${studentStatBox("المراجعة: جيد", murajaaJayyid, "#b78103")}
+      ${studentStatBox("المراجعة: يعيد", murajaaRe, "#c62828")}
 
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">الدرس الجديد: جيد</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #b78103;">${hifzJayyid}</h3>
-      </div>
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">مراجعة: جيد</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #b78103;">${murajaaJayyid}</h3>
-      </div>
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">تلاوة: جيد</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #b78103;">${tilawaJayyid}</h3>
-      </div>
+      ${studentStatBox("التلاوة: ممتاز", tilawaMumtaz, "#2e7d32")}
+      ${studentStatBox("التلاوة: ج.جداً", tilawaJayyidJiddan, "#0b6b7d")}
+      ${studentStatBox("التلاوة: جيد", tilawaJayyid, "#b78103")}
+      ${studentStatBox("التلاوة: يعيد", tilawaRe, "#c62828")}
+    </div>
 
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">الدرس الجديد: يعيد</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #c62828;">${hifzRe}</h3>
+    <!-- صندوق حالة الحضور المستقل (تحت الإحصائيات مباشرة) -->
+    <div
+      class="card mb-3"
+      style="padding: 0.85rem 1.1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; cursor: pointer;"
+      onclick="toggleStudentAttendanceHistory()"
+      title="اضغطي لعرض سجل الحضور للأيام السابقة"
+    >
+      <div style="display: flex; align-items: center; gap: 0.6rem;">
+        <span style="font-weight: 800; color: var(--primary-brown); font-size: 0.95rem;">📅 حالة الحضور اليوم (${todayStr}):</span>
+        ${attStatusBadge}
       </div>
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">مراجعة: يعيد</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #c62828;">${murajaaRe}</h3>
-      </div>
-      <div class="stat-card" style="padding: 0.75rem; text-align: center; flex-direction: column; justify-content: center;">
-        <span class="stat-label" style="font-size: 0.78rem;">تلاوة: يعيد</span>
-        <h3 class="stat-value" style="font-size: 1.35rem; color: #c62828;">${tilawaRe}</h3>
+      <span
+        id="student-att-history-toggle-btn"
+        class="btn btn-outline-brown btn-sm"
+        onclick="event.stopPropagation(); toggleStudentAttendanceHistory();"
+      >📜 عرض حضور الأيام السابقة</span>
+    </div>
+    <div
+      id="student-att-history-section"
+      class="card mb-3"
+      style="display: none; padding: 0.6rem;"
+    >
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr><th>التاريخ</th><th>الحالة</th></tr>
+          </thead>
+          <tbody>
+            ${
+              attHistorySorted.length === 0
+                ? '<tr><td colspan="2" class="text-center text-muted p-2">لا يوجد سجل حضور بعد</td></tr>'
+                : attHistorySorted
+                    .map(
+                      (a) => `
+              <tr>
+                <td>${escapeHtml(a.date)}</td>
+                <td>${attStatusLabels[a.status || ""] || "—"}</td>
+              </tr>
+            `,
+                    )
+                    .join("")
+            }
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -1637,26 +1738,29 @@ function renderStudentData() {
         <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--primary-brown); margin: 0;">
           📬 إشعارات وتنبيهات الإدارة والمعلم
         </h3>
-        <span class="badge badge-active">${studentNotifs.length} رسائل</span>
+        <span class="badge badge-active">${todayNotifs.length} اليوم</span>
       </div>
       <div class="card-body p-2" id="student-inbox-notifications">
         ${
-          studentNotifs.length === 0
-            ? '<p class="text-muted p-2" style="font-size:0.88rem;">لا توجد إشعارات أو رسائل جديدة حالياً</p>'
-            : studentNotifs
-                .map(
-                  (n) => `
-              <div class="mb-2 p-2" style="background:#f4f9f9; border: 1px solid var(--border-color); border-radius: 6px;">
-                <div class="flex-between">
-                  <strong style="color:var(--primary-brown); font-size:0.92rem;">${n.title || "تنبيه"}</strong>
-                  <small class="text-muted">${n.date || ""}</small>
-                </div>
-                <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #333;">${n.body || ""}</p>
-                <div style="font-size:0.75rem; color:#777; margin-top:3px;">المرسل: ${n.sender || "إدارة المَجْمَع"}</div>
-              </div>
-            `,
-                )
-                .join("")
+          todayNotifs.length === 0
+            ? '<p class="text-muted p-2" style="font-size:0.88rem;">لا توجد إشعارات جديدة اليوم</p>'
+            : todayNotifs.map(studentNotifCardHtml).join("")
+        }
+        ${
+          olderNotifs.length > 0
+            ? `
+          <button
+            id="student-old-notifs-toggle-btn"
+            type="button"
+            class="btn btn-outline-brown btn-sm"
+            style="width: 100%; margin-top: 0.4rem;"
+            onclick="toggleOldStudentNotifs()"
+          >📜 إظهار الإشعارات القديمة</button>
+          <div id="student-old-notifs-section" style="display: none; margin-top: 0.5rem;">
+            ${olderNotifs.map(studentNotifCardHtml).join("")}
+          </div>
+        `
+            : ""
         }
       </div>
     </div>
@@ -1710,10 +1814,6 @@ function renderStudentData() {
     <div class="card mb-3">
       <div class="card-header flex-between">
         <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--primary-brown); margin: 0;">📖 مقرر اليوم والتسميع</h3>
-        <div class="flex-align-gap">
-          <span style="font-size: 0.85rem; font-weight: 700;">حالة الحضور:</span>
-          ${attStatusBadge}
-        </div>
       </div>
       <div class="card-body p-2">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem;">
@@ -1733,6 +1833,42 @@ function renderStudentData() {
             ${todayRecord.tilawaRating ? `<span class="badge badge-active mt-1">${todayRecord.tilawaRating}</span>` : ""}
           </div>
         </div>
+        ${
+          tasmeeaHistorySorted.length > 0
+            ? `
+          <button
+            id="student-tasmeea-history-toggle-btn"
+            type="button"
+            class="btn btn-outline-brown btn-sm"
+            style="width: 100%; margin-top: 0.6rem;"
+            onclick="toggleStudentTasmeeaHistory()"
+          >📜 إظهار سجل الأيام السابقة</button>
+          <div id="student-tasmeea-history-section" style="display: none; margin-top: 0.5rem;">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr><th>التاريخ</th><th>الدرس الجديد</th><th>المراجعة</th><th>التلاوة</th></tr>
+                </thead>
+                <tbody>
+                  ${tasmeeaHistorySorted
+                    .map(
+                      (t) => `
+                  <tr>
+                    <td>${escapeHtml(t.date)}</td>
+                    <td>${escapeHtml(t.hifzSurah) || "—"}</td>
+                    <td>${escapeHtml(t.murajaaSurah) || "—"}</td>
+                    <td>${escapeHtml(t.tilawaSurah) || "—"}</td>
+                  </tr>
+                `,
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `
+            : ""
+        }
       </div>
     </div>
 
