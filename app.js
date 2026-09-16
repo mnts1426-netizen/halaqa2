@@ -1847,7 +1847,12 @@ function renderStudentData() {
             <div class="table-responsive">
               <table class="data-table">
                 <thead>
-                  <tr><th>التاريخ</th><th>الدرس الجديد</th><th>المراجعة</th><th>التلاوة</th></tr>
+                  <tr>
+                    <th>التاريخ</th>
+                    <th>الدرس الجديد</th><th>التقدير</th>
+                    <th>المراجعة</th><th>التقدير</th>
+                    <th>التلاوة</th><th>التقدير</th>
+                  </tr>
                 </thead>
                 <tbody>
                   ${tasmeeaHistorySorted
@@ -1856,8 +1861,11 @@ function renderStudentData() {
                   <tr>
                     <td>${escapeHtml(t.date)}</td>
                     <td>${escapeHtml(t.hifzSurah) || "—"}</td>
+                    <td>${escapeHtml(t.hifzRating) || "—"}</td>
                     <td>${escapeHtml(t.murajaaSurah) || "—"}</td>
+                    <td>${escapeHtml(t.murajaaRating) || "—"}</td>
                     <td>${escapeHtml(t.tilawaSurah) || "—"}</td>
+                    <td>${escapeHtml(t.tilawaRating) || "—"}</td>
                   </tr>
                 `,
                     )
