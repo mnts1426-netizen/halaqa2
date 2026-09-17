@@ -176,6 +176,12 @@ function handleReportTypeChange() {
     if (dateFromGroup) dateFromGroup.style.display = "none";
     if (dateToGroup) dateToGroup.style.display = "none";
     populateReportWeekRangeDropdowns();
+  } else if (reportType === "tasmeea_kashf") {
+    // تقرير كشف التسميع: كشف شامل لكل طلاب الحلقة، غير مرتبط بتاريخ محدد
+    if (studentGroup) studentGroup.style.display = "none";
+    if (weekRangeGroup) weekRangeGroup.classList.add("style-hidden");
+    if (dateFromGroup) dateFromGroup.style.display = "none";
+    if (dateToGroup) dateToGroup.style.display = "none";
   } else {
     if (studentGroup) studentGroup.style.display = "block";
     if (weekRangeGroup) weekRangeGroup.classList.add("style-hidden");
@@ -719,6 +725,49 @@ function generateReport() {
           <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.9rem;">
             <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #cbd5e1; font-size: 14px; white-space: nowrap;">⭐ ${escapeHtml(item.student.name)}</td>
             <td style="padding: 8px; font-weight: 900; color: #0a5c71; border: 1px solid #cbd5e1;">🎖️ ${item.count} بطاقات</td>
+          </tr>
+        `;
+      });
+    }
+  }
+
+  // 6. تقرير كشف التسميع
+  else if (reportType === "tasmeea_kashf") {
+    reportTitle = "تقرير كشف التسميع";
+
+    headHtml = `
+      <tr style="background: #0a5c71; color: #ffffff;">
+        <th style="width: 40px; text-align: center; border: 1px solid #cbd5e1;">م</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">اسم الطالب</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">عدد الصفحات الباقي</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">ملاحظات</th>
+      </tr>
+    `;
+
+    const kashfStudents = (window.appStore.students || [])
+      .filter((s) => s.circleId === circleId && s.status === "active")
+      .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
+
+    if (kashfStudents.length === 0) {
+      bodyHtml =
+        '<tr><td colspan="4" class="text-center text-muted p-4">لا يوجد طلاب مسجلون بهذه الحلقة</td></tr>';
+    } else {
+      kashfStudents.forEach((s, idx) => {
+        const entry =
+          (window.appStore.tasmeeaKashf || []).find(
+            (k) => k.studentId === s.id,
+          ) || {};
+        const remainingText =
+          entry.remainingPages === undefined || entry.remainingPages === null
+            ? "—"
+            : entry.remainingPages;
+
+        bodyHtml += `
+          <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.9rem;">
+            <td style="padding: 8px; border: 1px solid #cbd5e1;">${idx + 1}</td>
+            <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #cbd5e1; font-size: 14px; white-space: nowrap;">${escapeHtml(s.name)}</td>
+            <td style="padding: 8px; border: 1px solid #cbd5e1;">${remainingText}</td>
+            <td style="padding: 8px; text-align: right; border: 1px solid #cbd5e1;">${escapeHtml(entry.notes) || "—"}</td>
           </tr>
         `;
       });

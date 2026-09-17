@@ -822,7 +822,9 @@ function adjustSidebarAndViewsForRole(role) {
         el.style.display = "";
       });
       document
-        .querySelectorAll('.sidebar .nav-link[data-target="view-tasmeea"]')
+        .querySelectorAll(
+          '.sidebar .nav-link[data-target="view-tasmeea"], .sidebar .nav-link[data-target="view-tasmeea-kashf"]',
+        )
         .forEach((el) => {
           el.style.display = "flex";
         });
@@ -1911,6 +1913,7 @@ function updateCircleDropdowns() {
     "filter-student-circle",
     "attendance-circle-select",
     "tasmeea-circle-select",
+    "kashf-circle-select",
     "report-circle-select",
     "test-circle-select",
     "edit-comp-circle",
@@ -1947,7 +1950,7 @@ function updateCircleDropdowns() {
       user &&
       user.role === window.ROLES.TEACHER &&
       circlesList.length > 0 &&
-      id === "tasmeea-circle-select"
+      (id === "tasmeea-circle-select" || id === "kashf-circle-select")
     ) {
       select.value = circlesList[0].id;
     }
@@ -2000,6 +2003,11 @@ function refreshActiveView(viewId) {
       typeof renderTasmeeaStudents === "function"
     )
       renderTasmeeaStudents();
+    if (
+      viewId === "view-tasmeea-kashf" &&
+      typeof renderTasmeeaKashfStudents === "function"
+    )
+      renderTasmeeaKashfStudents();
     if (
       viewId === "view-teacher-notes" &&
       typeof renderTeacherNotesTable === "function"

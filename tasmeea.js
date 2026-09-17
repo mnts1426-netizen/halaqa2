@@ -36,6 +36,11 @@ document.addEventListener("DOMContentLoaded", () => {
   if (dateSelect) {
     dateSelect.addEventListener("change", renderTasmeeaStudents);
   }
+
+  const kashfCircleSelect = document.getElementById("kashf-circle-select");
+  if (kashfCircleSelect) {
+    kashfCircleSelect.addEventListener("change", renderTasmeeaKashfStudents);
+  }
 });
 
 function isOfficialWorkdayTasmeea(dateStr) {
@@ -191,6 +196,193 @@ function renderTasmeeaStudents() {
 
   container.innerHTML = html;
 }
+
+// كشف التسميع: متابعة عدد الصفحات الباقية على كل طالب حتى يُتم حفظ المرحلية
+// (جزئين)، تعبئته مفتوحة دائماً للمعلم وغير مرتبطة بيوم أو أسبوع محدد
+function renderTasmeeaKashfStudents() {
+  const circleId = document.getElementById("kashf-circle-select")?.value;
+  const container = document.getElementById("kashf-students-container");
+  if (!container) return;
+
+  const user = window.currentUser;
+  const isTeacher = user && user.role === "teacher";
+
+  if (isTeacher) {
+    const teacherObj = (window.appStore?.teachers || []).find(
+      (t) =>
+        t.userId === user.id ||
+        t.id === user.teacherId ||
+        t.id === user.id ||
+        t.phone === user.phone,
+    );
+    const teacherId = teacherObj ? teacherObj.id : user.teacherId || user.id;
+
+    const teacherCircles = (window.appStore?.circles || []).filter(
+      (c) =>
+        (Array.isArray(c.teacherIds) && c.teacherIds.includes(teacherId)) ||
+        c.teacherId === teacherId,
+    );
+    const teacherCircleIds = teacherCircles.map((c) => c.id);
+
+    if (circleId && !teacherCircleIds.includes(circleId)) {
+      container.innerHTML = `
+        <div class="empty-state-card">
+          <h3>⚠️ غير مصرح لك بالوصول</h3>
+          <p class="text-muted">هذه الحلقة غير مسندة لك حالياً.</p>
+        </div>
+      `;
+      return;
+    }
+  }
+
+  if (!circleId) {
+    container.innerHTML = `
+      <div class="empty-state-card">
+        <h3>اختر الحلقة</h3>
+        <p class="text-muted">قم باختيار الحلقة لعرض كشف التسميع الخاص بطلابها</p>
+      </div>
+    `;
+    return;
+  }
+
+  const circleStudents = (window.appStore.students || [])
+    .filter((s) => s.circleId === circleId && s.status === "active")
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
+
+  if (circleStudents.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state-card">
+        <h3>لا يوجد طلاب في هذه الحلقة</h3>
+        <p class="text-muted">يمكنك إضافة طلاب للحلقة من شاشة إدارة المَجْمَع</p>
+      </div>
+    `;
+    return;
+  }
+
+  let rows = "";
+  circleStudents.forEach((student, index) => {
+    const entry =
+      (window.appStore.tasmeeaKashf || []).find(
+        (k) => k.studentId === student.id,
+      ) || {};
+
+    const remainingVal =
+      entry.remainingPages === undefined || entry.remainingPages === null
+        ? ""
+        : entry.remainingPages;
+    const prevRemainingHtml =
+      entry.previousRemainingPages !== undefined &&
+      entry.previousRemainingPages !== null
+        ? `<div class="text-muted" style="font-size: 0.7rem; margin-top: 2px;">السابق: ${escapeHtml(String(entry.previousRemainingPages))}</div>`
+        : "";
+    const prevNotesHtml =
+      entry.previousNotes
+        ? `<div class="text-muted" style="font-size: 0.7rem; margin-top: 2px;">السابق: ${escapeHtml(entry.previousNotes)}</div>`
+        : "";
+
+    rows += `
+      <tr>
+        <td style="text-align: center; width: 40px;">${index + 1}</td>
+        <td style="font-weight: 700;">${escapeHtml(student.name)}</td>
+        <td style="width: 140px;">
+          <input
+            type="number"
+            min="0"
+            class="form-control"
+            value="${remainingVal}"
+            placeholder="عدد الصفحات"
+            onchange="saveKashfField('${student.id}', '${circleId}', 'remainingPages', this.value)"
+          />
+          ${prevRemainingHtml}
+        </td>
+        <td>
+          <input
+            type="text"
+            class="form-control"
+            value="${escapeHtml(entry.notes || "")}"
+            placeholder="ملاحظات"
+            onchange="saveKashfField('${student.id}', '${circleId}', 'notes', this.value)"
+          />
+          ${prevNotesHtml}
+        </td>
+      </tr>
+    `;
+  });
+
+  container.innerHTML = `
+    <div class="card">
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 40px;">م</th>
+              <th>اسم الطالب</th>
+              <th style="width: 140px;">عدد الصفحات الباقي</th>
+              <th>ملاحظات</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// حفظ حقل واحد من كشف التسميع لطالب محدد، مع الاحتفاظ بالقيمة السابقة (قبل هذا
+// التعديل) لغرض المتابعة - بدون التأثير على بقية حقول الكشف الخاصة بنفس الطالب
+window.saveKashfField = function (studentId, circleId, field, rawValue) {
+  const user = window.currentUser;
+  const existing =
+    (window.appStore.tasmeeaKashf || []).find(
+      (k) => k.studentId === studentId,
+    ) || {};
+
+  const value =
+    field === "remainingPages"
+      ? rawValue === ""
+        ? null
+        : Number(rawValue)
+      : rawValue;
+
+  const entry = {
+    id: existing.id || `kashf_${studentId}`,
+    studentId,
+    circleId,
+    remainingPages:
+      existing.remainingPages === undefined ? null : existing.remainingPages,
+    notes: existing.notes || "",
+    previousRemainingPages:
+      existing.previousRemainingPages === undefined
+        ? null
+        : existing.previousRemainingPages,
+    previousNotes: existing.previousNotes || "",
+    updatedAt: Date.now(),
+    updatedByName: user ? user.name || user.username || "" : "",
+    updatedByRole: user ? user.role : "",
+  };
+
+  if (field === "remainingPages") {
+    entry.previousRemainingPages =
+      existing.remainingPages === undefined ? null : existing.remainingPages;
+    entry.remainingPages = value;
+  } else if (field === "notes") {
+    entry.previousNotes = existing.notes || "";
+    entry.notes = value;
+  }
+
+  if (!window.appStore.tasmeeaKashf) window.appStore.tasmeeaKashf = [];
+  const idx = window.appStore.tasmeeaKashf.findIndex(
+    (k) => k.studentId === studentId,
+  );
+  if (idx >= 0) window.appStore.tasmeeaKashf[idx] = entry;
+  else window.appStore.tasmeeaKashf.push(entry);
+
+  saveToCloud("tasmeeaKashf", entry.id, entry);
+  if (typeof showQuickSaveConfirmation === "function") {
+    showQuickSaveConfirmation("✅ تم حفظ التعديل");
+  }
+  renderTasmeeaKashfStudents();
+};
 
 function buildStudentAccordionCard(
   student,

@@ -303,6 +303,24 @@
             </a>
             <a
               href="#"
+              class="nav-link nav-teacher-only"
+              data-target="view-tasmeea-kashf"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M9 11l3 3L22 4" />
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              </svg>
+              <span>كشف التسميع</span>
+            </a>
+            <a
+              href="#"
               class="nav-link nav-admin-only"
               data-target="view-accounts"
             >
@@ -1382,6 +1400,34 @@
           </div>
         </section>
 
+        <!-- 4ب. شاشة كشف التسميع (متابعة المرحلية: عدد الصفحات الباقية لكل طالب) -->
+        <section id="view-tasmeea-kashf" class="content-view">
+          <div class="card mb-3">
+            <div class="card-header">
+              <div>
+                <h3>📋 كشف التسميع</h3>
+                <small class="text-muted"
+                  >متابعة كل طالب وكم بقي له من صفحات حتى يُتم حفظ المرحلية
+                  (جزئين) ويكون جاهزاً للاختبار عليها. التعديل متاح في أي وقت
+                  ولا يُشترط تحديثه يومياً أو أسبوعياً.</small
+                >
+              </div>
+            </div>
+            <div class="form-group" style="max-width: 320px">
+              <label>الحلقة</label>
+              <select id="kashf-circle-select" class="form-control">
+                <option value="">— اختر الحلقة —</option>
+              </select>
+            </div>
+          </div>
+          <div id="kashf-students-container">
+            <div class="empty-state-card">
+              <h3>اختر الحلقة</h3>
+              <p class="text-muted">قم باختيار الحلقة لعرض كشف التسميع الخاص بطلابها</p>
+            </div>
+          </div>
+        </section>
+
         <!-- 5. شاشة إدارة الحسابات -->
         <section id="view-accounts" class="content-view">
           <div class="card">
@@ -1628,6 +1674,7 @@
                   </option>
                   <option value="comprehensive">تقرير شامل</option>
                   <option value="tamayuz">تقرير التميز الأسبوعي</option>
+                  <option value="tasmeea_kashf">تقرير كشف التسميع</option>
                 </select>
               </div>
               <div class="form-group style-hidden" id="report-week-range-group">
