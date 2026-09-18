@@ -177,7 +177,7 @@ function handleReportTypeChange() {
     if (dateToGroup) dateToGroup.style.display = "none";
     populateReportWeekRangeDropdowns();
   } else if (reportType === "tasmeea_kashf") {
-    // تقرير كشف التسميع: كشف شامل لكل طلاب الحلقة، غير مرتبط بتاريخ محدد
+    // تقرير كشف المرحليات: كشف شامل لكل طلاب الحلقة، غير مرتبط بتاريخ محدد
     if (studentGroup) studentGroup.style.display = "none";
     if (weekRangeGroup) weekRangeGroup.classList.add("style-hidden");
     if (dateFromGroup) dateFromGroup.style.display = "none";
@@ -731,9 +731,9 @@ function generateReport() {
     }
   }
 
-  // 6. تقرير كشف التسميع
+  // 6. تقرير كشف المرحليات
   else if (reportType === "tasmeea_kashf") {
-    reportTitle = "تقرير كشف التسميع";
+    reportTitle = "تقرير كشف المرحليات";
 
     headHtml = `
       <tr style="background: #0a5c71; color: #ffffff;">

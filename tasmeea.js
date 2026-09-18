@@ -50,6 +50,36 @@ function isOfficialWorkdayTasmeea(dateStr) {
   return day >= 0 && day <= 3;
 }
 
+// تذكير غير مزعج (نافذة في منتصف الشاشة، وليس شريطاً بالأعلى) يظهر للمعلم بحد
+// أقصى مرتين في اليوم، وفقط أيام الأحد-الأربعاء، لتذكيره بتحضير طلابه إن لم يكن
+// قد أتمّ ذلك بعد - بدون قفل أي شيء، يُغلَق فوراً بضغطة زر واحدة
+const TASMEEA_ATT_REMINDER_KEY_PREFIX = "halaqat_tasmeea_att_reminder_";
+
+function maybeShowTasmeeaAttendanceReminderModal() {
+  const today = toLocalDateStr(new Date());
+  if (!isOfficialWorkdayTasmeea(today)) return;
+  if (document.getElementById("tasmeea-attendance-reminder-modal")) return;
+
+  const storageKey = TASMEEA_ATT_REMINDER_KEY_PREFIX + today;
+  const shownCount = Number(localStorage.getItem(storageKey) || 0);
+  if (shownCount >= 2) return;
+  localStorage.setItem(storageKey, String(shownCount + 1));
+
+  const modal = document.createElement("div");
+  modal.id = "tasmeea-attendance-reminder-modal";
+  modal.style.cssText =
+    "position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; z-index: 99998;";
+  modal.innerHTML = `
+    <div style="background: #fff; border-radius: 12px; padding: 1.5rem; max-width: 340px; width: 90%; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.25);">
+      <div style="font-size: 2rem; margin-bottom: 0.5rem;">⏰</div>
+      <h3 style="margin: 0 0 0.5rem; font-weight: 800; color: var(--primary-brown);">تذكير بتحضير الطلاب</h3>
+      <p class="text-muted" style="margin-bottom: 1.2rem;">لا تنسَ تحضير جميع طلاب حلقتك لهذا اليوم.</p>
+      <button class="btn btn-primary" style="width: 100%;" onclick="document.getElementById('tasmeea-attendance-reminder-modal').remove()">إنهاء</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
 function getCircleNameTasmeea(circleId) {
   const c = (window.appStore?.circles || []).find((x) => x.id === circleId);
   return c ? c.name : "—";
@@ -145,9 +175,8 @@ function renderTasmeeaStudents() {
     return;
   }
 
-  // لا تُفتح شاشة تسجيل المقررات (الحفظ/المراجعة/التلاوة) إلا بعد تحضير جميع طلاب
-  // الحلقة لهذا اليوم (كل طالب له حالة غير فارغة) - يبقى التحضير نفسه متاحاً دائماً
-  // حتى تكتمل الشرط. المدير مستثنى دائماً بصلاحيته الكاملة على كل شيء بالنظام.
+  // تنبيه توعوي فقط (لا يقفل تسجيل المقررات): يذكّر المعلم بتحضير كل طلاب
+  // الحلقة لهذا اليوم إن لم يكن قد فعل بعد. المدير لا يُعنى بهذا التنبيه.
   const allAttendanceTaken = circleStudents.every((s) => {
     const rec = (window.appStore.attendance || []).find(
       (a) => a.studentId === s.id && a.date === dateVal,
@@ -155,10 +184,10 @@ function renderTasmeeaStudents() {
     return rec && rec.status && rec.status !== "";
   });
   const isAdminUser = user && user.role === "admin";
-  const curriculumLocked = !isAdminUser && !allAttendanceTaken;
+  const showAttendanceReminderBanner = !isAdminUser && !allAttendanceTaken;
 
   let html = "";
-  if (curriculumLocked) {
+  if (showAttendanceReminderBanner) {
     const remaining = circleStudents.filter((s) => {
       const rec = (window.appStore.attendance || []).find(
         (a) => a.studentId === s.id && a.date === dateVal,
@@ -167,8 +196,8 @@ function renderTasmeeaStudents() {
     }).length;
     html += `
       <div class="empty-state-card" style="margin-bottom: 1rem; background: #fff3e0; border: 1px solid #ffcc80;">
-        <h3>⚠️ سجّل حضور جميع الطالب أولاً</h3>
-        <p class="text-muted">تسجيل المقررات (الحفظ/المراجعة/التلاوة) يُفتح تلقائياً بعد تحضير كل طلاب الحلقة لهذا اليوم. متبقٍ (${remaining}) طالباً بدون تحضير.</p>
+        <h3>⚠️ سجّل حضور جميع الطلاب</h3>
+        <p class="text-muted">يفضَّل تحضير جميع طلاب الحلقة لهذا اليوم قبل البدء بتسجيل المقررات. متبقٍ (${remaining}) طالباً بدون تحضير.</p>
       </div>
     `;
   }
@@ -190,14 +219,21 @@ function renderTasmeeaStudents() {
       attRecord,
       index + 1,
       dateVal,
-      curriculumLocked,
     );
   });
 
   container.innerHTML = html;
+
+  if (
+    !isAdminUser &&
+    !allAttendanceTaken &&
+    typeof maybeShowTasmeeaAttendanceReminderModal === "function"
+  ) {
+    maybeShowTasmeeaAttendanceReminderModal();
+  }
 }
 
-// كشف التسميع: متابعة عدد الصفحات الباقية على كل طالب حتى يُتم حفظ المرحلية
+// كشف المرحليات: متابعة عدد الصفحات الباقية على كل طالب حتى يُتم حفظ المرحلية
 // (جزئين)، تعبئته مفتوحة دائماً للمعلم وغير مرتبطة بيوم أو أسبوع محدد
 function renderTasmeeaKashfStudents() {
   const circleId = document.getElementById("kashf-circle-select")?.value;
@@ -239,7 +275,7 @@ function renderTasmeeaKashfStudents() {
     container.innerHTML = `
       <div class="empty-state-card">
         <h3>اختر الحلقة</h3>
-        <p class="text-muted">قم باختيار الحلقة لعرض كشف التسميع الخاص بطلابها</p>
+        <p class="text-muted">قم باختيار الحلقة لعرض كشف المرحليات الخاص بطلابها</p>
       </div>
     `;
     return;
@@ -258,6 +294,8 @@ function renderTasmeeaKashfStudents() {
     `;
     return;
   }
+
+  const isAdminUser = user && user.role === "admin";
 
   let rows = "";
   circleStudents.forEach((student, index) => {
@@ -305,6 +343,13 @@ function renderTasmeeaKashfStudents() {
           />
           ${prevNotesHtml}
         </td>
+        ${
+          isAdminUser
+            ? `<td style="width: 60px; text-align: center;">
+          <button class="btn btn-danger btn-sm" title="حذف بيانات هذا الطالب من الكشف" onclick="deleteKashfEntry('${student.id}')">🗑️</button>
+        </td>`
+            : ""
+        }
       </tr>
     `;
   });
@@ -319,6 +364,7 @@ function renderTasmeeaKashfStudents() {
               <th>اسم الطالب</th>
               <th style="width: 140px;">عدد الصفحات الباقي</th>
               <th>ملاحظات</th>
+              ${isAdminUser ? '<th style="width: 60px;">حذف</th>' : ""}
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -328,7 +374,51 @@ function renderTasmeeaKashfStudents() {
   `;
 }
 
-// حفظ حقل واحد من كشف التسميع لطالب محدد، مع الاحتفاظ بالقيمة السابقة (قبل هذا
+// حذف بيانات كشف المرحليات لطالب واحد (متاح للمدير فقط من واجهة العرض) - يعيد
+// الصف لحالته الفارغة الأصلية دون التأثير على بقية طلاب الحلقة
+window.deleteKashfEntry = function (studentId) {
+  const user = window.currentUser;
+  if (!user || user.role !== "admin") {
+    alert("⚠️ هذه الخاصية متاحة لمدير المَجْمَع فقط.");
+    return;
+  }
+  if (!confirm("هل أنت متأكد من حذف بيانات هذا الطالب من كشف المرحليات؟"))
+    return;
+
+  saveToCloud("tasmeeaKashf", `kashf_${studentId}`, null, true);
+  if (typeof showQuickSaveConfirmation === "function") {
+    showQuickSaveConfirmation("🗑️ تم الحذف");
+  }
+  renderTasmeeaKashfStudents();
+};
+
+// استخراج/طباعة تقرير كشف المرحليات لنفس الحلقة المختارة، مباشرة من شاشة الكشف
+// نفسها (متاح للمدير فقط) - يستخدم محرك التقارير المشترك (reports.js) بنفس
+// التصميم والترويسة والتذييل المستخدمين في بقية التقارير، دون مغادرة الشاشة
+window.printKashfPageReport = function () {
+  const user = window.currentUser;
+  if (!user || user.role !== "admin") {
+    alert("⚠️ هذه الخاصية متاحة لمدير المَجْمَع فقط.");
+    return;
+  }
+  const circleId = document.getElementById("kashf-circle-select")?.value;
+  if (!circleId) {
+    alert("⚠️ يرجى اختيار الحلقة أولاً.");
+    return;
+  }
+
+  const reportCircleSelect = document.getElementById("report-circle-select");
+  const reportTypeSelect = document.getElementById("report-type-select");
+  if (!reportCircleSelect || !reportTypeSelect) return;
+
+  reportCircleSelect.value = circleId;
+  reportTypeSelect.value = "tasmeea_kashf";
+  if (typeof handleReportTypeChange === "function") handleReportTypeChange();
+  if (typeof generateReport === "function") generateReport();
+  if (typeof printOfficialReport === "function") printOfficialReport();
+};
+
+// حفظ حقل واحد من كشف المرحليات لطالب محدد، مع الاحتفاظ بالقيمة السابقة (قبل هذا
 // التعديل) لغرض المتابعة - بدون التأثير على بقية حقول الكشف الخاصة بنفس الطالب
 window.saveKashfField = function (studentId, circleId, field, rawValue) {
   const user = window.currentUser;
@@ -390,7 +480,6 @@ function buildStudentAccordionCard(
   attRecord,
   index,
   currentDateVal,
-  curriculumLocked,
 ) {
   const ratings = ["ممتاز", "جيد جداً", "جيد", "يعيد"];
 
@@ -479,15 +568,6 @@ function buildStudentAccordionCard(
 
       <!-- تفاصيل التسميع وتعديل المقررات المتاحة للمدير والمعلم -->
       <div id="tasmeea-details-${student.id}" style="display: none; padding: 1.25rem; border-top: 1px solid var(--border-color); background: #ffffff;">
-        ${
-          curriculumLocked
-            ? `
-        <div class="empty-state-card" style="margin: 0; background: #fff3e0; border: 1px solid #ffcc80;">
-          <h3>🔒 مقفل مؤقتاً</h3>
-          <p class="text-muted">يجب تحضير جميع طلاب الحلقة أولاً قبل فتح تسجيل المقررات لهذا الطالب.</p>
-        </div>
-        `
-            : `
         <form onsubmit="saveStudentTasmeea(event, '${student.id}')">
           <div class="tasmeea-sections-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
             
@@ -567,8 +647,6 @@ function buildStudentAccordionCard(
             <button type="submit" class="btn btn-primary">اعتماد الملاحظات</button>
           </div>
         </form>
-        `
-        }
       </div>
     </div>
   `;
