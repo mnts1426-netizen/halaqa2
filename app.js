@@ -1996,13 +1996,23 @@ function refreshActiveView(viewId) {
     if (
       viewId === "view-attendance" &&
       typeof renderAttendanceTable === "function"
-    )
+    ) {
       renderAttendanceTable();
+      // إعادة مزامنة عند فتح شاشة التحضير مباشرة (بدل الاكتفاء بمزامنة بداية
+      // التشغيل فقط) حتى تصل تعديلات المدير (حذف طالب، تغيير حالة إلى متأخر/
+      // مستأذن...) لجهاز المعلم بدون إعادة تحميل الصفحة كاملة - يخضع لنفس الحد
+      // الأدنى بين كل مزامنتين (دقيقتان) المطبَّق أصلاً داخل الدالة نفسها
+      if (typeof syncAndPurgeDataFromCloud === "function")
+        syncAndPurgeDataFromCloud();
+    }
     if (
       viewId === "view-tasmeea" &&
       typeof renderTasmeeaStudents === "function"
-    )
+    ) {
       renderTasmeeaStudents();
+      if (typeof syncAndPurgeDataFromCloud === "function")
+        syncAndPurgeDataFromCloud();
+    }
     if (
       viewId === "view-tasmeea-kashf" &&
       typeof renderTasmeeaKashfStudents === "function"

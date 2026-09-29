@@ -182,6 +182,14 @@ function handleReportTypeChange() {
     if (weekRangeGroup) weekRangeGroup.classList.add("style-hidden");
     if (dateFromGroup) dateFromGroup.style.display = "none";
     if (dateToGroup) dateToGroup.style.display = "none";
+  } else if (reportType === "curriculum_start_end") {
+    // تقرير بداية ونهاية المنهج: يُحسب دائماً من أول سجل فعلي لكل طالب على حدة
+    // حتى اليوم الحالي - بغض النظر عن أي تاريخ، حتى لا يُحسب من بداية فترة
+    // ثابتة لطالب انضم لاحقاً ولم يكن مسجلاً بعد في تلك الفترة
+    if (studentGroup) studentGroup.style.display = "block";
+    if (weekRangeGroup) weekRangeGroup.classList.add("style-hidden");
+    if (dateFromGroup) dateFromGroup.style.display = "none";
+    if (dateToGroup) dateToGroup.style.display = "none";
   } else {
     if (studentGroup) studentGroup.style.display = "block";
     if (weekRangeGroup) weekRangeGroup.classList.add("style-hidden");
@@ -218,22 +226,22 @@ function buildPdfTemplateChrome(titleText, circleName, centerSubHtml) {
   const header = `
     <div class="report-header-pdf" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.2rem; padding-bottom: 0.8rem; border-bottom: 2px solid #c59b27;">
       <!-- اليمين -->
-      <div style="text-align: right; font-size: 0.95rem; font-weight: 800; line-height: 1.6; color: #0a5c71;">
+      <div style="text-align: right; font-size: 0.95rem; font-weight: 800; line-height: 1.6; color: #2E657E;">
         <div style="font-family: 'Amiri', 'Cairo', serif; font-size: 1.05rem;">مجمع عبد الله بن مهدي القرآني</div>
         <div style="color: #6b4226;">جامع القمر</div>
-        <div style="color: #0a5c71; margin-top: 3px;">حلقة ${circleName || "أبو بكر الصديق"}</div>
+        <div style="color: #2E657E; margin-top: 3px;">حلقة ${circleName || "أبو بكر الصديق"}</div>
       </div>
 
       <!-- الوسط -->
       <div style="text-align: center; flex: 1; padding: 0 1rem;">
-        <div style="display: inline-block; border: 2px solid #0a5c71; border-radius: 6px; padding: 0.4rem 1.8rem; background: #f2f7f9; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-          <h2 style="margin: 0; font-size: 1.3rem; font-weight: 900; color: #0a5c71; font-family: 'Amiri', 'Cairo', serif;">${titleText}</h2>
+        <div style="display: inline-block; border: 2px solid #2E657E; border-radius: 6px; padding: 0.4rem 1.8rem; background: #f2f7f9; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+          <h2 style="margin: 0; font-size: 1.3rem; font-weight: 900; color: #2E657E; font-family: 'Amiri', 'Cairo', serif;">${titleText}</h2>
         </div>
         ${centerSubHtml || ""}
       </div>
 
       <!-- اليسار -->
-      <div style="text-align: left; font-size: 0.95rem; font-weight: 800; line-height: 1.6; color: #0a5c71;">
+      <div style="text-align: left; font-size: 0.95rem; font-weight: 800; line-height: 1.6; color: #2E657E;">
         <div style="font-family: 'Amiri', 'Cairo', serif; font-size: 1.05rem;">مجمع عبد الله بن مهدي القرآني</div>
         <div style="color: #6b4226;">جامع الهدى</div>
         <div style="color: #9e7817; margin-top: 3px;">حلقات جامع الهدى</div>
@@ -244,11 +252,11 @@ function buildPdfTemplateChrome(titleText, circleName, centerSubHtml) {
   const footer = `
     <div class="report-footer-pdf" style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 2px solid #ebd99f; padding-top: 1rem; margin-top: 1.2rem; font-size: 0.95rem; page-break-inside: avoid; break-inside: avoid; page-break-before: auto; break-before: auto;">
       <div style="text-align: right;">
-        <strong style="color: #0a5c71; font-size: 1rem;">المنصة الإلكترونية للمجمع القرآني</strong>
+        <strong style="color: #2E657E; font-size: 1rem;">المنصة الإلكترونية للمجمع القرآني</strong>
       </div>
       <div style="text-align: left;">
         <div style="font-weight: 800; color: #6b4226;">مدير المجمع القرآني</div>
-        <div style="font-weight: 900; color: #0a5c71; font-size: 1.05rem; margin-top: 2px;">أحمد بن عبدالله آل مهدي</div>
+        <div style="font-weight: 900; color: #2E657E; font-size: 1.05rem; margin-top: 2px;">أحمد بن عبدالله آل مهدي</div>
       </div>
     </div>
   `;
@@ -297,16 +305,16 @@ function generateReport() {
     centerSubHtml = dayDateFormatted;
 
     headHtml = `
-      <tr style="background: #0a5c71; color: #ffffff;">
-        <th style="width: 40px; text-align: center; border: 1px solid #cbd5e1;">م</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">اسم الطالب</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">حالة التحضير</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">منهج الدرس</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">التقدير</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">منهج المراجعة</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">التقدير</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">منهج التلاوة</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">التقدير</th>
+      <tr style="background: #2E657E; color: #ffffff;">
+        <th style="width: 40px; text-align: center; border: 1px solid #2E657E;">م</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">اسم الطالب</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">حالة التحضير</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">منهج الدرس</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">التقدير</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">منهج المراجعة</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">التقدير</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">منهج التلاوة</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">التقدير</th>
       </tr>
     `;
 
@@ -341,16 +349,16 @@ function generateReport() {
           ) || {};
 
         bodyHtml += `
-          <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.9rem;">
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${idx + 1}</td>
-            <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #cbd5e1; font-size: 14px; white-space: nowrap;">${escapeHtml(s.name)}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${attStatus}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${escapeHtml(tasm.hifzSurah) || "لا يوجد"}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${escapeHtml(tasm.hifzRating) || "—"}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${escapeHtml(tasm.murajaaSurah) || "لا يوجد"}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${escapeHtml(tasm.murajaaRating) || "—"}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${escapeHtml(tasm.tilawaSurah) || "لا يوجد"}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${escapeHtml(tasm.tilawaRating) || "—"}</td>
+          <tr style="border-bottom: 1px solid #2E657E; text-align: center; font-size: 0.9rem;">
+            <td style="padding: 8px; border: 1px solid #2E657E;">${idx + 1}</td>
+            <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #2E657E; font-size: 14px; white-space: nowrap;">${escapeHtml(s.name)}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${attStatus}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.hifzSurah) || "لا يوجد"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.hifzRating) || "—"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.murajaaSurah) || "لا يوجد"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.murajaaRating) || "—"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.tilawaSurah) || "لا يوجد"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.tilawaRating) || "—"}</td>
           </tr>
         `;
       });
@@ -381,45 +389,43 @@ function generateReport() {
     headerLeftText = `الفترة / ${studentDailyPeriodText}`;
 
     headHtml = `
-      <tr style="background: #0a5c71; color: #ffffff;">
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">اليوم والتاريخ</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">حالة التحضير</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">منهج الدرس</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">التقدير</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">منهج المراجعة</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">التقدير</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">منهج التلاوة</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">التقدير</th>
+      <tr style="background: #2E657E; color: #ffffff;">
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">اليوم والتاريخ</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">حالة التحضير</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">منهج الدرس</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">التقدير</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">منهج المراجعة</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">التقدير</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">منهج التلاوة</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">التقدير</th>
       </tr>
     `;
 
-    const startStr = dateFrom || "2026-08-30";
-    const endStr = dateTo || toLocalDateStr(new Date());
+    // يُعرض فقط أيام الدوام الرسمية (الأحد-الأربعاء) التي يوجد لها فعلياً سجل
+    // تحضير للطالب - بدون تعداد كل يوم تقويمي بين تاريخين ولا اختلاق صفوف
+    // "غير مسجل" لأيام لا يوجد فيها دوام أو لم يُسجَّل لها شيء أصلاً
+    let attRecords = (window.appStore.attendance || []).filter(
+      (a) => a.studentId === selectedStudentId,
+    );
+    if (dateFrom) attRecords = attRecords.filter((a) => a.date >= dateFrom);
+    if (dateTo) attRecords = attRecords.filter((a) => a.date <= dateTo);
+    attRecords = attRecords.filter((a) =>
+      typeof isOfficialWorkday === "function" ? isOfficialWorkday(a.date) : true,
+    );
+    attRecords.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
-    const dateList = [];
-    const cur = new Date(startStr + "T00:00:00");
-    const end = new Date(endStr + "T00:00:00");
-    while (cur <= end) {
-      dateList.push(toLocalDateStr(cur));
-      cur.setDate(cur.getDate() + 1);
-    }
-
-    if (dateList.length === 0) {
+    if (attRecords.length === 0) {
       bodyHtml =
-        '<tr><td colspan="8" class="text-center text-muted p-4">لا توجد أيام مطابقة ضمن الفترة المحددة</td></tr>';
+        '<tr><td colspan="8" class="text-center text-muted p-4">لا توجد أيام تحضير مسجّلة لهذا الطالب ضمن الفترة المحددة</td></tr>';
     } else {
-      dateList.forEach((dStr) => {
+      attRecords.forEach((att) => {
+        const dStr = att.date;
         const dayFormatted = formatArabicDayAndDate(dStr);
-        const att = (window.appStore.attendance || []).find(
-          (a) => a.studentId === selectedStudentId && a.date === dStr,
-        );
         let attStatus = "غير مسجل";
-        if (att) {
-          if (att.status === "present") attStatus = "حاضر";
-          else if (att.status === "absent") attStatus = "غائب";
-          else if (att.status === "late") attStatus = "متأخر";
-          else if (att.status === "excused") attStatus = "مستأذن";
-        }
+        if (att.status === "present") attStatus = "حاضر";
+        else if (att.status === "absent") attStatus = "غائب";
+        else if (att.status === "late") attStatus = "متأخر";
+        else if (att.status === "excused") attStatus = "مستأذن";
 
         const tasm =
           (window.appStore.tasmeea || []).find(
@@ -427,15 +433,15 @@ function generateReport() {
           ) || {};
 
         bodyHtml += `
-          <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.9rem;">
-            <td style="padding: 8px; font-weight: 700; border: 1px solid #cbd5e1;">${dayFormatted}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${attStatus}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${escapeHtml(tasm.hifzSurah) || "لا يوجد"}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${escapeHtml(tasm.hifzRating) || "لا يوجد"}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${escapeHtml(tasm.murajaaSurah) || "لا يوجد"}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${escapeHtml(tasm.murajaaRating) || "لا يوجد"}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${escapeHtml(tasm.tilawaSurah) || "لا يوجد"}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${escapeHtml(tasm.tilawaRating) || "لا يوجد"}</td>
+          <tr style="border-bottom: 1px solid #2E657E; text-align: center; font-size: 0.9rem;">
+            <td style="padding: 8px; font-weight: 700; border: 1px solid #2E657E;">${dayFormatted}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${attStatus}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.hifzSurah) || "لا يوجد"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.hifzRating) || "لا يوجد"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.murajaaSurah) || "لا يوجد"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.murajaaRating) || "لا يوجد"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.tilawaSurah) || "لا يوجد"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.tilawaRating) || "لا يوجد"}</td>
           </tr>
         `;
       });
@@ -445,19 +451,18 @@ function generateReport() {
   // 3. تقرير بداية ونهاية المنهج
   else if (reportType === "curriculum_start_end" || reportType === "tasmeea") {
     reportTitle = "تقرير بداية ونهاية المنهج";
-    const periodText =
-      dateFrom && dateTo
-        ? `من ${dateFrom} إلى ${dateTo}`
-        : "كامل الفترة المسجلة";
-    headerLeftText = `الفترة / ${periodText}`;
+    // يُحسب دائماً من أول سجل فعلي لكل طالب حتى اليوم - بغض النظر عن حقلي
+    // التاريخ (مخفيان لهذا التقرير) حتى لا يُحسب لطالب انضم متأخراً كأن بدايته
+    // من أول فترة ثابتة لم يكن مسجلاً فيها أصلاً
+    headerLeftText = `الفترة / منذ تسجيل كل طالب حتى اليوم`;
 
     headHtml = `
-      <tr style="background: #0a5c71; color: #ffffff;">
-        <th style="width: 40px; text-align: center; border: 1px solid #cbd5e1;">م</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">اسم الطالب</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">منهج درس</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">منهج مراجعة</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">منهج تلاوة</th>
+      <tr style="background: #2E657E; color: #ffffff;">
+        <th style="width: 40px; text-align: center; border: 1px solid #2E657E;">م</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">اسم الطالب</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">منهج درس</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">منهج مراجعة</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">منهج تلاوة</th>
       </tr>
     `;
 
@@ -477,11 +482,9 @@ function generateReport() {
         '<tr><td colspan="5" class="text-center text-muted p-4">لا توجد بيانات مطابقة للطلاب</td></tr>';
     } else {
       students.forEach((s, idx) => {
-        let tasmList = (window.appStore.tasmeea || []).filter(
+        const tasmList = (window.appStore.tasmeea || []).filter(
           (t) => t.studentId === s.id,
         );
-        if (dateFrom) tasmList = tasmList.filter((t) => t.date >= dateFrom);
-        if (dateTo) tasmList = tasmList.filter((t) => t.date <= dateTo);
 
         tasmList.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
@@ -507,18 +510,18 @@ function generateReport() {
           tilawaWithVal[tilawaWithVal.length - 1]?.tilawaSurah || "—";
 
         bodyHtml += `
-          <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.9rem;">
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${idx + 1}</td>
-            <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #cbd5e1; font-size: 14px; white-space: nowrap;">${escapeHtml(s.name)}</td>
-            <td style="padding: 8px; text-align: right; border: 1px solid #cbd5e1; line-height: 1.8;">
+          <tr style="border-bottom: 1px solid #2E657E; text-align: center; font-size: 0.9rem;">
+            <td style="padding: 8px; border: 1px solid #2E657E;">${idx + 1}</td>
+            <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #2E657E; font-size: 14px; white-space: nowrap;">${escapeHtml(s.name)}</td>
+            <td style="padding: 8px; text-align: right; border: 1px solid #2E657E; line-height: 1.8;">
               <div><strong>البداية :</strong> ${escapeHtml(hifzStart)}</div>
               <div><strong>النهاية :</strong> ${escapeHtml(hifzEnd)}</div>
             </td>
-            <td style="padding: 8px; text-align: right; border: 1px solid #cbd5e1; line-height: 1.8;">
+            <td style="padding: 8px; text-align: right; border: 1px solid #2E657E; line-height: 1.8;">
               <div><strong>البداية :</strong> ${escapeHtml(murajaaStart)}</div>
               <div><strong>النهاية :</strong> ${escapeHtml(murajaaEnd)}</div>
             </td>
-            <td style="padding: 8px; text-align: right; border: 1px solid #cbd5e1; line-height: 1.8;">
+            <td style="padding: 8px; text-align: right; border: 1px solid #2E657E; line-height: 1.8;">
               <div><strong>البداية :</strong> ${escapeHtml(tilawaStart)}</div>
               <div><strong>النهاية :</strong> ${escapeHtml(tilawaEnd)}</div>
             </td>
@@ -538,19 +541,19 @@ function generateReport() {
     headerLeftText = `الفترة / ${periodText}`;
 
     headHtml = `
-      <tr style="background: #0a5c71; color: #ffffff;">
-        <th style="width: 35px; text-align: center; border: 1px solid #cbd5e1;">م</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">اسم الطالب</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">أيام الحضور</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">أيام التأخر</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">أيام الاستئذان</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">أيام الغياب</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">بطاقات التميز</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">مرحليات</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">ممتاز</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">جيد جداً</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">جيد</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">يعيد</th>
+      <tr style="background: #2E657E; color: #ffffff;">
+        <th style="width: 35px; text-align: center; border: 1px solid #2E657E;">م</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">اسم الطالب</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">أيام الحضور</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">أيام التأخر</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">أيام الاستئذان</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">أيام الغياب</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">بطاقات التميز</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">مرحليات</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">ممتاز</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">جيد جداً</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">جيد</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">يعيد</th>
       </tr>
     `;
 
@@ -584,42 +587,14 @@ function generateReport() {
           (a) => a.status === "excused",
         ).length;
 
-        const nonAbsentDatesSet = new Set(
-          (window.appStore.attendance || [])
-            .filter(
-              (a) =>
-                a.studentId === s.id &&
-                (a.status === "present" ||
-                  a.status === "late" ||
-                  a.status === "excused"),
-            )
-            .map((a) => a.date),
-        );
-        const allStudentDates = (window.appStore.attendance || [])
-          .filter((a) => a.studentId === s.id)
-          .map((a) => a.date);
-        const earliestRecordDate =
-          allStudentDates.length > 0
-            ? allStudentDates.reduce((min, d) => (d < min ? d : min))
-            : null;
-        const absenceRangeStart =
-          dateFrom || earliestRecordDate || toLocalDateStr(new Date());
-        const absenceRangeEnd = dateTo || toLocalDateStr(new Date());
-
-        let absentCount = 0;
-        const cur = new Date(absenceRangeStart + "T00:00:00");
-        const end = new Date(absenceRangeEnd + "T00:00:00");
-        while (cur <= end) {
-          const dStr = toLocalDateStr(cur);
-          if (
-            typeof isOfficialWorkday === "function" &&
-            isOfficialWorkday(dStr) &&
-            !nonAbsentDatesSet.has(dStr)
-          ) {
-            absentCount++;
-          }
-          cur.setDate(cur.getDate() + 1);
-        }
+        // عدد الغياب يُحسب فقط من سجلات الحضور المُعتمدة صراحةً بحالة "غائب" -
+        // وليس بافتراض الغياب لأي يوم عمل رسمي لا يوجد له سجل إطلاقاً، لأن غياب
+        // السجل قد يعني ببساطة أن المعلم لم يحضّر ذلك اليوم (حلقة معطّلة، إجازة،
+        // نسيان...) وليس أن الطالب فعلاً غاب - هذا الافتراض كان يُنتج غيابات
+        // وهمية لطلاب لم يغيبوا فعلياً
+        const absentCount = attList.filter(
+          (a) => a.status === "absent",
+        ).length;
 
         let tamayuzCount = 0;
         for (let w = 0; w < 16; w++) {
@@ -657,19 +632,19 @@ function generateReport() {
         };
 
         bodyHtml += `
-          <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.9rem;">
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${idx + 1}</td>
-            <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #cbd5e1; font-size: 14px; white-space: nowrap;">${escapeHtml(s.name)}</td>
-            <td style="padding: 8px; font-weight: 800; color: #2e7d32; border: 1px solid #cbd5e1;">${presentCount}</td>
-            <td style="padding: 8px; font-weight: 800; color: #b78103; border: 1px solid #cbd5e1;">${lateCount}</td>
-            <td style="padding: 8px; font-weight: 800; color: #1565c0; border: 1px solid #cbd5e1;">${excusedCount}</td>
-            <td style="padding: 8px; font-weight: 800; color: #c62828; border: 1px solid #cbd5e1;">${absentCount}</td>
-            <td style="padding: 8px; font-weight: 800; color: #0a5c71; border: 1px solid #cbd5e1;">${tamayuzCount}</td>
-            <td style="padding: 8px; font-weight: 800; border: 1px solid #cbd5e1;">${testsCount}</td>
-            <td style="padding: 8px; font-weight: 800; color: #2e7d32; border: 1px solid #cbd5e1;">${countRatingTotal("ممتاز")}</td>
-            <td style="padding: 8px; font-weight: 800; color: #0a5c71; border: 1px solid #cbd5e1;">${countRatingTotal("جيد جداً")}</td>
-            <td style="padding: 8px; font-weight: 800; color: #6b4226; border: 1px solid #cbd5e1;">${countRatingTotal("جيد")}</td>
-            <td style="padding: 8px; font-weight: 800; color: #c62828; border: 1px solid #cbd5e1;">${countRatingTotal("يعيد")}</td>
+          <tr style="border-bottom: 1px solid #2E657E; text-align: center; font-size: 0.9rem;">
+            <td style="padding: 8px; border: 1px solid #2E657E;">${idx + 1}</td>
+            <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #2E657E; font-size: 14px; white-space: nowrap;">${escapeHtml(s.name)}</td>
+            <td style="padding: 8px; font-weight: 800; color: #2e7d32; border: 1px solid #2E657E;">${presentCount}</td>
+            <td style="padding: 8px; font-weight: 800; color: #b78103; border: 1px solid #2E657E;">${lateCount}</td>
+            <td style="padding: 8px; font-weight: 800; color: #1565c0; border: 1px solid #2E657E;">${excusedCount}</td>
+            <td style="padding: 8px; font-weight: 800; color: #c62828; border: 1px solid #2E657E;">${absentCount}</td>
+            <td style="padding: 8px; font-weight: 800; color: #2E657E; border: 1px solid #2E657E;">${tamayuzCount}</td>
+            <td style="padding: 8px; font-weight: 800; border: 1px solid #2E657E;">${testsCount}</td>
+            <td style="padding: 8px; font-weight: 800; color: #2e7d32; border: 1px solid #2E657E;">${countRatingTotal("ممتاز")}</td>
+            <td style="padding: 8px; font-weight: 800; color: #2E657E; border: 1px solid #2E657E;">${countRatingTotal("جيد جداً")}</td>
+            <td style="padding: 8px; font-weight: 800; color: #816105; border: 1px solid #2E657E;">${countRatingTotal("جيد")}</td>
+            <td style="padding: 8px; font-weight: 800; color: #c62828; border: 1px solid #2E657E;">${countRatingTotal("يعيد")}</td>
           </tr>
         `;
       });
@@ -688,9 +663,9 @@ function generateReport() {
     headerLeftText = `الفترة / ${tamayuzPeriodText}`;
 
     headHtml = `
-      <tr style="background: #0a5c71; color: #ffffff;">
-        <th style="padding: 10px; text-align: right; border: 1px solid #cbd5e1;">اسم الطالب المتميز</th>
-        <th style="padding: 10px; text-align: center; border: 1px solid #cbd5e1;">مرات التميز الأسبوعية</th>
+      <tr style="background: #2E657E; color: #ffffff;">
+        <th style="padding: 10px; text-align: right; border: 1px solid #2E657E;">اسم الطالب المتميز</th>
+        <th style="padding: 10px; text-align: center; border: 1px solid #2E657E;">مرات التميز الأسبوعية</th>
       </tr>
     `;
 
@@ -722,9 +697,9 @@ function generateReport() {
     } else {
       studentBadgesCount.forEach((item) => {
         bodyHtml += `
-          <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.9rem;">
-            <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #cbd5e1; font-size: 14px; white-space: nowrap;">⭐ ${escapeHtml(item.student.name)}</td>
-            <td style="padding: 8px; font-weight: 900; color: #0a5c71; border: 1px solid #cbd5e1;">🎖️ ${item.count} بطاقات</td>
+          <tr style="border-bottom: 1px solid #2E657E; text-align: center; font-size: 0.9rem;">
+            <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #2E657E; font-size: 14px; white-space: nowrap;">⭐ ${escapeHtml(item.student.name)}</td>
+            <td style="padding: 8px; font-weight: 900; color: #2E657E; border: 1px solid #2E657E;">🎖️ ${item.count} بطاقات</td>
           </tr>
         `;
       });
@@ -736,11 +711,11 @@ function generateReport() {
     reportTitle = "تقرير كشف المرحليات";
 
     headHtml = `
-      <tr style="background: #0a5c71; color: #ffffff;">
-        <th style="width: 40px; text-align: center; border: 1px solid #cbd5e1;">م</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">اسم الطالب</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">عدد الصفحات الباقي</th>
-        <th style="padding: 10px 8px; text-align: center; border: 1px solid #cbd5e1;">ملاحظات</th>
+      <tr style="background: #2E657E; color: #ffffff;">
+        <th style="width: 40px; text-align: center; border: 1px solid #2E657E;">م</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">اسم الطالب</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">عدد الصفحات الباقي</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">ملاحظات</th>
       </tr>
     `;
 
@@ -763,11 +738,11 @@ function generateReport() {
             : entry.remainingPages;
 
         bodyHtml += `
-          <tr style="border-bottom: 1px solid #cbd5e1; text-align: center; font-size: 0.9rem;">
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${idx + 1}</td>
-            <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #cbd5e1; font-size: 14px; white-space: nowrap;">${escapeHtml(s.name)}</td>
-            <td style="padding: 8px; border: 1px solid #cbd5e1;">${remainingText}</td>
-            <td style="padding: 8px; text-align: right; border: 1px solid #cbd5e1;">${escapeHtml(entry.notes) || "—"}</td>
+          <tr style="border-bottom: 1px solid #2E657E; text-align: center; font-size: 0.9rem;">
+            <td style="padding: 8px; border: 1px solid #2E657E;">${idx + 1}</td>
+            <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #2E657E; font-size: 14px; white-space: nowrap;">${escapeHtml(s.name)}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${remainingText}</td>
+            <td style="padding: 8px; text-align: right; border: 1px solid #2E657E;">${escapeHtml(entry.notes) || "—"}</td>
           </tr>
         `;
       });
@@ -798,10 +773,14 @@ function generateReport() {
   wrapper._chromeFooter = adjustedFooter;
 
   wrapper.innerHTML = `
-    <div style="border: 2.5px double #0a5c71; border-radius: 8px; padding: 1.5rem; background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-top: 1rem; margin-right: 12px;">
+    <style>
+      #report-results-table tbody tr:nth-child(even) { background-color: #DDECF3 !important; }
+      #report-results-table thead th { background-color: #2E657E !important; border-bottom-color: #C9A227 !important; }
+    </style>
+    <div style="border: 2.5px double #2E657E; border-radius: 8px; padding: 1.5rem; background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-top: 1rem; margin-right: 12px;">
       ${chrome.header}
       <div class="table-responsive" style="margin-bottom: 0.8rem;">
-        <table class="data-table" id="report-results-table" style="width: 100%; border-collapse: collapse; border: 1.5px solid #0a5c71;">
+        <table class="data-table" id="report-results-table" style="width: 100%; border-collapse: collapse; border: 1.5px solid #2E657E;">
           <thead id="report-thead">${headHtml}</thead>
           <tbody id="report-tbody">${bodyHtml}</tbody>
         </table>
@@ -882,8 +861,8 @@ async function downloadReportWord() {
         <style>
           body { font-family: 'Cairo', 'Tajawal', Arial, sans-serif; direction: rtl; }
           table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11pt; }
-          th, td { border: 1px solid #cbd5e1; padding: 6px; text-align: center; }
-          th { background-color: #0a5c71; color: #ffffff; font-weight: bold; }
+          th, td { border: 1px solid #2E657E; padding: 6px; text-align: center; }
+          th { background-color: #2E657E; color: #ffffff; font-weight: bold; }
         </style>
       </head>
       <body dir="rtl">
@@ -1014,21 +993,24 @@ function printOfficialReport() {
             break-inside: avoid !important;
           }
           th, td {
-            border: 1px solid #cbd5e1;
+            border: 1px solid #2E657E;
             padding: 6px 4px;
             text-align: center;
             word-wrap: break-word;
             overflow-wrap: break-word;
           }
           th {
-            background-color: #0a5c71 !important;
+            background-color: #2E657E !important;
             color: #ffffff !important;
             font-weight: bold;
           }
+          tbody tr:nth-child(even) {
+            background-color: #DDECF3 !important;
+          }
           /* تثبيت تذييل التقرير واسم المدير في الصفحة الأخيرة ومنع انفصاله */
           .report-footer-print,
-          [style*="border-top: 1.5px solid #ebd99f"],
-          [style*="border-top: 2px solid #ebd99f"],
+          [style*="border-top: 1.5px solid #C9A227"],
+          [style*="border-top: 2px solid #C9A227"],
           .report-footer-pdf {
             page-break-inside: avoid !important;
             break-inside: avoid !important;

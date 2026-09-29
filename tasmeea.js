@@ -521,19 +521,29 @@ function buildStudentAccordionCard(
   // المعلم: ثلاث حالات فقط (غير محدد/حاضر/غائب)، ولا يقدر يعدّل حالة سبق تسجيلها
   // (القائمة تُقفَل بعدها). المدير: كل الحالات الأربع دائماً وقابلة للتعديل دوماً
   const isLockedForTeacher = !isAdmin && currentAtt !== "";
-  const quickAttOptions = isAdmin
-    ? `
+  let quickAttOptions;
+  if (isAdmin) {
+    quickAttOptions = `
     <option value="" ${currentAtt === "" ? "selected" : ""}>— غير محدد —</option>
     <option value="present" ${currentAtt === "present" ? "selected" : ""}>🟢 حاضر</option>
     <option value="late" ${currentAtt === "late" ? "selected" : ""}>🟡 متأخر</option>
     <option value="absent" ${currentAtt === "absent" ? "selected" : ""}>🔴 غائب</option>
     <option value="excused" ${currentAtt === "excused" ? "selected" : ""}>🔵 مستأذن</option>
-  `
-    : `
+  `;
+  } else {
+    quickAttOptions = `
     <option value="" ${currentAtt === "" ? "selected" : ""}>— غير محدد —</option>
     <option value="present" ${currentAtt === "present" ? "selected" : ""}>🟢 حاضر</option>
     <option value="absent" ${currentAtt === "absent" ? "selected" : ""}>🔴 غائب</option>
   `;
+    // المعلم مقيَّد باختيار 3 حالات فقط، لكن لو كانت الحالة الفعلية محدَّدة من
+    // المدير بقيمة خارج هذه الثلاث (متأخر/مستأذن) يجب أن تظهر له كما هي فعلاً
+    if (currentAtt === "late") {
+      quickAttOptions += `<option value="late" selected>🟡 متأخر</option>`;
+    } else if (currentAtt === "excused") {
+      quickAttOptions += `<option value="excused" selected>🔵 مستأذن</option>`;
+    }
+  }
 
   return `
     <div class="card mb-3" style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;" id="tasmeea-card-${student.id}">

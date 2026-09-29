@@ -296,50 +296,60 @@ window.buildOfficialPrintChrome = function (
     minute: "2-digit",
   });
 
+  // ملاحظة: هذه الترويسة تُستخدم أيضاً داخل تصدير Word (عبر downloadReportWord)،
+  // ومحرك عرض HTML في Word لا يدعم display:flex إطلاقاً (يُهمَل تماماً فتتكدّس كل
+  // العناصر عمودياً وتكبر الشعارات بلا ضابط) - لذا استُخدم تخطيط بجداول <table> هنا
+  // بدل flex، فهو مدعوم بنفس الشكل في المتصفح والطباعة وWord معاً.
   const header = `
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <div style="width: 130px; text-align: right;">
-        <img src="report_logo_right.png" alt="شعار المَجْمَع" style="height: 70px; width: auto; object-fit: contain;" />
-      </div>
-      <div style="text-align: center; flex: 1;">
-        <h2 style="margin: 3px 0; font-size: 1.35rem; font-weight: 900; color: #0a5c71; font-family: 'Amiri', 'Cairo', serif;">مَجْمَع عبدالله بن مهدي القرآني</h2>
-        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #6b4226;">جامع الهدى</h4>
-      </div>
-      <div style="width: 130px; text-align: left;">
-        <img src="report_logo_left.png" alt="شعار المَجْمَع" style="height: 70px; width: auto; object-fit: contain;" />
-      </div>
-    </div>
-    <div style="height: 2px; width: 100%; margin: 0.5rem 0; background: linear-gradient(90deg, #c59b27, #6b4226);"></div>
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px double #0a5c71; padding-bottom: 0.7rem; margin-bottom: 1rem;">
-      <div style="width: 130px; text-align: right; padding-right: 10px;">
-        ${rightSubText ? `<div style="font-weight:800; color:#9e7817; font-size:0.8rem; white-space: nowrap;">${rightSubText}</div>` : ""}
-      </div>
-      <div style="text-align: center; flex: 1;">
-        <div style="display: table; max-width: 90%; margin: 0 auto; border: 1.5px solid #c59b27; border-radius: 6px; padding: 0.2rem 0.9rem; background: #f3f8fa;">
-          <h3 style="margin: 0; font-size: 0.95rem; font-weight: 900; color: #0a5c71; line-height: 1.3; word-break: break-word;">${titleText}</h3>
-        </div>
-        ${centerSubHtml ? `<div style="margin-top: 4px; font-weight: 800; color: #6b4226; font-size: 0.78rem; white-space: nowrap;">${centerSubHtml}</div>` : ""}
-      </div>
-      <div style="width: 130px; text-align: left; padding-left: 10px;">
-        ${
-          leftSubText
-            ? `<div style="font-weight:800; color:#6b4226; font-size:0.78rem; white-space: normal; word-wrap: break-word; overflow-wrap: break-word;">${leftSubText}</div>`
-            : `<div style="font-weight:800; color:#6b4226; font-size:0.78rem;">${dateDisplay}<br>${timeDisplay}</div>`
-        }
-      </div>
-    </div>
+    <table style="width: 100%; border-collapse: collapse;" role="presentation">
+      <tr>
+        <td style="width: 130px; text-align: right; vertical-align: middle;">
+          <img src="report_logo_right.png" alt="شعار المَجْمَع" style="height: 70px; width: auto; object-fit: contain;" />
+        </td>
+        <td style="text-align: center; vertical-align: middle;">
+          <h2 style="margin: 3px 0; font-size: 1.35rem; font-weight: 900; color: #2E657E; font-family: 'Cairo', 'Tajawal', sans-serif;">مَجْمَع عبدالله بن مهدي القرآني</h2>
+          <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #816105;">جامع الهدى</h4>
+        </td>
+        <td style="width: 130px; text-align: left; vertical-align: middle;">
+          <img src="report_logo_left.png" alt="شعار المَجْمَع" style="height: 70px; width: auto; object-fit: contain;" />
+        </td>
+      </tr>
+    </table>
+    <div style="height: 2px; width: 100%; margin: 0.5rem 0; background: #C9A227;"></div>
+    <table style="width: 100%; border-collapse: collapse; border-bottom: 2px double #2E657E; padding-bottom: 0.7rem; margin-bottom: 1rem;" role="presentation">
+      <tr>
+        <td style="width: 130px; text-align: right; padding-right: 10px; vertical-align: middle;">
+          ${rightSubText ? `<div style="font-weight:800; color:#816105; font-size:0.8rem; white-space: nowrap;">${rightSubText}</div>` : ""}
+        </td>
+        <td style="text-align: center; vertical-align: middle;">
+          <div style="display: table; max-width: 90%; margin: 0 auto; border: 1.5px solid #C9A227; border-radius: 6px; padding: 0.2rem 0.9rem; background: #DDECF3;">
+            <h3 style="margin: 0; font-size: 0.95rem; font-weight: 900; color: #2E657E; line-height: 1.3; word-break: break-word;">${titleText}</h3>
+          </div>
+          ${centerSubHtml ? `<div style="margin-top: 4px; font-weight: 800; color: #816105; font-size: 0.78rem; white-space: nowrap;">${centerSubHtml}</div>` : ""}
+        </td>
+        <td style="width: 130px; text-align: left; padding-left: 10px; vertical-align: middle;">
+          ${
+            leftSubText
+              ? `<div style="font-weight:800; color:#816105; font-size:0.78rem; white-space: normal; word-wrap: break-word; overflow-wrap: break-word;">${leftSubText}</div>`
+              : `<div style="font-weight:800; color:#816105; font-size:0.78rem;">${dateDisplay}<br>${timeDisplay}</div>`
+          }
+        </td>
+      </tr>
+    </table>
   `;
 
   const footer = `
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px solid #ebd99f; padding-top: 1rem; margin-top: 1.2rem; font-size: 0.9rem; page-break-inside: avoid; break-inside: avoid; page-break-before: avoid; break-before: avoid;">
-      <div style="text-align: right;">
-        <strong style="color: #0a5c71;">المنصّة الإلكترونيّة للمَجْمَع القرآنيّ</strong>
-      </div>
-      <div style="text-align: center;">
-        <div style="font-weight: 800; color: #6b4226;">مدير المَجْمَع القرآنيّ</div>
-        <div style="font-weight: 900; color: #0a5c71;">أحمد بن عبدالله آل مهدي</div>
-      </div>
-    </div>
+    <table style="width: 100%; border-collapse: collapse; border-top: 1.5px solid #C9A227; padding-top: 1rem; margin-top: 1.2rem; font-size: 0.9rem; page-break-inside: avoid; break-inside: avoid; page-break-before: avoid; break-before: avoid;" role="presentation">
+      <tr>
+        <td style="text-align: right; vertical-align: bottom;">
+          <strong style="color: #2E657E;">المنصّة الإلكترونيّة للمَجْمَع القرآنيّ</strong>
+        </td>
+        <td style="text-align: center; vertical-align: bottom;">
+          <div style="font-weight: 800; color: #816105;">مدير المَجْمَع القرآنيّ</div>
+          <div style="font-weight: 900; color: #2E657E;">أحمد بن عبدالله آل مهدي</div>
+        </td>
+      </tr>
+    </table>
   `;
 
   return { header, footer };
@@ -396,8 +406,9 @@ window.printTableElement = function (tableId, title) {
           table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
           thead { display: table-header-group !important; }
           tbody tr { page-break-inside: avoid !important; break-inside: avoid !important; }
-          th, td { border: 1px solid #cbd5e1; padding: 5px 4px; text-align: center; word-wrap: break-word; overflow-wrap: break-word; }
-          th { background-color: #0a5c71; color: #ffffff; font-weight: bold; }
+          th, td { border: 1px solid #2E657E; padding: 5px 4px; text-align: center; word-wrap: break-word; overflow-wrap: break-word; }
+          th { background-color: #2E657E; color: #ffffff; font-weight: bold; }
+          tbody tr:nth-child(even) { background-color: #DDECF3; }
           .no-print, button { display: none !important; }
         </style>
       </head>
@@ -491,12 +502,26 @@ window.generateMultiPagePDF = async function (
   const scaleMmPerPx = usableWidthMm / contentWidthPx;
   const usableHeightPx = usableHeightMm / scaleMmPerPx;
 
+  // html2canvas (المرفق ضمن html2pdf) لا يلتقط أي محتوى لعنصر مموضع خارج نافذة
+  // العرض الفعلية (سواء position: fixed أو absolute بإزاحة كبيرة) - ينتج عنه صفحة
+  // PDF بيضاء تماماً رغم عدم وجود أي خطأ برمجي ظاهر. الحل: تثبيت العنصر عند
+  // (0,0) ضمن نافذة العرض الفعلية، وإخفاؤه بصرياً عن المستخدم بواسطة z-index سالب
+  // بدل دفعه بعيداً خارج الشاشة.
   const makeWrapper = () => {
     const w = document.createElement("div");
+    w.className = "pdf-export-page-wrapper";
     w.style.cssText =
-      "position: fixed; top: -99999px; left: -99999px; background:#fff; padding: 1.2rem; width: 1200px; font-family: 'Cairo','Tajawal',sans-serif;";
+      "position: absolute; top: 0; left: 0; z-index: -1; background:#fff; padding: 1.2rem; width: 1200px; font-family: 'Cairo','Tajawal',sans-serif;";
     return w;
   };
+
+  // يعيد بناء الجدول داخل الحاوية المؤقتة بدون id="report-results-table" الأصلي، لذا
+  // تُفرض ألوان الهوية الرسمية هنا صراحةً بدل الاعتماد على تنسيق .data-table العام
+  // (الذي لا يزال يستخدم لون الواجهة القديم) حتى لا يظهر PDF بلون مختلف عن الشاشة
+  const pdfBrandStyleTag = `<style>
+    .pdf-export-page-wrapper thead th { background-color: #2E657E !important; color: #ffffff !important; border-bottom-color: #C9A227 !important; }
+    .pdf-export-page-wrapper tbody tr:nth-child(even) { background-color: #DDECF3 !important; }
+  </style>`;
 
   const measureWrapper = makeWrapper();
   document.body.appendChild(measureWrapper);
@@ -536,6 +561,7 @@ window.generateMultiPagePDF = async function (
     const pageWrapper = makeWrapper();
     const rowsHtml = pageChunks[pageIdx].map((r) => r.outerHTML).join("");
     pageWrapper.innerHTML =
+      pdfBrandStyleTag +
       chromeHeader +
       `<div class="table-responsive" style="margin-bottom: 0.8rem;"><table class="${tableClassAttr}" style="${tableStyleAttr}"><thead>${theadHtml}</thead><tbody>${rowsHtml}</tbody></table></div>` +
       (isLastPage ? chromeFooter : "");
@@ -2993,19 +3019,30 @@ window.renderAttendanceTable = function () {
     const effectiveStatus = record.status || "";
     const isLockedForTeacher = isTeacher && effectiveStatus !== "";
 
-    const selectOptionsHtml = isTeacher
-      ? `
+    let selectOptionsHtml;
+    if (isTeacher) {
+      selectOptionsHtml = `
       <option value="" ${effectiveStatus === "" ? "selected" : ""}>— غير محدد —</option>
       <option value="present" ${effectiveStatus === "present" ? "selected" : ""}>🟢 حاضر</option>
       <option value="absent" ${effectiveStatus === "absent" ? "selected" : ""}>🔴 غائب</option>
-    `
-      : `
+    `;
+      // المعلم مقيَّد باختيار 3 حالات فقط، لكن لو كانت الحالة الفعلية محدَّدة من
+      // المدير بقيمة خارج هذه الثلاث (متأخر/مستأذن) يجب أن تظهر له كما هي فعلاً
+      // بدل أن يظهر السجل وكأنه "غير محدد" لعدم وجود خيار مطابق يُحدَّد تلقائياً
+      if (effectiveStatus === "late") {
+        selectOptionsHtml += `<option value="late" selected>🟡 متأخر</option>`;
+      } else if (effectiveStatus === "excused") {
+        selectOptionsHtml += `<option value="excused" selected>🔵 مستأذن</option>`;
+      }
+    } else {
+      selectOptionsHtml = `
       <option value="" ${effectiveStatus === "" ? "selected" : ""}>— غير محدد —</option>
       <option value="present" ${effectiveStatus === "present" ? "selected" : ""}>🟢 حاضر</option>
       <option value="late" ${effectiveStatus === "late" ? "selected" : ""}>🟡 متأخر</option>
       <option value="absent" ${effectiveStatus === "absent" ? "selected" : ""}>🔴 غائب</option>
       <option value="excused" ${effectiveStatus === "excused" ? "selected" : ""}>🔵 مستأذن</option>
     `;
+    }
 
     html += `
       <tr>

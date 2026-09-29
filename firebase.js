@@ -223,7 +223,10 @@ function migrateAllPasswordsRoleBased() {
   if (Array.isArray(window.appStore.users)) {
     window.appStore.users.forEach((user) => {
       if (user.role === SAFE_ROLES.STUDENT || user.role === "student") {
-        if (user.pass !== "1111") {
+        // يُعبّى الرقم السري الافتراضي فقط إن كان مفقوداً أصلاً - وليس كلما كان
+        // مختلفاً عن "1111"، لأن الشرط السابق كان يُرجع أي رقم سري خاص يضبطه
+        // المدير يدوياً من "إدارة الحسابات" إلى الافتراضي بصمت في أول مزامنة تالية
+        if (!user.pass || user.pass === "") {
           user.pass = "1111";
           hasChanges = true;
           if (typeof saveToCloud === "function") {
@@ -464,8 +467,13 @@ async function syncAndPurgeDataFromCloud() {
     migrateAllPasswordsRoleBased();
     saveLocalStore();
     localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
+    // تمرير الشاشة الظاهرة فعلياً حتى تُعاد كتابتها ببيانات المزامنة الجديدة (حذف
+    // طالب من قبل المدير، تغيير حالة تحضير...) - بدون تمرير المعرّف هنا لا تُنفَّذ
+    // أي دالة عرض خاصة بالشاشة (كل شروط "if (viewId === ...)" في refreshActiveView
+    // تبقى معطَّلة)، فتبقى الشاشة المفتوحة بالبيانات القديمة حتى يُعاد تحميل الصفحة
     if (typeof refreshActiveView === "function") {
-      refreshActiveView();
+      const activeViewId = document.querySelector(".content-view.active")?.id;
+      refreshActiveView(activeViewId);
     }
   } catch (err) {
     console.warn(

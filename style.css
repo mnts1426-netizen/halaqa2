@@ -1444,8 +1444,8 @@ body {
 
   /* الإطار الملكي المزدوج المطابق للـ PDF */
   #report-results-wrapper > div {
-    border: 2.5px double #0a5c71 !important;
-    border-top: 4px solid #c59b27 !important;
+    border: 2.5px double #2E657E !important;
+    border-top: 4px solid #C9A227 !important;
     border-radius: 4px !important;
     padding: 6mm 8mm !important;
     background: #ffffff !important;
@@ -1457,7 +1457,7 @@ body {
   #report-results-table {
     width: 100% !important;
     border-collapse: collapse !important;
-    border: 1.5px solid #0a5c71 !important;
+    border: 1.5px solid #2E657E !important;
     font-size: 10pt !important;
     margin-bottom: 6px !important;
   }
@@ -1471,11 +1471,15 @@ body {
     break-inside: avoid !important;
   }
 
+  #report-results-table tbody tr:nth-child(even) {
+    background-color: #DDECF3 !important;
+  }
+
   #report-results-table th {
-    background-color: #0a5c71 !important;
+    background-color: #2E657E !important;
     color: #ffffff !important;
-    border: 1px solid #cbd5e1 !important;
-    border-bottom: 2.5px solid #c59b27 !important;
+    border: 1px solid #2E657E !important;
+    border-bottom: 2.5px solid #C9A227 !important;
     text-align: center !important;
     font-weight: 800 !important;
     padding: 6px 4px !important;
@@ -1484,7 +1488,7 @@ body {
   }
 
   #report-results-table td {
-    border: 1px solid #cbd5e1 !important;
+    border: 1px solid #2E657E !important;
     padding: 5px 3px !important;
     color: #000000 !important;
     text-align: center !important;
@@ -1500,8 +1504,8 @@ body {
   /* تثبيت تذييل التقرير واسم المدير (صالح ال ناشع) في نفس الصفحة الأخيرة ومنع انفصاله في صفحة مستقلة عند الطباعة عبر الجوال */
   .report-footer-pdf,
   .report-footer-print,
-  [style*="border-top: 1.5px solid #ebd99f"],
-  [style*="border-top: 2px solid #ebd99f"] {
+  [style*="border-top: 1.5px solid #C9A227"],
+  [style*="border-top: 2px solid #C9A227"] {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     page-break-inside: avoid !important;
