@@ -1777,15 +1777,15 @@ function renderStudentData() {
       </div>
       <div class="card-body p-2">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem;">
-          <div style="background: #ffffff; padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+          <div style="background: var(--bg-card); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
             <strong style="color: var(--accent-gold-dark); font-size: 0.88rem;">📖 حفظ الغد:</strong>
             <p style="margin-top: 4px; font-weight: 800; font-size: 1rem; color: #222;">${tomorrowHifz}</p>
           </div>
-          <div style="background: #ffffff; padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+          <div style="background: var(--bg-card); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
             <strong style="color: var(--accent-gold-dark); font-size: 0.88rem;">🔄 مراجعة الغد:</strong>
             <p style="margin-top: 4px; font-weight: 800; font-size: 1rem; color: #222;">${tomorrowMurajaa}</p>
           </div>
-          <div style="background: #ffffff; padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
+          <div style="background: var(--bg-card); padding: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color);">
             <strong style="color: var(--accent-gold-dark); font-size: 0.88rem;">🎧 تلاوة الغد:</strong>
             <p style="margin-top: 4px; font-weight: 800; font-size: 1rem; color: #222;">${tomorrowTilawa}</p>
           </div>
@@ -1915,7 +1915,6 @@ function updateCircleDropdowns() {
     "tasmeea-circle-select",
     "kashf-circle-select",
     "report-circle-select",
-    "test-circle-select",
     "edit-comp-circle",
     "bulk-target-circle",
     "filter-teacher-notes-circle",
@@ -1980,6 +1979,17 @@ function refreshAllViews() {
 
 function refreshActiveView(viewId) {
   try {
+    if (
+      window.previewAppThemeValue &&
+      viewId !== "view-settings" &&
+      typeof applyAppTheme === "function"
+    ) {
+      window.previewAppThemeValue = null;
+      applyAppTheme(window.savedAppTheme || "classic", false);
+    }
+    if (viewId === "view-settings" && typeof renderThemePicker === "function")
+      renderThemePicker();
+
     updateCircleDropdowns();
     applyAppIdentity();
     syncHeaderDateTime();

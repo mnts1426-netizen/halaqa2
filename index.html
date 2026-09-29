@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&family=Amiri:wght@400;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Aref+Ruqaa:wght@400;700&display=swap"
       rel="stylesheet"
     />
     <!-- مكتبة الخرائط التفاعلية Leaflet -->
@@ -40,6 +40,15 @@
     ></script>
     <!-- ملف التنسيقات -->
     <link rel="stylesheet" href="style.css" />
+    <!-- تطبيق هوية المنصة المحفوظة قبل رسم الصفحة (تفادياً لوميض الهوية الافتراضية) -->
+    <script>
+      try {
+        var savedAppTheme = localStorage.getItem("HALAQAT_APP_THEME");
+        if (["islamic", "modern", "heritage"].indexOf(savedAppTheme) !== -1) {
+          document.documentElement.setAttribute("data-app-theme", savedAppTheme);
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <!-- ========================================== -->
@@ -502,9 +511,9 @@
             style="
               flex-wrap: wrap;
               gap: 0.8rem;
-              background: #ffffff;
+              background: var(--bg-card);
               padding: 0.75rem 1rem;
-              border-radius: 8px;
+              border-radius: var(--radius-sm);
               border: 1px solid var(--border-color);
             "
           >
@@ -1583,7 +1592,10 @@
         <!-- 7. شاشة الاختبارات -->
         <section id="view-tests" class="content-view">
           <div class="flex-between mb-3 no-print">
-            <div class="flex-align-gap">
+            <div class="flex-align-gap" style="flex-wrap: wrap">
+              <button class="btn btn-primary" onclick="generateTestsReport()">
+                📋 استخراج تقرير
+              </button>
               <button
                 class="btn btn-outline-brown"
                 onclick="exportTestsExcel()"
@@ -1607,7 +1619,7 @@
                 type="text"
                 id="search-tests"
                 class="form-control search-input"
-                placeholder="ابحث باسم الطالب أو نوع الاختبار..."
+                placeholder="ابحث باسم الطالب أو الحلقة أو المرحلية..."
                 oninput="renderTestsTable()"
               />
               <select
@@ -1624,9 +1636,10 @@
                   <tr>
                     <th>اسم الطالب</th>
                     <th>الحلقة</th>
-                    <th>نوع الاختبار / المقرر</th>
+                    <th>المرحلية</th>
                     <th>الدرجة</th>
                     <th>التقدير</th>
+                    <th>الجائزة</th>
                     <th>التاريخ</th>
                     <th class="no-print">إجراءات</th>
                   </tr>
@@ -1635,6 +1648,11 @@
               </table>
             </div>
           </div>
+          <div
+            class="card mt-3"
+            id="tests-report-wrapper"
+            style="display: none"
+          ></div>
         </section>
 
         <!-- 8. شاشة التقارير الرسمية (محدثة بالنماذج الأربعة المعتمدة من الـ PDF) -->
@@ -2256,6 +2274,98 @@
 
         <!-- 11. شاشة الإعدادات -->
         <section id="view-settings" class="content-view">
+          <div class="card nav-admin-only" id="admin-theme-card">
+            <div class="card-header">
+              <h3>🎨 هوية المنصة</h3>
+              <p class="theme-card-hint">
+                اختر هوية لمعاينتها على جهازك فوراً، ثم اضغط "حفظ" لتطبيقها على
+                جميع المستخدمين. التقارير المطبوعة تبقى بهويتها الرسمية.
+              </p>
+            </div>
+            <div class="theme-choices">
+              <label class="theme-choice" for="theme-choice-classic">
+                <input
+                  type="radio"
+                  name="app-theme-choice"
+                  id="theme-choice-classic"
+                  value="classic"
+                  onchange="previewAppTheme(this.value)"
+                />
+                <span class="theme-swatches"
+                  ><i style="background: #ffffff"></i
+                  ><i style="background: #0a5c71"></i
+                  ><i style="background: #c59b27"></i
+                ></span>
+                <span class="theme-choice-text"
+                  ><b>الهوية الحالية</b
+                  ><small>قائمة بيضاء بالتركوازي والذهبي</small></span
+                >
+              </label>
+              <label class="theme-choice" for="theme-choice-islamic">
+                <input
+                  type="radio"
+                  name="app-theme-choice"
+                  id="theme-choice-islamic"
+                  value="islamic"
+                  onchange="previewAppTheme(this.value)"
+                />
+                <span class="theme-swatches"
+                  ><i style="background: #0b4541"></i
+                  ><i style="background: #b8913a"></i
+                  ><i style="background: #f1f2ea"></i
+                ></span>
+                <span class="theme-choice-text"
+                  ><b>إسلامي راقٍ</b
+                  ><small>نقش هندسي وحدود ذهبية</small></span
+                >
+              </label>
+              <label class="theme-choice" for="theme-choice-modern">
+                <input
+                  type="radio"
+                  name="app-theme-choice"
+                  id="theme-choice-modern"
+                  value="modern"
+                  onchange="previewAppTheme(this.value)"
+                />
+                <span class="theme-swatches"
+                  ><i style="background: #ffffff"></i
+                  ><i style="background: #0b6e77"></i
+                  ><i style="background: #f3f5f6"></i
+                ></span>
+                <span class="theme-choice-text"
+                  ><b>عصري نظيف</b><small>بسيط وواضح بلا زخارف</small></span
+                >
+              </label>
+              <label class="theme-choice" for="theme-choice-heritage">
+                <input
+                  type="radio"
+                  name="app-theme-choice"
+                  id="theme-choice-heritage"
+                  value="heritage"
+                  onchange="previewAppTheme(this.value)"
+                />
+                <span class="theme-swatches"
+                  ><i style="background: #3c291b"></i
+                  ><i style="background: #b8913a"></i
+                  ><i style="background: #ece0c7"></i
+                ></span>
+                <span class="theme-choice-text"
+                  ><b>دافئ تراثي</b
+                  ><small>ورق عتيق وإطارات مزدوجة</small></span
+                >
+              </label>
+            </div>
+            <div class="theme-actions">
+              <button
+                type="button"
+                class="btn btn-primary"
+                onclick="saveAppTheme()"
+              >
+                💾 حفظ الهوية لجميع المستخدمين
+              </button>
+              <span id="app-theme-status" class="theme-card-hint"></span>
+            </div>
+          </div>
           <div class="dashboard-columns">
             <div class="card nav-admin-only" id="admin-org-settings-card">
               <h3 style="color: var(--primary-brown); font-weight: 800">
@@ -2721,30 +2831,31 @@
         <form id="form-add-test" onsubmit="handleSaveTest(event)">
           <div class="modal-body">
             <div class="form-group">
-              <label>الحلقة</label>
-              <select
-                id="test-circle-select"
-                class="form-control"
-                onchange="populateTestStudentsDropdown()"
-                required
-              >
-                <option value="">— اختر الحلقة —</option>
-              </select>
-            </div>
-            <div class="form-group">
               <label>الطالب</label>
-              <select id="test-student-select" class="form-control" required>
-                <option value="">— اختر الطالب —</option>
-              </select>
+              <input
+                type="text"
+                id="test-student-filter"
+                class="form-control"
+                placeholder="🔍 اكتب اسم الطالب أو اسم الحلقة..."
+                oninput="populateTestStudentsDropdown()"
+                autocomplete="off"
+                style="margin-bottom: 0.4rem"
+              />
+              <select
+                id="test-student-select"
+                class="form-control"
+                size="7"
+                required
+              ></select>
             </div>
             <div class="form-row">
               <div class="form-group flex-1">
-                <label>نوع الاختبار / المقرر</label>
+                <label>المرحلية</label>
                 <input
                   type="text"
                   id="test-type"
                   class="form-control"
-                  placeholder="مثال: اختبار جزء عم..."
+                  placeholder="مثال: المرحلية الأولى..."
                   required
                 />
               </div>
@@ -2771,6 +2882,15 @@
                 <option value="جيد">جيد</option>
                 <option value="ضعيف">ضعيف</option>
               </select>
+            </div>
+            <div class="form-group">
+              <label>الجائزة (اختياري)</label>
+              <input
+                type="text"
+                id="test-prize"
+                class="form-control"
+                placeholder="مثال: شهادة تقدير، جائزة نقدية..."
+              />
             </div>
           </div>
           <div class="modal-footer">
@@ -3848,7 +3968,7 @@
                 <div
                   style="
                     margin-top: 1rem;
-                    background: #fff;
+                    background: var(--bg-card);
                     padding: 0.75rem;
                     border-radius: 4px;
                     border: 1px solid var(--border-color);

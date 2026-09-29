@@ -70,7 +70,7 @@ function maybeShowTasmeeaAttendanceReminderModal() {
   modal.style.cssText =
     "position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; z-index: 99998;";
   modal.innerHTML = `
-    <div style="background: #fff; border-radius: 12px; padding: 1.5rem; max-width: 340px; width: 90%; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.25);">
+    <div style="background: var(--bg-card); border-radius: 12px; padding: 1.5rem; max-width: 340px; width: 90%; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.25);">
       <div style="font-size: 2rem; margin-bottom: 0.5rem;">⏰</div>
       <h3 style="margin: 0 0 0.5rem; font-weight: 800; color: var(--primary-brown);">تذكير بتحضير الطلاب</h3>
       <p class="text-muted" style="margin-bottom: 1.2rem;">لا تنسَ تحضير جميع طلاب حلقتك لهذا اليوم.</p>
@@ -489,7 +489,7 @@ function buildStudentAccordionCard(
       const selected = currentVal === r ? "selected" : "";
       opts += `<option value="${r}" ${selected}>${r}</option>`;
     });
-    return `<select class="form-control" name="${name}" style="font-weight: 700; background: #fff;">${opts}</select>`;
+    return `<select class="form-control" name="${name}" style="font-weight: 700; background: var(--bg-card);">${opts}</select>`;
   };
 
   const isSaved = Boolean(record.id);
@@ -549,7 +549,7 @@ function buildStudentAccordionCard(
     <div class="card mb-3" style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;" id="tasmeea-card-${student.id}">
       
       <!-- شريط الطالب الرئيسي -->
-      <div class="card-header flex-between p-3" style="background: #faf8f5; cursor: pointer;" onclick="toggleTasmeeaAccordion('${student.id}')">
+      <div class="card-header flex-between p-3" style="background: var(--bg-soft-panel); cursor: pointer;" onclick="toggleTasmeeaAccordion('${student.id}')">
         <div class="flex-align-gap" style="flex: 1;">
           <span class="avatar-sm" style="background: var(--primary-brown); color:#fff; border-radius:50%; width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.85rem;">
             ${index}
@@ -577,12 +577,12 @@ function buildStudentAccordionCard(
       </div>
 
       <!-- تفاصيل التسميع وتعديل المقررات المتاحة للمدير والمعلم -->
-      <div id="tasmeea-details-${student.id}" style="display: none; padding: 1.25rem; border-top: 1px solid var(--border-color); background: #ffffff;">
+      <div id="tasmeea-details-${student.id}" style="display: none; padding: 1.25rem; border-top: 1px solid var(--border-color); background: var(--bg-card);">
         <form onsubmit="saveStudentTasmeea(event, '${student.id}')">
           <div class="tasmeea-sections-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
             
             <!-- 1. الدرس الجديد -->
-            <div class="tasmeea-section-box p-3" style="background: #faf8f5; border: 1px solid var(--border-color); border-radius: 8px;">
+            <div class="tasmeea-section-box p-3" style="background: var(--bg-soft-panel); border: 1px solid var(--border-color); border-radius: 8px;">
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">📖 الدرس الجديد</h4>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">مقرر اليوم</label>
@@ -601,7 +601,7 @@ function buildStudentAccordionCard(
             </div>
 
             <!-- 2. المراجعة -->
-            <div class="tasmeea-section-box p-3" style="background: #faf8f5; border: 1px solid var(--border-color); border-radius: 8px;">
+            <div class="tasmeea-section-box p-3" style="background: var(--bg-soft-panel); border: 1px solid var(--border-color); border-radius: 8px;">
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">🔄 المراجعة</h4>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">مقرر اليوم</label>
@@ -620,7 +620,7 @@ function buildStudentAccordionCard(
             </div>
 
             <!-- 3. التلاوة -->
-            <div class="tasmeea-section-box p-3" style="background: #faf8f5; border: 1px solid var(--border-color); border-radius: 8px;">
+            <div class="tasmeea-section-box p-3" style="background: var(--bg-soft-panel); border: 1px solid var(--border-color); border-radius: 8px;">
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">🎧 التلاوة</h4>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">مقرر اليوم</label>

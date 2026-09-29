@@ -187,6 +187,56 @@ function loadInitialData() {
   if (isFirebaseOnline && dbFirestore) {
     syncAndPurgeDataFromCloud();
     watchForAppUpdates();
+    watchAppTheme();
+  }
+}
+
+// هوية المنصة (يختارها المدير من الإعدادات): classic = الهوية الحالية بلا تغيير.
+// تُحفظ في مستند مستقل (meta/appTheme) وتصل لكل الأجهزة المفتوحة فوراً عند الحفظ
+const APP_THEMES = ["classic", "islamic", "modern", "heritage"];
+const APP_THEME_STORAGE_KEY = "HALAQAT_APP_THEME";
+window.savedAppTheme = "classic";
+
+window.applyAppTheme = function (theme, persist = true) {
+  const t = APP_THEMES.includes(theme) ? theme : "classic";
+  if (t === "classic") {
+    document.documentElement.removeAttribute("data-app-theme");
+  } else {
+    document.documentElement.setAttribute("data-app-theme", t);
+  }
+  if (persist) {
+    window.savedAppTheme = t;
+    try {
+      localStorage.setItem(APP_THEME_STORAGE_KEY, t);
+    } catch (e) {}
+  }
+  return t;
+};
+
+try {
+  const cachedTheme = localStorage.getItem(APP_THEME_STORAGE_KEY);
+  if (APP_THEMES.includes(cachedTheme)) window.savedAppTheme = cachedTheme;
+} catch (e) {}
+
+function watchAppTheme() {
+  if (!dbFirestore) return;
+  try {
+    dbFirestore
+      .collection("meta")
+      .doc("appTheme")
+      .onSnapshot(
+        (doc) => {
+          const theme = doc.exists ? doc.data().theme : "classic";
+          window.previewAppThemeValue = null;
+          applyAppTheme(theme);
+          if (typeof renderThemePicker === "function") renderThemePicker();
+        },
+        (error) => {
+          console.warn("تنبيه أثناء قراءة هوية المنصة:", error);
+        },
+      );
+  } catch (err) {
+    console.warn("خطأ في تفعيل متابعة هوية المنصة:", err);
   }
 }
 

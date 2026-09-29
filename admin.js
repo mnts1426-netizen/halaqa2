@@ -634,7 +634,8 @@ window.printAccountsTable = function () {
 };
 
 window.printTestsTable = function () {
-  printTableElement("tests-table-element", "سجل الاختبارات والنتائج");
+  if (!generateTestsReport()) return;
+  printTableElement("tests-report-table", "سجل الاختبارات والنتائج");
 };
 
 window.printTeacherNotes = function () {
@@ -738,7 +739,7 @@ window.exportAccountsPDF = function () {
 };
 
 window.exportTestsExcel = function () {
-  const table = document.getElementById("tests-table-element");
+  const table = generateTestsReport();
   if (!table) return;
   if (typeof XLSX === "undefined") {
     alert("⚠️ مكتبة Excel غير متوفرة!");
@@ -752,8 +753,9 @@ window.exportTestsExcel = function () {
 };
 
 window.exportTestsPDF = function () {
+  if (!generateTestsReport()) return;
   directDownloadPDF(
-    "tests-table-element",
+    "tests-report-table",
     "سجل_الاختبارات",
     "سجل الاختبارات والنتائج",
   );
@@ -1230,7 +1232,7 @@ window.renderCirclesCards = function () {
     );
 
     html += `
-      <div class="circle-card" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 10px; padding: 1.25rem;">
+      <div class="circle-card" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 1.25rem;">
         <div class="circle-header flex-between mb-2">
           <div class="circle-title">
             <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--primary-brown); margin-bottom: 2px;">${escapeHtml(circle.name)}</h3>
@@ -1239,7 +1241,7 @@ window.renderCirclesCards = function () {
           <span class="badge badge-active">${circle.status || "نشطة"}</span>
         </div>
 
-        <div class="circle-stats-row flex-between p-2 mb-2" style="background: #faf8f5; border-radius: 6px;">
+        <div class="circle-stats-row flex-between p-2 mb-2" style="background: var(--bg-soft-panel); border-radius: 6px;">
           <div>
             <div style="font-size: 1.1rem; font-weight: 800; color: var(--primary-brown);">${circleStudents.length}</div>
             <div style="font-size: 0.75rem; color: #666;">عدد الطلاب</div>
@@ -2554,7 +2556,7 @@ window.renderExcelColumnMappingInputs = function () {
 
   container.innerHTML = STANDARD_7_COLUMNS.map(
     (col) => `
-    <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; font-size: 0.85rem;">
+    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem; font-size: 0.85rem;">
       <strong style="color: var(--primary-brown);">${col.label}</strong>
     </div>
   `,
@@ -3461,52 +3463,78 @@ window.renderTeacherNotesTable = function () {
 };
 
 // الاختبارات
-window.renderTestsTable = function () {
-  const tbody = document.getElementById("tests-table-body");
-  if (!tbody) return;
-
+// قائمة الاختبارات بعد تطبيق البحث (اسم الطالب/الحلقة/المرحلية/الجائزة) وفلتر
+// الحلقة، مرتبة أبجدياً باسم الطالب - مشتركة بين الجدول والتقرير المستخرج
+function getFilteredSortedTests() {
   const searchVal = (document.getElementById("search-tests")?.value || "")
     .trim()
     .toLowerCase();
   const circleFilter =
     document.getElementById("filter-test-circle")?.value || "all";
+  const students = window.appStore?.students || [];
+  const circles = window.appStore?.circles || [];
 
-  const tests = window.appStore?.tests || [];
-  const filtered = tests.filter((t) => {
-    const student = (window.appStore?.students || []).find(
-      (s) => s.id === t.studentId,
+  return (window.appStore?.tests || [])
+    .map((t) => {
+      const student = students.find((s) => s.id === t.studentId);
+      const circle = circles.find((c) => c.id === t.circleId);
+      return {
+        test: t,
+        studentName: student ? student.name : "طالب",
+        circleName: circle ? circle.name : "—",
+      };
+    })
+    .filter(({ test, studentName, circleName }) => {
+      const matchesCircle =
+        circleFilter === "all" || test.circleId === circleFilter;
+      if (!matchesCircle) return false;
+      if (!searchVal) return true;
+      return [studentName, circleName, test.type, test.prize].some(
+        (v) => v && String(v).toLowerCase().includes(searchVal),
+      );
+    })
+    .sort(
+      (a, b) =>
+        a.studentName.localeCompare(b.studentName, "ar") ||
+        (a.test.date || "").localeCompare(b.test.date || ""),
     );
-    const matchesSearch =
-      (student && student.name.toLowerCase().includes(searchVal)) ||
-      (t.type && t.type.toLowerCase().includes(searchVal));
-    const matchesCircle = circleFilter === "all" || t.circleId === circleFilter;
-    return matchesSearch && matchesCircle;
-  });
+}
 
-  if (filtered.length === 0) {
-    tbody.innerHTML =
-      '<tr><td colspan="7" class="text-center text-muted p-4">لا توجد اختبارات مسجلة</td></tr>';
-    return;
+window.renderTestsTable = function () {
+  const tbody = document.getElementById("tests-table-body");
+  if (!tbody) return;
+
+  const circleFilterSelect = document.getElementById("filter-test-circle");
+  if (circleFilterSelect) {
+    const currentVal = circleFilterSelect.value || "all";
+    let opts = '<option value="all">كل الحلقات</option>';
+    (window.appStore?.circles || []).forEach((c) => {
+      opts += `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`;
+    });
+    circleFilterSelect.innerHTML = opts;
+    circleFilterSelect.value = (window.appStore?.circles || []).some(
+      (c) => c.id === currentVal,
+    )
+      ? currentVal
+      : "all";
   }
 
-  let html = "";
-  filtered.forEach((t) => {
-    const student = (window.appStore?.students || []).find(
-      (s) => s.id === t.studentId,
-    );
-    const circle = (window.appStore?.circles || []).find(
-      (c) => c.id === t.circleId,
-    );
+  const rows = getFilteredSortedTests();
 
+  let html = rows.length
+    ? ""
+    : '<tr><td colspan="8" class="text-center text-muted p-4">لا توجد اختبارات مسجلة</td></tr>';
+  rows.forEach(({ test: t, studentName, circleName }) => {
     html += `
       <tr>
-        <td style="font-weight: 700;">${student ? student.name : "طالب"}</td>
-        <td><span style="font-weight: 600; color: var(--text-dark);">${circle ? circle.name : "—"}</span></td>
-        <td>${t.type || "—"}</td>
-        <td style="font-weight: 700; color: var(--primary-brown);">${t.score || "0"} / 100</td>
-        <td><span class="badge badge-active">${t.rating || "—"}</span></td>
-        <td>${t.date || "—"}</td>
-        <td>
+        <td style="font-weight: 700;">${escapeHtml(studentName)}</td>
+        <td><span style="font-weight: 600; color: var(--text-dark);">${escapeHtml(circleName)}</span></td>
+        <td>${escapeHtml(t.type) || "—"}</td>
+        <td style="font-weight: 700; color: var(--primary-brown);">${escapeHtml(t.score) || "0"} / 100</td>
+        <td><span class="badge badge-active">${escapeHtml(t.rating) || "—"}</span></td>
+        <td>${escapeHtml(t.prize) || "—"}</td>
+        <td>${escapeHtml(t.date) || "—"}</td>
+        <td class="no-print">
           <button class="btn btn-danger btn-sm" onclick="deleteTest('${t.id}')">حذف</button>
         </td>
       </tr>
@@ -3514,24 +3542,94 @@ window.renderTestsTable = function () {
   });
 
   tbody.innerHTML = html;
+
+  const reportWrapper = document.getElementById("tests-report-wrapper");
+  if (reportWrapper && reportWrapper.style.display !== "none") {
+    generateTestsReport();
+  }
+};
+
+// استخراج تقرير الاختبارات: جدول نظيف (بدون عمود الإجراءات أو أي أزرار)
+// بترويسة وتذييل الطباعة الرسمية - هو وحده ما يُطبع أو يُصدَّر
+window.generateTestsReport = function () {
+  const wrapper = document.getElementById("tests-report-wrapper");
+  if (!wrapper) return null;
+
+  const rows = getFilteredSortedTests();
+  const cell = "padding: 8px; border: 1px solid #2E657E; text-align: center;";
+  const head = "padding: 10px 8px; border: 1px solid #2E657E; text-align: center;";
+
+  let bodyHtml = "";
+  if (rows.length === 0) {
+    bodyHtml =
+      '<tr><td colspan="8" style="padding: 16px; text-align: center;">لا توجد اختبارات مطابقة</td></tr>';
+  } else {
+    rows.forEach(({ test: t, studentName, circleName }, idx) => {
+      bodyHtml += `
+        <tr>
+          <td style="${cell}">${idx + 1}</td>
+          <td style="${cell} font-weight: 800; text-align: right; white-space: nowrap;">${escapeHtml(studentName)}</td>
+          <td style="${cell}">${escapeHtml(circleName)}</td>
+          <td style="${cell}">${escapeHtml(t.type) || "—"}</td>
+          <td style="${cell} font-weight: 700;">${escapeHtml(t.score) || "0"} / 100</td>
+          <td style="${cell}">${escapeHtml(t.rating) || "—"}</td>
+          <td style="${cell}">${escapeHtml(t.prize) || "—"}</td>
+          <td style="${cell}">${escapeHtml(t.date) || "—"}</td>
+        </tr>
+      `;
+    });
+  }
+
+  const circleFilter =
+    document.getElementById("filter-test-circle")?.value || "all";
+  const circle = (window.appStore?.circles || []).find(
+    (c) => c.id === circleFilter,
+  );
+  const chrome = window.buildOfficialPrintChrome(
+    "سجل الاختبارات والنتائج",
+    circle ? escapeHtml(circle.name) : "كل الحلقات",
+    "",
+    "",
+  );
+
+  wrapper.innerHTML = `
+    <style>
+      #tests-report-table tbody tr:nth-child(even) { background-color: #DDECF3 !important; }
+      #tests-report-table thead th { background-color: #2E657E !important; color: #ffffff !important; border-bottom-color: #C9A227 !important; }
+    </style>
+    <div style="border: 2.5px double #2E657E; border-radius: 8px; padding: 1.5rem; background: #ffffff;">
+      ${chrome.header}
+      <div class="table-responsive" style="margin-bottom: 0.8rem;">
+        <table class="data-table" id="tests-report-table" style="width: 100%; border-collapse: collapse; border: 1.5px solid #2E657E;">
+          <thead>
+            <tr>
+              <th style="${head} width: 40px;">م</th>
+              <th style="${head}">اسم الطالب</th>
+              <th style="${head}">الحلقة</th>
+              <th style="${head}">المرحلية</th>
+              <th style="${head}">الدرجة</th>
+              <th style="${head}">التقدير</th>
+              <th style="${head}">الجائزة</th>
+              <th style="${head}">التاريخ</th>
+            </tr>
+          </thead>
+          <tbody>${bodyHtml}</tbody>
+        </table>
+      </div>
+      ${chrome.footer}
+    </div>
+  `;
+  wrapper.style.display = "block";
+  return document.getElementById("tests-report-table");
 };
 
 window.openModalAddTest = function () {
-  const circleSelect = document.getElementById("test-circle-select");
-  if (circleSelect) {
-    let opts = '<option value="">— اختر الحلقة —</option>';
-    (window.appStore?.circles || []).forEach((c) => {
-      opts += `<option value="${c.id}">${c.name}</option>`;
-    });
-    circleSelect.innerHTML = opts;
-    circleSelect.value = "";
-  }
+  const filterInput = document.getElementById("test-student-filter");
+  if (filterInput) filterInput.value = "";
 
   const stuSelect = document.getElementById("test-student-select");
-  if (stuSelect) {
-    stuSelect.innerHTML = '<option value="">— اختر الطالب —</option>';
-    stuSelect.value = "";
-  }
+  if (stuSelect) stuSelect.value = "";
+  populateTestStudentsDropdown();
 
   const typeInput = document.getElementById("test-type");
   if (typeInput) typeInput.value = "";
@@ -3542,49 +3640,81 @@ window.openModalAddTest = function () {
   const ratingSelect = document.getElementById("test-rating");
   if (ratingSelect) ratingSelect.value = "ممتاز";
 
+  const prizeInput = document.getElementById("test-prize");
+  if (prizeInput) prizeInput.value = "";
+
   openModal("modal-add-test");
 };
 
+// كل الطلاب النشطين بلا اشتراط اختيار الحلقة، مرتبين أبجدياً ويظهر بجانب كل
+// اسم حلقته - والبحث يطابق اسم الطالب أو اسم الحلقة
 window.populateTestStudentsDropdown = function () {
-  const circleId = document.getElementById("test-circle-select")?.value;
   const stuSelect = document.getElementById("test-student-select");
   if (!stuSelect) return;
 
-  let opts = '<option value="">— اختر الطالب —</option>';
-  const list = circleId
-    ? (window.appStore?.students || []).filter(
-        (s) => s.circleId === circleId && s.status === "active",
-      )
-    : (window.appStore?.students || []).filter((s) => s.status === "active");
+  const query = (document.getElementById("test-student-filter")?.value || "")
+    .trim()
+    .toLowerCase();
+  const previousVal = stuSelect.value;
+  const circles = window.appStore?.circles || [];
 
-  list.forEach((s) => {
-    opts += `<option value="${s.id}">${s.name}</option>`;
+  const list = (window.appStore?.students || [])
+    .filter((s) => s.status === "active")
+    .map((s) => {
+      const circle = circles.find((c) => c.id === s.circleId);
+      return { student: s, circleName: circle ? circle.name : "بدون حلقة" };
+    })
+    .filter(
+      ({ student, circleName }) =>
+        !query ||
+        (student.name || "").toLowerCase().includes(query) ||
+        circleName.toLowerCase().includes(query),
+    )
+    .sort((a, b) =>
+      (a.student.name || "").localeCompare(b.student.name || "", "ar"),
+    );
+
+  let opts = "";
+  list.forEach(({ student, circleName }) => {
+    opts += `<option value="${escapeHtml(student.id)}">${escapeHtml(student.name)} — ${escapeHtml(circleName)}</option>`;
   });
-  stuSelect.innerHTML = opts;
+  stuSelect.innerHTML =
+    opts || '<option value="" disabled>لا يوجد طالب مطابق</option>';
+
+  if (list.some(({ student }) => student.id === previousVal)) {
+    stuSelect.value = previousVal;
+  } else if (list.length === 1) {
+    stuSelect.value = list[0].student.id;
+  }
 };
 
 window.handleSaveTest = function (e) {
   if (e && e.preventDefault) e.preventDefault();
 
-  const circleId = document.getElementById("test-circle-select")?.value || "";
   const studentId = document.getElementById("test-student-select")?.value || "";
   const type = (document.getElementById("test-type")?.value || "").trim();
   const score = document.getElementById("test-score")?.value || "100";
   const rating = document.getElementById("test-rating")?.value || "ممتاز";
+  const prize = (document.getElementById("test-prize")?.value || "").trim();
 
-  if (!circleId || !studentId || !type) {
-    alert("يرجى اختيار الحلقة، الطالب، ونوع الاختبار.");
+  const student = (window.appStore?.students || []).find(
+    (s) => s.id === studentId,
+  );
+  if (!student || !type) {
+    alert("يرجى اختيار الطالب وكتابة المرحلية.");
     return;
   }
 
+  const now = new Date();
   const newTest = {
     id: "test_" + Date.now(),
-    circleId,
+    circleId: student.circleId || "",
     studentId,
     type,
     score,
     rating,
-    date: new Date().toISOString().split("T")[0],
+    prize,
+    date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
     createdAt: Date.now(),
   };
 
@@ -4104,68 +4234,38 @@ window.renderScreenView = function () {
           .map((t) => t.studentId),
       ).size;
 
-      grid.innerHTML = `
-        <div style="grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.15rem;">
-          <div style="width: 44px; text-align: right; flex-shrink: 0;">
-            <img src="report_logo_right.png" alt="شعار المَجْمَع" style="height: 52px; width: auto; object-fit: contain;" />
-          </div>
-          <div style="text-align: center; flex: 1;">
-            <h2 style="font-size: 1.5rem; font-weight: 900; color: var(--primary-brown); margin: 0;">
-              📊 لوحة الإحصائيات الحية لمَجْمَع عبدالله بن مهدي القرآني
-            </h2>
-            <p class="text-muted" style="font-size: 0.9rem; margin: 2px 0 0 0; line-height: 1.2;">جامع الهدى — تقرير المتابعة والإنجاز لليوم</p>
-          </div>
-          <div style="width: 44px; text-align: left; flex-shrink: 0;">
-            <img src="report_logo_left.png" alt="شعار المَجْمَع" style="height: 52px; width: auto; object-fit: contain;" />
-          </div>
+      const statTile = (tone, icon, label, value) => `
+        <div class="screen-stat-tile ${tone}">
+          <div class="screen-stat-icon">${icon}</div>
+          <div class="screen-stat-value">${value}</div>
+          <div class="screen-stat-label">${label}</div>
         </div>
+      `;
 
-        <div style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem;">
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 1.7rem;">👨‍🎓</div>
-            <div style="text-align: right;">
-              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">إجمالي المسجلين</div>
-              <div style="font-size: 1.5rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${activeStudents.length}</div>
+      grid.innerHTML = `
+        <div class="screen-board">
+          <div class="screen-board-rail"></div>
+          <div class="screen-board-body">
+            <div class="screen-board-header">
+              <img src="report_logo_right.png" alt="شعار المَجْمَع" />
+              <div class="screen-board-title">
+                <h2>إحصائيات اليوم</h2>
+                <p>متابعة الحضور والتسميع في حلقات المَجْمَع لهذا اليوم</p>
+                <p class="screen-board-period">${getHijriFullLabel(now)}</p>
+              </div>
+              <img src="report_logo_left.png" alt="شعار المَجْمَع" />
             </div>
-          </div>
-
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 1.7rem;">🟢</div>
-            <div style="text-align: right;">
-              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">حاضرون اليوم</div>
-              <div style="font-size: 1.5rem; font-weight: 900; color: #2e7d32; line-height: 1;">${presentCount}</div>
+            <div class="screen-stats-grid">
+              ${statTile("teal", "👨‍🎓", "إجمالي الطلاب المسجلين", activeStudents.length)}
+              ${statTile("green", "🟢", "الحاضرون اليوم", presentCount)}
+              ${statTile("red", "🔴", "الغائبون اليوم", absentCount)}
+              ${statTile("brown", "📖", "سمّعوا اليوم", recitedCount)}
+              ${statTile("teal", "🕌", "عدد الحلقات", circlesCount)}
+              ${statTile("brown", "👨‍🏫", "عدد المعلمين", teachersCount)}
             </div>
-          </div>
-
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 1.7rem;">🔴</div>
-            <div style="text-align: right;">
-              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">غياب اليوم</div>
-              <div style="font-size: 1.5rem; font-weight: 900; color: #c62828; line-height: 1;">${absentCount}</div>
-            </div>
-          </div>
-
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 1.7rem;">📖</div>
-            <div style="text-align: right;">
-              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">سمّعوا اليوم</div>
-              <div style="font-size: 1.5rem; font-weight: 900; color: #0b6b7d; line-height: 1;">${recitedCount}</div>
-            </div>
-          </div>
-
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 1.7rem;">🏛️</div>
-            <div style="text-align: right;">
-              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">عدد الحلقات</div>
-              <div style="font-size: 1.5rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${circlesCount}</div>
-            </div>
-          </div>
-
-          <div class="card" style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; border: 1.5px solid var(--border-color); border-radius: 10px; padding: 0.5rem; background: #ffffff; margin-bottom: 0;">
-            <div style="font-size: 1.7rem;">👨‍🏫</div>
-            <div style="text-align: right;">
-              <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">عدد المعلمين</div>
-              <div style="font-size: 1.5rem; font-weight: 900; color: var(--primary-brown); line-height: 1;">${teachersCount}</div>
+            <div class="screen-board-footer">
+              <span style="color: var(--primary-teal);">الشاشة الالكترونية للمَجْمَع</span>
+              <span>إدارة المَجْمَع القرآني</span>
             </div>
           </div>
         </div>
@@ -4538,6 +4638,58 @@ window.confirmMapPickerLocation = function () {
   alert(
     `✅ تم تحديد موقع ونطاق المسجد بنجاح:\nالإحداثيات: ${coords}\nنصف قطر التحضير: ${radius} متراً`,
   );
+};
+
+const APP_THEME_LABELS = {
+  classic: "الهوية الحالية",
+  islamic: "إسلامي راقٍ",
+  modern: "عصري نظيف",
+  heritage: "دافئ تراثي",
+};
+
+window.renderThemePicker = function () {
+  const selected = window.previewAppThemeValue || window.savedAppTheme || "classic";
+  document
+    .querySelectorAll('input[name="app-theme-choice"]')
+    .forEach((r) => (r.checked = r.value === selected));
+
+  const status = document.getElementById("app-theme-status");
+  if (status) {
+    const savedLabel = APP_THEME_LABELS[window.savedAppTheme] || APP_THEME_LABELS.classic;
+    status.textContent = window.previewAppThemeValue
+      ? `معاينة على جهازك فقط — المطبَّقة للجميع الآن: ${savedLabel}`
+      : `المطبَّقة للجميع الآن: ${savedLabel}`;
+  }
+};
+
+// معاينة محلية فقط (لا تُحفظ ولا تصل لغير هذا الجهاز) حتى يضغط المدير "حفظ"
+window.previewAppTheme = function (theme) {
+  window.previewAppThemeValue =
+    theme === (window.savedAppTheme || "classic") ? null : theme;
+  applyAppTheme(theme, false);
+  renderThemePicker();
+};
+
+window.saveAppTheme = async function () {
+  const user = window.currentUser;
+  if (!user || user.role !== "admin") {
+    alert("⚠️ تغيير هوية المنصة متاح لمدير المَجْمَع فقط.");
+    return;
+  }
+  const chosen =
+    document.querySelector('input[name="app-theme-choice"]:checked')?.value ||
+    "classic";
+
+  const ok = await saveToCloud("meta", "appTheme", {
+    theme: chosen,
+    updatedBy: user.name || "المدير",
+  });
+  if (ok === false) return;
+
+  window.previewAppThemeValue = null;
+  applyAppTheme(chosen);
+  renderThemePicker();
+  alert(`✅ تم حفظ الهوية (${APP_THEME_LABELS[chosen]}) وتطبيقها على جميع المستخدمين.`);
 };
 
 window.handleSaveOrgSettings = function (e) {
