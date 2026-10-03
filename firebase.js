@@ -33,6 +33,69 @@ window.studentInCircle = function (student, circleId) {
   );
 };
 
+// المراحل (المرحليات) من الأولى إلى الخامسة عشرة بالترتيب، تُستخدم في كل القوائم المنسدلة
+// والتقارير. الكتابة بدون همزة (المرحلية الاولى) لتطابق السجلات المحفوظة سابقاً.
+window.MARHALIYA_NAMES = [
+  "المرحلية الاولى",
+  "المرحلية الثانية",
+  "المرحلية الثالثة",
+  "المرحلية الرابعة",
+  "المرحلية الخامسة",
+  "المرحلية السادسة",
+  "المرحلية السابعة",
+  "المرحلية الثامنة",
+  "المرحلية التاسعة",
+  "المرحلية العاشرة",
+  "المرحلية الحادية عشرة",
+  "المرحلية الثانية عشرة",
+  "المرحلية الثالثة عشرة",
+  "المرحلية الرابعة عشرة",
+  "المرحلية الخامسة عشرة",
+];
+
+window.normalizeMarhaliya = function (text) {
+  return String(text || "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+// ترتيب المرحلية (0 = الأولى ... 14 = الخامسة عشرة)؛ أي قيمة غير معروفة تأتي في النهاية
+window.marhaliyaOrder = function (text) {
+  const key = normalizeMarhaliya(text);
+  const idx = window.MARHALIYA_NAMES.findIndex(
+    (n) => normalizeMarhaliya(n) === key,
+  );
+  return idx < 0 ? 999 : idx;
+};
+
+window.sameMarhaliya = function (a, b) {
+  return normalizeMarhaliya(a) === normalizeMarhaliya(b);
+};
+
+// خيارات <option> للقائمة المنسدلة. firstOption = {value, label}. وإن كانت القيمة
+// المحفوظة غير موجودة في القائمة (سجل قديم مكتوب يدوياً) تُضاف كخيار حتى لا تضيع.
+window.buildMarhaliyaOptionsHtml = function (selected, firstOption) {
+  const esc = (v) =>
+    String(v)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  const sel = String(selected || "");
+  const known = window.MARHALIYA_NAMES.some((n) => sameMarhaliya(n, sel));
+  let html = firstOption
+    ? `<option value="${esc(firstOption.value)}">${esc(firstOption.label)}</option>`
+    : "";
+  window.MARHALIYA_NAMES.forEach((n) => {
+    html += `<option value="${esc(n)}"${sameMarhaliya(n, sel) ? " selected" : ""}>${esc(n)}</option>`;
+  });
+  if (sel && !known) {
+    html += `<option value="${esc(sel)}" selected>${esc(sel)}</option>`;
+  }
+  return html;
+};
+
 window.studentInAnyCircle = function (student, circleIds) {
   return (circleIds || []).some((id) => studentInCircle(student, id));
 };

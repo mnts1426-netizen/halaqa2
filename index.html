@@ -1629,6 +1629,13 @@
               >
                 <option value="all">كل الحلقات</option>
               </select>
+              <select
+                id="filter-test-marhaliya"
+                class="form-control select-input"
+                onchange="renderTestsTable()"
+              >
+                <option value="all">كل المرحليات</option>
+              </select>
             </div>
             <div class="table-responsive">
               <table class="data-table" id="tests-table-element">
@@ -1674,6 +1681,12 @@
                   onchange="populateReportStudentsDropdown()"
                 >
                   <option value="all">كل الحلقات</option>
+                </select>
+              </div>
+              <div class="form-group" id="report-marhaliya-group" style="display: none">
+                <label>المرحلية</label>
+                <select id="report-marhaliya-select" class="form-control">
+                  <option value="all">كل المرحليات</option>
                 </select>
               </div>
               <div class="form-group" id="report-student-group">
@@ -2275,6 +2288,30 @@
 
         <!-- 11. شاشة الإعدادات -->
         <section id="view-settings" class="content-view">
+          <div class="card nav-admin-only mb-3" id="admin-backup-card">
+            <div class="card-header">
+              <h3>💾 النسخة الاحتياطية</h3>
+              <p class="theme-card-hint">
+                تنزيل نسخة كاملة من قاعدة البيانات (الطلاب، الحلقات، التسميع،
+                التحضير، الاختبارات، المعلمين، الحسابات، الإعدادات...) في ملف
+                واحد على جهازك. العملية للقراءة فقط ولا تغيّر أي بيانات.
+              </p>
+            </div>
+            <div class="flex-align-gap" style="flex-wrap: wrap; padding: 0 1.2rem 1rem">
+              <button
+                class="btn btn-primary"
+                id="btn-download-backup"
+                onclick="downloadFullBackup()"
+              >
+                💾 تنزيل نسخة احتياطية الآن
+              </button>
+              <small class="text-muted" id="backup-status"></small>
+            </div>
+            <p class="theme-card-hint" style="padding: 0 1.2rem 1rem; margin: 0">
+              ⚠️ الملف يحتوي على كلمات مرور الحسابات، فاحتفظ به في مكان آمن ولا
+              ترسله لأحد.
+            </p>
+          </div>
           <div class="card nav-admin-only" id="admin-theme-card">
             <div class="card-header">
               <h3>🎨 هوية المنصة</h3>
@@ -2824,7 +2861,7 @@
     <div id="modal-add-test" class="modal-overlay">
       <div class="modal-card">
         <div class="modal-header">
-          <h3>تسجيل اختبار جديد</h3>
+          <h3 id="test-modal-title">تسجيل اختبار جديد</h3>
           <button class="modal-close" onclick="closeModal('modal-add-test')">
             &times;
           </button>
@@ -2852,13 +2889,7 @@
             <div class="form-row">
               <div class="form-group flex-1">
                 <label>المرحلية</label>
-                <input
-                  type="text"
-                  id="test-type"
-                  class="form-control"
-                  placeholder="مثال: المرحلية الأولى..."
-                  required
-                />
+                <select id="test-type" class="form-control" required></select>
               </div>
               <div class="form-group flex-1">
                 <label>الدرجة من (100)</label>
@@ -2895,7 +2926,9 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button type="submit" class="btn btn-primary">حفظ الاختبار</button>
+            <button type="submit" class="btn btn-primary" id="test-modal-submit">
+              حفظ الاختبار
+            </button>
             <button
               type="button"
               class="btn btn-outline-brown"

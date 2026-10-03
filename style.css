@@ -1467,6 +1467,24 @@ body {
 
 /* وضع ملء الشاشة (شاشة المسجد): خلفية بدل السواد الافتراضي، واللوحة تملأ
    الشاشة بخطوط وشعارات أكبر مناسبة للعرض على التلفاز */
+/* حساب الشاشة: لوحة العرض فقط بلا ترويسة ولا أزرار ولا جدول التحكم (حساب المدير يبقى كما هو) */
+body.screen-only-mode #view-screen > .card:not(:first-child),
+body.screen-only-mode #view-screen > .card:first-child > .card-header {
+  display: none !important;
+}
+
+body.screen-only-mode #view-screen > .card:first-child {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+body.screen-only-mode #view-screen #mosque-screen-grid {
+  margin-top: 0 !important;
+}
+
 #mosque-screen-grid:fullscreen {
   display: flex !important;
   align-items: center;

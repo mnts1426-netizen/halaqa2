@@ -151,6 +151,23 @@ function handleReportTypeChange() {
 
   if (circleGroup) circleGroup.style.display = "block";
 
+  // فلتر المرحلية يظهر في تقرير الاختبارات فقط (كشف المرحليات بحث عادي بالحلقة)
+  const marhaliyaGroup = document.getElementById("report-marhaliya-group");
+  const marhaliyaSelect = document.getElementById("report-marhaliya-select");
+  if (marhaliyaGroup) {
+    const usesMarhaliya =
+      reportType === "marhaliyat_report" || reportType === "exams_report";
+    marhaliyaGroup.style.display = usesMarhaliya ? "block" : "none";
+    if (usesMarhaliya && marhaliyaSelect) {
+      // تغيير نوع التقرير يعيد الفلتر إلى "كل المرحليات" حتى لا يبقى فلتر قديم مخفياً
+      marhaliyaSelect.innerHTML = buildMarhaliyaOptionsHtml("", {
+        value: "all",
+        label: "كل المرحليات",
+      });
+      marhaliyaSelect.value = "all";
+    }
+  }
+
   // تقرير إنجاز يوم الحلقة مخصص لكامل الحلقة في يوم محدد
   if (reportType === "circle_daily" || reportType === "student_achievement") {
     if (studentGroup) studentGroup.style.display = "none";
@@ -287,7 +304,9 @@ function generateReport() {
   if (!wrapper) return;
 
   const allowsAllCircles =
-    reportType === "marhaliyat_report" || reportType === "exams_report";
+    reportType === "marhaliyat_report" ||
+    reportType === "exams_report" ||
+    reportType === "tasmeea_kashf";
   if (circleId === "all" && !allowsAllCircles) {
     alert("⚠️ يرجى اختيار الحلقة أولاً قبل استخراج التقرير.");
     wrapper.style.display = "none";
@@ -720,24 +739,42 @@ function generateReport() {
   // 6. تقرير كشف المرحليات
   else if (reportType === "tasmeea_kashf") {
     reportTitle = "تقرير كشف المرحليات";
+    const allCirclesKashf = circleId === "all";
+    if (allCirclesKashf) headerRightText = "كل الحلقات";
+    const kashfColCount = allCirclesKashf ? 6 : 5;
 
     headHtml = `
       <tr style="background: #2E657E; color: #ffffff;">
         <th style="width: 40px; text-align: center; border: 1px solid #2E657E;">م</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">اسم الطالب</th>
+        ${allCirclesKashf ? '<th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">الحلقة</th>' : ""}
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">${KASHF_DETAIL_LABEL}</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">عدد الصفحات الباقي</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">ملاحظات</th>
       </tr>
     `;
 
+    const kashfCircles = window.appStore.circles || [];
+    const kashfCircleName = (stu) => {
+      const c = kashfCircles.find((x) => x.id === stu.circleId);
+      return c ? c.name : "—";
+    };
+    // كل الحلقات: كل طالب نشط مرة واحدة تحت حلقته الأساسية، مرتبين بالحلقة ثم الاسم
     const kashfStudents = (window.appStore.students || [])
-      .filter((s) => studentInCircle(s, circleId) && s.status === "active")
-      .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
+      .filter(
+        (s) =>
+          s.status === "active" &&
+          (allCirclesKashf || studentInCircle(s, circleId)),
+      )
+      .sort(
+        (a, b) =>
+          (allCirclesKashf
+            ? kashfCircleName(a).localeCompare(kashfCircleName(b), "ar")
+            : 0) || (a.name || "").localeCompare(b.name || "", "ar"),
+      );
 
     if (kashfStudents.length === 0) {
-      bodyHtml =
-        '<tr><td colspan="5" class="text-center text-muted p-4">لا يوجد طلاب مسجلون بهذه الحلقة</td></tr>';
+      bodyHtml = `<tr><td colspan="${kashfColCount}" class="text-center text-muted p-4">لا يوجد طلاب مسجلون بهذه الحلقة</td></tr>`;
     } else {
       kashfStudents.forEach((s, idx) => {
         const entry =
@@ -753,6 +790,7 @@ function generateReport() {
           <tr style="border-bottom: 1px solid #2E657E; text-align: center; font-size: 0.9rem;">
             <td style="padding: 8px; border: 1px solid #2E657E;">${idx + 1}</td>
             <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #2E657E; font-size: 14px; white-space: nowrap;">${escapeHtml(s.name)}</td>
+            ${allCirclesKashf ? `<td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(kashfCircleName(s))}</td>` : ""}
             <td style="padding: 8px; text-align: right; border: 1px solid #2E657E;">${escapeHtml(entry.detail) || "—"}</td>
             <td style="padding: 8px; border: 1px solid #2E657E;">${remainingText}</td>
             <td style="padding: 8px; text-align: right; border: 1px solid #2E657E;">${escapeHtml(entry.notes) || "—"}</td>
@@ -787,6 +825,8 @@ function generateReport() {
       </tr>
     `;
 
+    const marhaliyaFilter =
+      document.getElementById("report-marhaliya-select")?.value || "all";
     const allStudents = window.appStore.students || [];
     const allCircles = window.appStore.circles || [];
     const rows = (window.appStore.tests || [])
@@ -805,8 +845,13 @@ function generateReport() {
           ? true
           : t.circleId === circleId || (stu && studentInCircle(stu, circleId)),
       )
+      .filter(
+        ({ t }) =>
+          marhaliyaFilter === "all" || sameMarhaliya(t.type, marhaliyaFilter),
+      )
       .sort(
         (a, b) =>
+          marhaliyaOrder(a.t.type) - marhaliyaOrder(b.t.type) ||
           a.studentName.localeCompare(b.studentName, "ar") ||
           (a.t.date || "").localeCompare(b.t.date || ""),
       );

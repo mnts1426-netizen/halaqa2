@@ -3548,13 +3548,16 @@ window.renderTeacherNotesTable = function () {
 
 // الاختبارات
 // قائمة الاختبارات بعد تطبيق البحث (اسم الطالب/الحلقة/المرحلية/الجائزة) وفلتر
-// الحلقة، مرتبة أبجدياً باسم الطالب - مشتركة بين الجدول والتقرير المستخرج
+// الحلقة والمرحلية، مرتبة بالمرحلية (من الأولى إلى الخامسة عشرة) ثم باسم الطالب - مشتركة بين
+// الجدول والتقرير المستخرج
 function getFilteredSortedTests() {
   const searchVal = (document.getElementById("search-tests")?.value || "")
     .trim()
     .toLowerCase();
   const circleFilter =
     document.getElementById("filter-test-circle")?.value || "all";
+  const marhaliyaFilter =
+    document.getElementById("filter-test-marhaliya")?.value || "all";
   const students = window.appStore?.students || [];
   const circles = window.appStore?.circles || [];
 
@@ -3572,6 +3575,8 @@ function getFilteredSortedTests() {
       const matchesCircle =
         circleFilter === "all" || test.circleId === circleFilter;
       if (!matchesCircle) return false;
+      if (marhaliyaFilter !== "all" && !sameMarhaliya(test.type, marhaliyaFilter))
+        return false;
       if (!searchVal) return true;
       return [studentName, circleName, test.type, test.prize].some(
         (v) => v && String(v).toLowerCase().includes(searchVal),
@@ -3579,6 +3584,7 @@ function getFilteredSortedTests() {
     })
     .sort(
       (a, b) =>
+        marhaliyaOrder(a.test.type) - marhaliyaOrder(b.test.type) ||
         a.studentName.localeCompare(b.studentName, "ar") ||
         (a.test.date || "").localeCompare(b.test.date || ""),
     );
@@ -3603,6 +3609,22 @@ window.renderTestsTable = function () {
       : "all";
   }
 
+  const marhaliyaFilterSelect = document.getElementById(
+    "filter-test-marhaliya",
+  );
+  if (marhaliyaFilterSelect) {
+    const currentMarhaliya = marhaliyaFilterSelect.value || "all";
+    marhaliyaFilterSelect.innerHTML = buildMarhaliyaOptionsHtml("", {
+      value: "all",
+      label: "كل المرحليات",
+    });
+    marhaliyaFilterSelect.value = window.MARHALIYA_NAMES.includes(
+      currentMarhaliya,
+    )
+      ? currentMarhaliya
+      : "all";
+  }
+
   const rows = getFilteredSortedTests();
 
   let html = rows.length
@@ -3619,6 +3641,7 @@ window.renderTestsTable = function () {
         <td>${escapeHtml(t.prize) || "—"}</td>
         <td>${escapeHtml(t.date) || "—"}</td>
         <td class="no-print">
+          <button class="btn btn-outline-brown btn-sm" onclick="openModalEditTest('${t.id}')">تعديل</button>
           <button class="btn btn-danger btn-sm" onclick="deleteTest('${t.id}')">حذف</button>
         </td>
       </tr>
@@ -3707,7 +3730,19 @@ window.generateTestsReport = function () {
   return document.getElementById("tests-report-table");
 };
 
+const setTestModalMode = (isEdit) => {
+  const title = document.getElementById("test-modal-title");
+  const submit = document.getElementById("test-modal-submit");
+  if (title) title.textContent = isEdit ? "تعديل اختبار" : "تسجيل اختبار جديد";
+  if (submit)
+    submit.textContent = isEdit ? "حفظ التعديلات" : "حفظ الاختبار";
+};
+
 window.openModalAddTest = function () {
+  window.editingTestId = null;
+  window.editingTestStudentId = null;
+  setTestModalMode(false);
+
   const filterInput = document.getElementById("test-student-filter");
   if (filterInput) filterInput.value = "";
 
@@ -3716,7 +3751,13 @@ window.openModalAddTest = function () {
   populateTestStudentsDropdown();
 
   const typeInput = document.getElementById("test-type");
-  if (typeInput) typeInput.value = "";
+  if (typeInput) {
+    typeInput.innerHTML = buildMarhaliyaOptionsHtml("", {
+      value: "",
+      label: "اختر المرحلية",
+    });
+    typeInput.value = "";
+  }
 
   const scoreInput = document.getElementById("test-score");
   if (scoreInput) scoreInput.value = "100";
@@ -3726,6 +3767,55 @@ window.openModalAddTest = function () {
 
   const prizeInput = document.getElementById("test-prize");
   if (prizeInput) prizeInput.value = "";
+
+  openModal("modal-add-test");
+};
+
+// تعديل اختبار مسجَّل: نفس نافذة الإضافة معبّأة ببيانات الاختبار (الطالب، المرحلية،
+// الدرجة، التقدير، الجائزة)؛ يبقى معرّف الاختبار وتاريخه كما هما
+window.openModalEditTest = function (testId) {
+  const test = (window.appStore?.tests || []).find((t) => t.id === testId);
+  if (!test) {
+    alert("⚠️ لم يتم العثور على هذا الاختبار.");
+    return;
+  }
+
+  window.editingTestId = testId;
+  window.editingTestStudentId = test.studentId;
+  setTestModalMode(true);
+
+  const filterInput = document.getElementById("test-student-filter");
+  if (filterInput) filterInput.value = "";
+  populateTestStudentsDropdown();
+  const stuSelect = document.getElementById("test-student-select");
+  if (stuSelect) stuSelect.value = test.studentId || "";
+
+  const typeSelect = document.getElementById("test-type");
+  if (typeSelect) {
+    // قيمة المرحلية القديمة غير الموجودة في القائمة تبقى خياراً محدداً فلا تضيع
+    typeSelect.innerHTML = buildMarhaliyaOptionsHtml(test.type || "", {
+      value: "",
+      label: "اختر المرحلية",
+    });
+  }
+
+  const scoreInput = document.getElementById("test-score");
+  if (scoreInput) scoreInput.value = test.score ?? "";
+
+  const ratingSelect = document.getElementById("test-rating");
+  if (ratingSelect) {
+    const rating = test.rating || "ممتاز";
+    if (![...ratingSelect.options].some((o) => o.value === rating)) {
+      ratingSelect.insertAdjacentHTML(
+        "beforeend",
+        `<option value="${escapeHtml(rating)}">${escapeHtml(rating)}</option>`,
+      );
+    }
+    ratingSelect.value = rating;
+  }
+
+  const prizeInput = document.getElementById("test-prize");
+  if (prizeInput) prizeInput.value = test.prize || "";
 
   openModal("modal-add-test");
 };
@@ -3743,7 +3833,9 @@ window.populateTestStudentsDropdown = function () {
   const circles = window.appStore?.circles || [];
 
   const list = (window.appStore?.students || [])
-    .filter((s) => s.status === "active")
+    .filter(
+      (s) => s.status === "active" || s.id === window.editingTestStudentId,
+    )
     .map((s) => {
       const circle = circles.find((c) => c.id === s.circleId);
       return { student: s, circleName: circle ? circle.name : "بدون حلقة" };
@@ -3785,8 +3877,36 @@ window.handleSaveTest = function (e) {
     (s) => s.id === studentId,
   );
   if (!student || !type) {
-    alert("يرجى اختيار الطالب وكتابة المرحلية.");
+    alert("يرجى اختيار الطالب والمرحلية.");
     return;
+  }
+
+  if (window.editingTestId) {
+    const existing = (window.appStore?.tests || []).find(
+      (t) => t.id === window.editingTestId,
+    );
+    if (existing) {
+      // الحلقة تتغير فقط إن تغيّر الطالب، وإلا تبقى حلقة الاختبار الأصلية كما سُجّلت
+      if (existing.studentId !== studentId) {
+        existing.circleId = student.circleId || "";
+      }
+      existing.studentId = studentId;
+      existing.type = type;
+      existing.score = score;
+      existing.rating = rating;
+      existing.prize = prize;
+
+      if (typeof saveToCloud === "function")
+        saveToCloud("tests", existing.id, existing);
+      if (typeof saveLocalStore === "function") saveLocalStore();
+
+      window.editingTestId = null;
+      window.editingTestStudentId = null;
+      closeModal("modal-add-test");
+      alert("✅ تم حفظ التعديل بنجاح!");
+      renderTestsTable();
+      return;
+    }
   }
 
   const now = new Date();
@@ -5620,4 +5740,95 @@ window.exportPayrollExcel = function () {
     wb,
     `مسير_الرواتب_${new Date().toISOString().split("T")[0]}.xlsx`,
   );
+};
+
+
+// ==========================================================================
+// النسخة الاحتياطية الكاملة (للمدير فقط): قراءة فقط من Firestore ثم تنزيل ملف JSON
+// ==========================================================================
+const BACKUP_COLLECTIONS = [
+  "students",
+  "circles",
+  "teachers",
+  "users",
+  "tasmeea",
+  "tasmeeaKashf",
+  "attendance",
+  "attendanceHistory",
+  "teacherAttendance",
+  "teacherLogs",
+  "tests",
+  "notifications",
+  "payroll",
+  "financeExpenses",
+  "financeRevenues",
+  "screenOrder",
+  "settings",
+  "meta",
+  "logs",
+  "deletedTombstones",
+];
+
+window.downloadFullBackup = async function () {
+  const user = window.currentUser;
+  if (!user || user.role !== window.ROLES.ADMIN) {
+    alert("⚠️ النسخة الاحتياطية متاحة لمدير المَجْمَع فقط.");
+    return;
+  }
+  const btn = document.getElementById("btn-download-backup");
+  const status = document.getElementById("backup-status");
+  const firestoreDb =
+    window.db || (typeof firebase !== "undefined" ? firebase.firestore() : null);
+  if (!firestoreDb || !navigator.onLine) {
+    alert("⚠️ يلزم اتصال بالإنترنت لأخذ النسخة الاحتياطية.");
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  const setStatus = (msg) => {
+    if (status) status.textContent = msg;
+  };
+
+  try {
+    const backup = {
+      app: "halaqa2",
+      createdAt: new Date().toISOString(),
+      createdBy: user.name || "",
+      counts: {},
+      collections: {},
+    };
+
+    for (let i = 0; i < BACKUP_COLLECTIONS.length; i++) {
+      const col = BACKUP_COLLECTIONS[i];
+      setStatus(`جاري قراءة ${col} (${i + 1}/${BACKUP_COLLECTIONS.length})...`);
+      const snap = await firestoreDb.collection(col).get();
+      backup.collections[col] = snap.docs.map((d) => ({ id: d.id, data: d.data() }));
+      backup.counts[col] = snap.size;
+    }
+
+    const total = Object.values(backup.counts).reduce((a, b) => a + b, 0);
+    const blob = new Blob([JSON.stringify(backup)], {
+      type: "application/json;charset=utf-8",
+    });
+    const stamp = new Date()
+      .toISOString()
+      .slice(0, 16)
+      .replace("T", "_")
+      .replace(":", "-");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `halaqa2_backup_${stamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+
+    setStatus(`✅ تم تنزيل النسخة (${total} سجل)`);
+  } catch (e) {
+    console.error("فشل أخذ النسخة الاحتياطية:", e);
+    setStatus("");
+    alert("❌ تعذر أخذ النسخة الاحتياطية، تأكد من الاتصال وحاول مرة أخرى.");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 };

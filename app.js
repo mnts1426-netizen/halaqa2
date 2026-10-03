@@ -738,6 +738,81 @@ window.doLogin = function (user, isAutoSession = false) {
   adjustSidebarAndViewsForRole(user.role);
 };
 
+// حساب الشاشة: عند الدخول يُطلب ملء الشاشة فوراً (تنجح مباشرة بعد ضغط زر الدخول). وإن رفضها
+// المتصفح (مثلاً عند إعادة فتح الصفحة بجلسة محفوظة) تُفعَّل عند أول نقرة أو ضغطة مفتاح.
+// وبعد ذلك أي نقرة/لمسة على الشاشة تُخرج من الحساب وتعيد صفحة الدخول.
+function startScreenAccountFullscreen() {
+  const target = document.getElementById("mosque-screen-grid");
+  if (!target) return;
+  const request =
+    target.requestFullscreen ||
+    target.webkitRequestFullscreen ||
+    target.msRequestFullscreen;
+
+  const isScreenUser = () =>
+    window.currentUser && window.currentUser.role === window.ROLES.SCREEN;
+
+  window.__screenWantsFullscreen = !!request;
+  window.__screenTryEnter = () => {
+    if (!request || document.fullscreenElement || !isScreenUser()) return;
+    try {
+      const result = request.call(target);
+      if (result && typeof result.catch === "function") {
+        result.catch(() => {
+          window.__screenWantsFullscreen = true;
+        });
+      }
+    } catch (e) {
+      window.__screenWantsFullscreen = true;
+    }
+  };
+
+  window.__screenTryEnter();
+
+  if (window.__screenAccountBound) return;
+  window.__screenAccountBound = true;
+
+  document.addEventListener(
+    "click",
+    () => {
+      if (!isScreenUser()) return;
+      // أول نقرة بعد رفض المتصفح لملء الشاشة تُدخل ملء الشاشة فقط ولا تُخرج من الحساب
+      if (!document.fullscreenElement && window.__screenWantsFullscreen) {
+        window.__screenWantsFullscreen = false;
+        window.__screenTryEnter();
+        return;
+      }
+      if (
+        document.fullscreenElement &&
+        typeof exitScreenFullscreenIfActive === "function"
+      ) {
+        exitScreenFullscreenIfActive();
+      }
+      handleLogout();
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "keydown",
+    () => {
+      if (
+        isScreenUser() &&
+        !document.fullscreenElement &&
+        window.__screenWantsFullscreen
+      ) {
+        window.__screenWantsFullscreen = false;
+        window.__screenTryEnter();
+      }
+    },
+    true,
+  );
+
+  document.addEventListener("fullscreenchange", () => {
+    if (document.fullscreenElement) window.__screenWantsFullscreen = false;
+  });
+}
+
 // ضبط القائمة الجانبية وإتاحة التسميع كاملاً لمدير المَجْمَع
 function adjustSidebarAndViewsForRole(role) {
   const adminNav = document.querySelector(".role-section-admin");
@@ -746,12 +821,18 @@ function adjustSidebarAndViewsForRole(role) {
   const mainContent = document.querySelector(".main-content");
   const topHeader = document.querySelector(".top-header");
 
+  document.body.classList.toggle(
+    "screen-only-mode",
+    role === window.ROLES.SCREEN,
+  );
+
   if (role === window.ROLES.SCREEN) {
+    // حساب الشاشة: لوحة التميز فقط بملء الشاشة بلا قائمة جانبية ولا ترويسة ولا أزرار
     if (adminNav) adminNav.style.display = "none";
     if (studentNav) studentNav.style.display = "none";
-    if (sidebar) sidebar.style.display = "flex";
-    if (mainContent) mainContent.style.marginRight = "";
-    if (topHeader) topHeader.style.display = "flex";
+    if (sidebar) sidebar.style.display = "none";
+    if (mainContent) mainContent.style.marginRight = "0";
+    if (topHeader) topHeader.style.display = "none";
 
     const pwaBarScreen = document.getElementById("pwa-install-notify-bar");
     if (pwaBarScreen) pwaBarScreen.style.display = "none";
@@ -762,6 +843,7 @@ function adjustSidebarAndViewsForRole(role) {
     } catch (e) {
       console.warn(e);
     }
+    startScreenAccountFullscreen();
   } else if (role === window.ROLES.STUDENT) {
     if (sidebar) sidebar.style.display = "none";
     if (mainContent) mainContent.style.marginRight = "0";
