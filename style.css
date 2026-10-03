@@ -817,6 +817,16 @@ body {
   overflow-wrap: break-word;
 }
 
+/* خلايا ترويسة/تذييل التقرير الرسمي (جداول تخطيط فقط): بلا حدود الجدول الأم، وإلا تظهر خطوط
+   غير مطلوبة وتتضخم الترويسة فلا تتكرر في كل صفحة عند الطباعة الأفقية */
+#report-results-table table[role="presentation"] td,
+#report-results-table table[role="presentation"] th {
+  border: none !important;
+}
+#report-results-table table[role="presentation"] td:not([style*="padding"]) {
+  padding: 0 4px !important;
+}
+
 .badge {
   padding: 0.35rem 0.85rem;
   border-radius: 20px;
@@ -1482,6 +1492,32 @@ body {
 #mosque-screen-grid:fullscreen .screen-stats-grid {
   flex: 1;
   align-content: center;
+}
+
+/* شاشة التميز في وضع ملء الشاشة: الحلقات في صفين (مثلاً ٥ حلقات = ٣ أعلى + ٢ أسفل)
+   والصف الأخير الناقص يتوسّط الشاشة؛ عدد الأعمدة يحسبه admin.js في --tmz-cols */
+#mosque-screen-grid:fullscreen .screen-circle-cols.tamayuz-cols {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  gap: 2.4vh 1.4vw;
+}
+
+#mosque-screen-grid:fullscreen .screen-circle-cols.tamayuz-cols > .screen-circle-col {
+  flex: 0 0 calc((100% - (var(--tmz-cols, 3) - 1) * 1.4vw) / var(--tmz-cols, 3) - 0.1px);
+  min-width: 0;
+}
+
+/* صفّان من الحلقات يتقاسمان ارتفاع الشاشة فيُصغَّر الخط والحشو قليلاً ليتّسع عدد أكبر من الطلاب */
+#mosque-screen-grid:fullscreen .screen-circle-cols.tamayuz-cols .screen-circle-title {
+  font-size: clamp(0.95rem, 1.8vh, 1.3rem);
+}
+
+#mosque-screen-grid:fullscreen .screen-circle-cols.tamayuz-cols .screen-rank-bar,
+#mosque-screen-grid:fullscreen .screen-circle-cols.tamayuz-cols .screen-pill {
+  font-size: clamp(0.85rem, 1.6vh, 1.2rem);
+  padding: 0.3vh 0.8rem;
 }
 
 /* المقاسات هنا نسبة لارتفاع الشاشة (vh) حتى تتسع قائمة "المنجزون أولاً" (15

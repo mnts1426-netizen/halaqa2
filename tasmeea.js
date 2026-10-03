@@ -162,7 +162,7 @@ function renderTasmeeaStudents() {
   }
 
   const circleStudents = (window.appStore.students || [])
-    .filter((s) => s.circleId === circleId && s.status === "active")
+    .filter((s) => studentInCircle(s, circleId) && s.status === "active")
     .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
 
   if (circleStudents.length === 0) {
@@ -233,6 +233,10 @@ function renderTasmeeaStudents() {
   }
 }
 
+// عنوان العمود الإضافي الفارغ (بين "عدد الصفحات الباقي" و"ملاحظات") في كشف
+// المرحليات وتقريره - يسجّله المعلم أو المدير
+const KASHF_DETAIL_LABEL = "المرحلية";
+
 // كشف المرحليات: متابعة عدد الصفحات الباقية على كل طالب حتى يُتم حفظ المرحلية
 // (جزئين)، تعبئته مفتوحة دائماً للمعلم وغير مرتبطة بيوم أو أسبوع محدد
 function renderTasmeeaKashfStudents() {
@@ -282,7 +286,7 @@ function renderTasmeeaKashfStudents() {
   }
 
   const circleStudents = (window.appStore.students || [])
-    .filter((s) => s.circleId === circleId && s.status === "active")
+    .filter((s) => studentInCircle(s, circleId) && s.status === "active")
     .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
 
   if (circleStudents.length === 0) {
@@ -322,6 +326,15 @@ function renderTasmeeaKashfStudents() {
       <tr>
         <td style="text-align: center; width: 40px;">${index + 1}</td>
         <td style="font-weight: 700;">${escapeHtml(student.name)}</td>
+        <td>
+          <input
+            type="text"
+            class="form-control"
+            value="${escapeHtml(entry.detail || "")}"
+            placeholder="${KASHF_DETAIL_LABEL}"
+            onchange="saveKashfField('${student.id}', '${circleId}', 'detail', this.value)"
+          />
+        </td>
         <td style="width: 140px;">
           <input
             type="number"
@@ -362,6 +375,7 @@ function renderTasmeeaKashfStudents() {
             <tr>
               <th style="width: 40px;">م</th>
               <th>اسم الطالب</th>
+              <th>${KASHF_DETAIL_LABEL}</th>
               <th style="width: 140px;">عدد الصفحات الباقي</th>
               <th>ملاحظات</th>
               ${isAdminUser ? '<th style="width: 60px;">حذف</th>' : ""}
@@ -441,6 +455,7 @@ window.saveKashfField = function (studentId, circleId, field, rawValue) {
     remainingPages:
       existing.remainingPages === undefined ? null : existing.remainingPages,
     notes: existing.notes || "",
+    detail: existing.detail || "",
     previousRemainingPages:
       existing.previousRemainingPages === undefined
         ? null
@@ -458,6 +473,8 @@ window.saveKashfField = function (studentId, circleId, field, rawValue) {
   } else if (field === "notes") {
     entry.previousNotes = existing.notes || "";
     entry.notes = value;
+  } else if (field === "detail") {
+    entry.detail = value;
   }
 
   if (!window.appStore.tasmeeaKashf) window.appStore.tasmeeaKashf = [];

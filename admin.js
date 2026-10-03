@@ -303,14 +303,14 @@ window.buildOfficialPrintChrome = function (
   const header = `
     <table style="width: 100%; border-collapse: collapse;" role="presentation">
       <tr>
-        <td style="width: 130px; text-align: right; vertical-align: middle;">
+        <td style="border: none; width: 130px; text-align: right; vertical-align: middle;">
           <img src="report_logo_right.png" alt="شعار المَجْمَع" style="height: 70px; width: auto; object-fit: contain;" />
         </td>
-        <td style="text-align: center; vertical-align: middle;">
+        <td style="border: none; text-align: center; vertical-align: middle;">
           <h2 style="margin: 3px 0; font-size: 1.35rem; font-weight: 900; color: #2E657E; font-family: 'Cairo', 'Tajawal', sans-serif;">مَجْمَع عبدالله بن مهدي القرآني</h2>
           <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: #816105;">جامع الهدى</h4>
         </td>
-        <td style="width: 130px; text-align: left; vertical-align: middle;">
+        <td style="border: none; width: 130px; text-align: left; vertical-align: middle;">
           <img src="report_logo_left.png" alt="شعار المَجْمَع" style="height: 70px; width: auto; object-fit: contain;" />
         </td>
       </tr>
@@ -318,16 +318,16 @@ window.buildOfficialPrintChrome = function (
     <div style="height: 2px; width: 100%; margin: 0.5rem 0; background: #C9A227;"></div>
     <table style="width: 100%; border-collapse: collapse; border-bottom: 2px double #2E657E; padding-bottom: 0.7rem; margin-bottom: 1rem;" role="presentation">
       <tr>
-        <td style="width: 130px; text-align: right; padding-right: 10px; vertical-align: middle;">
+        <td style="border: none; width: 130px; text-align: right; padding-right: 10px; vertical-align: middle;">
           ${rightSubText ? `<div style="font-weight:800; color:#816105; font-size:0.8rem; white-space: nowrap;">${rightSubText}</div>` : ""}
         </td>
-        <td style="text-align: center; vertical-align: middle;">
+        <td style="border: none; text-align: center; vertical-align: middle;">
           <div style="display: table; max-width: 90%; margin: 0 auto; border: 1.5px solid #C9A227; border-radius: 6px; padding: 0.2rem 0.9rem; background: #DDECF3;">
             <h3 style="margin: 0; font-size: 0.95rem; font-weight: 900; color: #2E657E; line-height: 1.3; word-break: break-word;">${titleText}</h3>
           </div>
           ${centerSubHtml ? `<div style="margin-top: 4px; font-weight: 800; color: #816105; font-size: 0.78rem; white-space: nowrap;">${centerSubHtml}</div>` : ""}
         </td>
-        <td style="width: 130px; text-align: left; padding-left: 10px; vertical-align: middle;">
+        <td style="border: none; width: 130px; text-align: left; padding-left: 10px; vertical-align: middle;">
           ${
             leftSubText
               ? `<div style="font-weight:800; color:#816105; font-size:0.78rem; white-space: normal; word-wrap: break-word; overflow-wrap: break-word;">${leftSubText}</div>`
@@ -341,10 +341,10 @@ window.buildOfficialPrintChrome = function (
   const footer = `
     <table style="width: 100%; border-collapse: collapse; border-top: 1.5px solid #C9A227; padding-top: 1rem; margin-top: 1.2rem; font-size: 0.9rem; page-break-inside: avoid; break-inside: avoid; page-break-before: avoid; break-before: avoid;" role="presentation">
       <tr>
-        <td style="text-align: right; vertical-align: bottom;">
+        <td style="border: none; text-align: right; vertical-align: bottom;">
           <strong style="color: #2E657E;">المنصّة الإلكترونيّة للمَجْمَع القرآنيّ</strong>
         </td>
-        <td style="text-align: center; vertical-align: bottom;">
+        <td style="border: none; text-align: center; vertical-align: bottom;">
           <div style="font-weight: 800; color: #816105;">مدير المَجْمَع القرآنيّ</div>
           <div style="font-weight: 900; color: #2E657E;">أحمد بن عبدالله آل مهدي</div>
         </td>
@@ -395,6 +395,10 @@ window.printTableElement = function (tableId, title) {
       : chrome.header + table.outerHTML;
 
   const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    alert("⚠️ تعذّر فتح نافذة الطباعة، يرجى السماح بالنوافذ المنبثقة لهذا الموقع ثم المحاولة مرة أخرى.");
+    return;
+  }
   printWindow.document.write(`
     <html dir="rtl" lang="ar">
       <head>
@@ -407,6 +411,7 @@ window.printTableElement = function (tableId, title) {
           thead { display: table-header-group !important; }
           tbody tr { page-break-inside: avoid !important; break-inside: avoid !important; }
           th, td { border: 1px solid #2E657E; padding: 5px 4px; text-align: center; word-wrap: break-word; overflow-wrap: break-word; }
+          table[role="presentation"] td { border: none; padding: 0 4px; }
           th { background-color: #2E657E; color: #ffffff; font-weight: bold; }
           tbody tr:nth-child(even) { background-color: #DDECF3; }
           .no-print, button { display: none !important; }
@@ -421,8 +426,13 @@ window.printTableElement = function (tableId, title) {
   printWindow.document.close();
   printWindow.focus();
   setTimeout(() => {
+    printWindow.onafterprint = () => printWindow.close();
     printWindow.print();
-    printWindow.close();
+    setTimeout(() => {
+      try {
+        printWindow.close();
+      } catch (e) {}
+    }, 60000);
   }, 350);
 };
 
@@ -533,20 +543,40 @@ window.generateMultiPagePDF = async function (
   const theadEl = tableClone.querySelector("thead");
   const theadHeightPx = theadEl ? theadEl.getBoundingClientRect().height : 0;
   const bodyRowsClone = Array.from(tableClone.querySelectorAll("tbody tr"));
-  const rowHeightPx =
-    bodyRowsClone.length > 0
-      ? bodyRowsClone[0].getBoundingClientRect().height
-      : 30;
+  // ارتفاع كل صف فعلياً (الصفوف قد تتفاوت عند التفاف الأسماء/الملاحظات الطويلة)
+  const rowHeightsPx = bodyRowsClone.map((r) => r.getBoundingClientRect().height);
+  measureWrapper.innerHTML = chromeFooter || "";
+  const footerHeightPx = chromeFooter ? measureWrapper.scrollHeight : 0;
   document.body.removeChild(measureWrapper);
 
-  const availablePx = usableHeightPx - headerHeightPx - theadHeightPx - 30;
-  const rowsPerPage = Math.max(1, Math.floor(availablePx / rowHeightPx));
+  // 60px = حشو الحاوية (1.2rem أعلى وأسفل) + هامش الجدول
+  const availablePx = usableHeightPx - headerHeightPx - theadHeightPx - 60;
 
   const allRows = Array.from(table.querySelectorAll("tbody tr"));
   const pageChunks = [];
-  for (let i = 0; i < allRows.length; i += rowsPerPage) {
-    pageChunks.push(allRows.slice(i, i + rowsPerPage));
+  let currentChunk = [];
+  let currentPx = 0;
+  allRows.forEach((row, i) => {
+    const h = rowHeightsPx[i] || 30;
+    if (currentChunk.length > 0 && currentPx + h > availablePx) {
+      pageChunks.push(currentChunk);
+      currentChunk = [];
+      currentPx = 0;
+    }
+    currentChunk.push(row);
+    currentPx += h;
+  });
+  // التذييل يظهر في الصفحة الأخيرة فقط: إن لم يتّسع بعد آخر صف يُنقل صف أخير إلى صفحة
+  // جديدة بدل أن يُصغَّر محتوى الصفحة كلها أو يُقتطع التذييل
+  if (
+    currentChunk.length > 1 &&
+    currentPx + footerHeightPx > availablePx
+  ) {
+    const movedRow = currentChunk.pop();
+    pageChunks.push(currentChunk);
+    currentChunk = [movedRow];
   }
+  if (currentChunk.length > 0) pageChunks.push(currentChunk);
   if (pageChunks.length === 0) pageChunks.push([]);
 
   const theadHtml = table.querySelector("thead")
@@ -583,30 +613,44 @@ window.generateMultiPagePDF = async function (
       jsPDF: { unit: "mm", format: "a4", orientation },
     };
 
-    if (pageIdx === 0) {
-      const worker = html2pdf().set(opt).from(pageWrapper);
-      await worker.toPdf();
-      pdfDoc = worker.prop.pdf;
-    } else {
-      const worker = html2pdf().set(opt).from(pageWrapper);
-      await worker.toCanvas();
-      const canvas = worker.prop.canvas;
-      const imgData = canvas.toDataURL("image/jpeg", 0.98);
-      pdfDoc.addPage([pageWidthMm, pageHeightMm], orientation);
-      const imgProps = pdfDoc.getImageProperties(imgData);
-      const imgHeightMm = (imgProps.height * usableWidthMm) / imgProps.width;
-      pdfDoc.addImage(
-        imgData,
-        "JPEG",
-        marginMm,
-        marginMm,
-        usableWidthMm,
-        imgHeightMm,
-      );
+    const worker = html2pdf().set(opt).from(pageWrapper);
+    await worker.toCanvas();
+    const canvas = worker.prop.canvas;
+    const imgData = canvas.toDataURL("image/jpeg", 0.98);
+    if (!pdfDoc) {
+      // يُنشأ مستند jsPDF من عنصر صغير جداً (صفحته الأولى المؤقتة تُحذف في النهاية)،
+      // ثم تُوضع كل صفحات التقرير يدوياً بنفس الهوامش بدل ترك html2pdf يوزّع الصفحة
+      // الأولى بلا هوامش وبمقاس مختلف عن بقية الصفحات
+      const seedEl = makeWrapper();
+      seedEl.style.width = "40px";
+      seedEl.style.padding = "0";
+      seedEl.textContent = ".";
+      document.body.appendChild(seedEl);
+      try {
+        const seedWorker = html2pdf()
+          .set({ jsPDF: { unit: "mm", format: "a4", orientation } })
+          .from(seedEl);
+        await seedWorker.toPdf();
+        pdfDoc = seedWorker.prop.pdf;
+      } finally {
+        document.body.removeChild(seedEl);
+      }
     }
+    pdfDoc.addPage([pageWidthMm, pageHeightMm], orientation);
+    const imgProps = pdfDoc.getImageProperties(imgData);
+    let drawW = usableWidthMm;
+    let drawH = (imgProps.height * drawW) / imgProps.width;
+    // إن زاد ارتفاع المحتوى عن الصفحة يُصغَّر ليتّسع كاملاً بدل أن يُقتطع
+    if (drawH > usableHeightMm) {
+      drawH = usableHeightMm;
+      drawW = (imgProps.width * drawH) / imgProps.height;
+    }
+    const drawX = marginMm + (usableWidthMm - drawW) / 2;
+    pdfDoc.addImage(imgData, "JPEG", drawX, marginMm, drawW, drawH);
     document.body.removeChild(pageWrapper);
   }
 
+  pdfDoc.deletePage(1);
   pdfDoc.save(`${filename}_${new Date().toISOString().split("T")[0]}.pdf`);
 };
 
@@ -1022,7 +1066,7 @@ window.openDashboardDetailsModal = function (type) {
       const teacherNames =
         assignedTeachers.map((t) => t.name).join(" ، ") || "غير معين";
       const stuCount = (window.appStore?.students || []).filter(
-        (s) => s.circleId === c.id && s.status === "active",
+        (s) => studentInCircle(s, c.id) && s.status === "active",
       ).length;
       html += `
         <tr>
@@ -1228,7 +1272,7 @@ window.renderCirclesCards = function () {
         ? assignedTeachers.map((t) => t.name).join(" ، ")
         : "غير معين";
     const circleStudents = (window.appStore?.students || []).filter(
-      (s) => s.circleId === circle.id && s.status === "active",
+      (s) => studentInCircle(s, circle.id) && s.status === "active",
     );
 
     html += `
@@ -1309,7 +1353,7 @@ window.openModalEditCircle = function (circleId) {
   const currentTeacherIds =
     circle.teacherIds || (circle.teacherId ? [circle.teacherId] : []);
   const currentStudents = (window.appStore?.students || [])
-    .filter((s) => s.circleId === circleId)
+    .filter((s) => studentInCircle(s, circleId))
     .map((s) => s.id);
 
   populateCircleTeachersList(currentTeacherIds);
@@ -1355,13 +1399,22 @@ window.populateCircleStudentsList = function (selectedStudentIds = []) {
     return;
   }
 
+  // اختيار طالب من حلقة أخرى يضيفه إلى هذه الحلقة كحلقة إضافية دون إخراجه من
+  // حلقته الأساسية (كان يُنقل بصمت فيختفي من حلقته الأولى)
+  const circles = window.appStore?.circles || [];
+  const editId = document.getElementById("edit-circle-id")?.value || "";
   let html = "";
   students.forEach((s) => {
     const isChecked = selectedStudentIds.includes(s.id) ? "checked" : "";
+    const primary = circles.find((c) => c.id === s.circleId);
+    const note =
+      primary && s.circleId !== editId
+        ? ` <small class="text-muted">(حلقته الأساسية: ${escapeHtml(primary.name)})</small>`
+        : "";
     html += `
       <label class="checkbox-item-row p-1 mb-1" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.88rem;">
         <input type="checkbox" name="circle_students" value="${s.id}" ${isChecked}>
-        <span>${s.name}</span>
+        <span>${escapeHtml(s.name)}${note}</span>
       </label>
     `;
   });
@@ -1393,6 +1446,37 @@ window.filterCircleModalStudents = function () {
         : "none";
     });
 };
+
+// يطبّق اختيار طلاب الحلقة: من ليس له حلقة تصبح أساسيته، ومن له حلقة أخرى تُضاف
+// هذه كحلقة إضافية (لا يخرج من حلقته الأولى). وعند إلغاء اختياره من حلقته الأساسية
+// تُرقّى حلقته الإضافية الأولى (إن وجدت) أساسيةً حتى لا يختفي من كل الحلقات.
+// الطلاب غير النشطين لا يظهرون في القائمة فلا يُمسّون.
+function applyCircleMembership(circleId, selectedIds) {
+  (window.appStore?.students || []).forEach((s) => {
+    if (s.status !== "active") return;
+    const selected = selectedIds.includes(s.id);
+    const extras = Array.isArray(s.extraCircleIds) ? s.extraCircleIds : [];
+    const inExtras = extras.includes(circleId);
+    let changed = false;
+
+    if (selected) {
+      if (s.circleId === circleId || inExtras) return;
+      if (!s.circleId) s.circleId = circleId;
+      else s.extraCircleIds = [...extras, circleId];
+      changed = true;
+    } else if (s.circleId === circleId) {
+      s.circleId = extras[0] || "";
+      s.extraCircleIds = extras.slice(1);
+      changed = true;
+    } else if (inExtras) {
+      s.extraCircleIds = extras.filter((id) => id !== circleId);
+      changed = true;
+    }
+
+    if (changed && typeof saveToCloud === "function")
+      saveToCloud("students", s.id, s);
+  });
+}
 
 window.handleSaveCircle = function (e) {
   if (e && e.preventDefault) e.preventDefault();
@@ -1431,15 +1515,7 @@ window.handleSaveCircle = function (e) {
         saveToCloud("circles", circle.id, circle);
     }
 
-    (window.appStore?.students || []).forEach((s) => {
-      if (selectedStudents.includes(s.id)) {
-        s.circleId = editId;
-        if (typeof saveToCloud === "function") saveToCloud("students", s.id, s);
-      } else if (s.circleId === editId) {
-        s.circleId = "";
-        if (typeof saveToCloud === "function") saveToCloud("students", s.id, s);
-      }
-    });
+    applyCircleMembership(editId, selectedStudents);
 
     alert("✅ تم تعديل بيانات الحلقة بنجاح!");
   } else {
@@ -1458,15 +1534,7 @@ window.handleSaveCircle = function (e) {
     if (typeof saveToCloud === "function")
       saveToCloud("circles", newCircle.id, newCircle);
 
-    (window.appStore?.students || []).forEach((s) => {
-      if (selectedStudents.includes(s.id)) {
-        s.circleId = newCircleId;
-        if (typeof saveToCloud === "function") saveToCloud("students", s.id, s);
-      } else if (s.circleId === newCircleId) {
-        s.circleId = "";
-        if (typeof saveToCloud === "function") saveToCloud("students", s.id, s);
-      }
-    });
+    applyCircleMembership(newCircleId, selectedStudents);
 
     alert("✅ تم إنشاء الحلقة بنجاح!");
   }
@@ -1490,10 +1558,19 @@ window.deleteCircle = function (circleId) {
   );
 
   (window.appStore?.students || []).forEach((s) => {
-    if (s.circleId === circleId) {
-      s.circleId = "";
-      if (typeof saveToCloud === "function") saveToCloud("students", s.id, s);
+    const extras = Array.isArray(s.extraCircleIds) ? s.extraCircleIds : [];
+    let changed = false;
+    if (extras.includes(circleId)) {
+      s.extraCircleIds = extras.filter((id) => id !== circleId);
+      changed = true;
     }
+    if (s.circleId === circleId) {
+      s.circleId = (s.extraCircleIds || [])[0] || "";
+      s.extraCircleIds = (s.extraCircleIds || []).slice(1);
+      changed = true;
+    }
+    if (changed && typeof saveToCloud === "function")
+      saveToCloud("students", s.id, s);
   });
 
   if (typeof saveToCloud === "function")
@@ -2180,7 +2257,7 @@ window.renderStudentsTable = function () {
         (s.parentPhone && String(s.parentPhone).includes(searchVal));
 
       const matchesCircle =
-        circleFilter === "all" || s.circleId === circleFilter;
+        circleFilter === "all" || studentInCircle(s, circleFilter);
       const matchesStatus = s.status === statusFilter;
       return matchesSearch && matchesCircle && matchesStatus;
     })
@@ -2198,7 +2275,14 @@ window.renderStudentsTable = function () {
     const circle = (window.appStore?.circles || []).find(
       (c) => c.id === s.circleId,
     );
-    const circleName = circle ? circle.name : "غير مسجل";
+    const extraNames = (Array.isArray(s.extraCircleIds) ? s.extraCircleIds : [])
+      .filter((id) => id !== s.circleId)
+      .map((id) => (window.appStore?.circles || []).find((c) => c.id === id))
+      .filter(Boolean)
+      .map((c) => c.name);
+    const circleName = [circle ? circle.name : "غير مسجل", ...extraNames]
+      .map(escapeHtml)
+      .join(" + ");
 
     html += `
       <tr>
@@ -2992,7 +3076,7 @@ window.renderAttendanceTable = function () {
   }
 
   let students = (window.appStore?.students || []).filter(
-    (s) => s.circleId === circleId && s.status === "active",
+    (s) => studentInCircle(s, circleId) && s.status === "active",
   );
   if (searchVal)
     students = students.filter(
@@ -3333,7 +3417,7 @@ window.markAllAbsent = function () {
     return;
   }
   const students = (window.appStore?.students || []).filter(
-    (s) => s.circleId === circleId && s.status === "active",
+    (s) => studentInCircle(s, circleId) && s.status === "active",
   );
   students.forEach((s) => setStudentAttendance(s.id, "absent"));
   renderAttendanceTable();
@@ -3365,7 +3449,7 @@ window.markAllAttendanceStatus = async function (status) {
   };
 
   const students = (window.appStore?.students || []).filter(
-    (s) => s.circleId === circleId && s.status === "active",
+    (s) => studentInCircle(s, circleId) && s.status === "active",
   );
 
   if (students.length === 0) {
@@ -4121,7 +4205,7 @@ window.renderScreenView = function () {
                 </div>
                 <img src="report_logo_left.png" alt="شعار المَجْمَع" />
               </div>
-              <div class="screen-circle-cols">${colsHtml}</div>
+              <div class="screen-circle-cols tamayuz-cols" style="--tmz-cols: ${circleGroups.length <= 3 ? Math.max(1, circleGroups.length) : Math.ceil(circleGroups.length / 2)};">${colsHtml}</div>
               <div class="screen-board-footer">
                 <span style="color: var(--primary-teal);">الشاشة الالكترونية للمَجْمَع</span>
                 <span>إدارة المَجْمَع القرآني</span>
@@ -4289,7 +4373,7 @@ window.renderScreenView = function () {
       const nextIdx = (curIdx + 1) % availableScreenSlides.length;
       window.screenCurrentSlide = availableScreenSlides[nextIdx];
       displayCurrentSlide();
-    }, 30000);
+    }, 15000);
   }
 
   if (window.screenDataRefreshTimer)

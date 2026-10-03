@@ -118,7 +118,7 @@ function populateReportStudentsDropdown() {
   }
 
   if (circleId !== "all") {
-    students = students.filter((s) => s.circleId === circleId);
+    students = students.filter((s) => studentInCircle(s, circleId));
   }
 
   students = students
@@ -178,6 +178,15 @@ function handleReportTypeChange() {
     populateReportWeekRangeDropdowns();
   } else if (reportType === "tasmeea_kashf") {
     // تقرير كشف المرحليات: كشف شامل لكل طلاب الحلقة، غير مرتبط بتاريخ محدد
+    if (studentGroup) studentGroup.style.display = "none";
+    if (weekRangeGroup) weekRangeGroup.classList.add("style-hidden");
+    if (dateFromGroup) dateFromGroup.style.display = "none";
+    if (dateToGroup) dateToGroup.style.display = "none";
+  } else if (
+    reportType === "marhaliyat_report" ||
+    reportType === "exams_report"
+  ) {
+    // قائمة المرحليات المسجلة: لا تعتمد على طالب ولا تاريخ محدد
     if (studentGroup) studentGroup.style.display = "none";
     if (weekRangeGroup) weekRangeGroup.classList.add("style-hidden");
     if (dateFromGroup) dateFromGroup.style.display = "none";
@@ -277,7 +286,9 @@ function generateReport() {
   const wrapper = document.getElementById("report-results-wrapper");
   if (!wrapper) return;
 
-  if (circleId === "all") {
+  const allowsAllCircles =
+    reportType === "marhaliyat_report" || reportType === "exams_report";
+  if (circleId === "all" && !allowsAllCircles) {
     alert("⚠️ يرجى اختيار الحلقة أولاً قبل استخراج التقرير.");
     wrapper.style.display = "none";
     return;
@@ -321,7 +332,7 @@ function generateReport() {
     let students = (window.appStore.students || [])
       .filter(
         (s) =>
-          s.circleId === circleId &&
+          studentInCircle(s, circleId) &&
           s.status !== "pending" &&
           s.status !== "archived",
       )
@@ -468,7 +479,7 @@ function generateReport() {
 
     let students = (window.appStore.students || []).filter(
       (s) =>
-        s.circleId === circleId &&
+        studentInCircle(s, circleId) &&
         s.status !== "pending" &&
         s.status !== "archived",
     );
@@ -559,7 +570,7 @@ function generateReport() {
 
     let students = (window.appStore.students || []).filter(
       (s) =>
-        s.circleId === circleId &&
+        studentInCircle(s, circleId) &&
         s.status !== "pending" &&
         s.status !== "archived",
     );
@@ -670,7 +681,7 @@ function generateReport() {
     `;
 
     let students = (window.appStore.students || []).filter(
-      (s) => s.circleId === circleId && s.status === "active",
+      (s) => studentInCircle(s, circleId) && s.status === "active",
     );
     if (selectedStudentId !== "all") {
       students = students.filter((s) => s.id === selectedStudentId);
@@ -714,18 +725,19 @@ function generateReport() {
       <tr style="background: #2E657E; color: #ffffff;">
         <th style="width: 40px; text-align: center; border: 1px solid #2E657E;">م</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">اسم الطالب</th>
+        <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">${KASHF_DETAIL_LABEL}</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">عدد الصفحات الباقي</th>
         <th style="padding: 10px 8px; text-align: center; border: 1px solid #2E657E;">ملاحظات</th>
       </tr>
     `;
 
     const kashfStudents = (window.appStore.students || [])
-      .filter((s) => s.circleId === circleId && s.status === "active")
+      .filter((s) => studentInCircle(s, circleId) && s.status === "active")
       .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
 
     if (kashfStudents.length === 0) {
       bodyHtml =
-        '<tr><td colspan="4" class="text-center text-muted p-4">لا يوجد طلاب مسجلون بهذه الحلقة</td></tr>';
+        '<tr><td colspan="5" class="text-center text-muted p-4">لا يوجد طلاب مسجلون بهذه الحلقة</td></tr>';
     } else {
       kashfStudents.forEach((s, idx) => {
         const entry =
@@ -741,8 +753,79 @@ function generateReport() {
           <tr style="border-bottom: 1px solid #2E657E; text-align: center; font-size: 0.9rem;">
             <td style="padding: 8px; border: 1px solid #2E657E;">${idx + 1}</td>
             <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #2E657E; font-size: 14px; white-space: nowrap;">${escapeHtml(s.name)}</td>
+            <td style="padding: 8px; text-align: right; border: 1px solid #2E657E;">${escapeHtml(entry.detail) || "—"}</td>
             <td style="padding: 8px; border: 1px solid #2E657E;">${remainingText}</td>
             <td style="padding: 8px; text-align: right; border: 1px solid #2E657E;">${escapeHtml(entry.notes) || "—"}</td>
+          </tr>
+        `;
+      });
+    }
+  }
+
+  // 7. تقرير المرحليات / 8. تقرير الاختبارات (نفس القائمة المسجَّلة من شاشة
+  // الاختبارات، ويزيد تقرير الاختبارات وحده عمود "التوقيع" الفارغ)
+  else if (reportType === "marhaliyat_report" || reportType === "exams_report") {
+    const withSignature = reportType === "exams_report";
+    reportTitle = withSignature ? "تقرير الاختبارات" : "تقرير المرحليات";
+    if (circleId === "all") headerRightText = "كل الحلقات";
+
+    const cellStyle = "padding: 8px; border: 1px solid #2E657E; text-align: center;";
+    const thStyle = "padding: 10px 8px; text-align: center; border: 1px solid #2E657E;";
+    const colCount = withSignature ? 9 : 8;
+
+    headHtml = `
+      <tr style="background: #2E657E; color: #ffffff;">
+        <th style="width: 40px; ${thStyle}">م</th>
+        <th style="${thStyle}">اسم الطالب</th>
+        <th style="${thStyle}">الحلقة</th>
+        <th style="${thStyle}">المرحلية</th>
+        <th style="${thStyle}">الدرجة</th>
+        <th style="${thStyle}">التقدير</th>
+        <th style="${thStyle}">الجائزة</th>
+        <th style="${thStyle}">التاريخ</th>
+        ${withSignature ? `<th style="${thStyle} width: 20%; white-space: normal;">التوقيع باستلام الجائزة</th>` : ""}
+      </tr>
+    `;
+
+    const allStudents = window.appStore.students || [];
+    const allCircles = window.appStore.circles || [];
+    const rows = (window.appStore.tests || [])
+      .map((t) => {
+        const stu = allStudents.find((s) => s.id === t.studentId);
+        const circle = allCircles.find((c) => c.id === t.circleId);
+        return {
+          t,
+          stu,
+          studentName: stu ? stu.name : "طالب",
+          circleName: circle ? circle.name : "—",
+        };
+      })
+      .filter(({ t, stu }) =>
+        circleId === "all"
+          ? true
+          : t.circleId === circleId || (stu && studentInCircle(stu, circleId)),
+      )
+      .sort(
+        (a, b) =>
+          a.studentName.localeCompare(b.studentName, "ar") ||
+          (a.t.date || "").localeCompare(b.t.date || ""),
+      );
+
+    if (rows.length === 0) {
+      bodyHtml = `<tr><td colspan="${colCount}" class="text-center text-muted p-4">لا توجد مرحليات مسجلة</td></tr>`;
+    } else {
+      rows.forEach(({ t, studentName, circleName }, idx) => {
+        bodyHtml += `
+          <tr style="text-align: center; font-size: 0.9rem;">
+            <td style="${cellStyle}">${idx + 1}</td>
+            <td style="${cellStyle} font-weight: 800; text-align: right; white-space: nowrap;">${escapeHtml(studentName)}</td>
+            <td style="${cellStyle}">${escapeHtml(circleName)}</td>
+            <td style="${cellStyle}">${escapeHtml(t.type) || "—"}</td>
+            <td style="${cellStyle} font-weight: 700;">${escapeHtml(t.score) || "0"} / 100</td>
+            <td style="${cellStyle}">${escapeHtml(t.rating) || "—"}</td>
+            <td style="${cellStyle}">${escapeHtml(t.prize) || "—"}</td>
+            <td style="${cellStyle}">${escapeHtml(t.date) || "—"}</td>
+            ${withSignature ? `<td style="${cellStyle} height: 34px;"></td>` : ""}
           </tr>
         `;
       });
@@ -958,6 +1041,10 @@ function printOfficialReport() {
       : chromeHeader + (table ? table.outerHTML : wrapper.innerHTML);
 
   const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    alert("⚠️ تعذّر فتح نافذة الطباعة، يرجى السماح بالنوافذ المنبثقة لهذا الموقع ثم المحاولة مرة أخرى.");
+    return;
+  }
   printWindow.document.write(`
     <html dir="rtl" lang="ar">
       <head>
@@ -999,6 +1086,8 @@ function printOfficialReport() {
             word-wrap: break-word;
             overflow-wrap: break-word;
           }
+          /* جداول تخطيط الترويسة/التذييل: بلا حدود ولا حشو الجدول الأم */
+          table[role="presentation"] td { border: none; padding: 0 4px; }
           th {
             background-color: #2E657E !important;
             color: #ffffff !important;
@@ -1041,8 +1130,15 @@ function printOfficialReport() {
   const triggerPrint = () => {
     if (printTriggered) return;
     printTriggered = true;
+    // إغلاق النافذة فور print() يلغي توليد ملف PDF في بعض المتصفحات (خصوصاً الجوال)،
+    // لذا تُغلق بعد انتهاء الطباعة فعلياً، مع مهلة احتياطية طويلة
+    printWindow.onafterprint = () => printWindow.close();
     printWindow.print();
-    printWindow.close();
+    setTimeout(() => {
+      try {
+        printWindow.close();
+      } catch (e) {}
+    }, 60000);
   };
 
   const pendingImgs = Array.from(printWindow.document.images || []).filter(

@@ -22,6 +22,21 @@ window.escapeHtml = function (value) {
     .replace(/'/g, "&#39;");
 };
 
+// الطالب له حلقة أساسية (circleId) وقد يكون له حلقات إضافية (extraCircleIds) دون
+// أن يخرج من حلقته الأساسية. من ليس له حلقات إضافية يعمل بالضبط كما كان سابقاً.
+window.studentInCircle = function (student, circleId) {
+  if (!student || !circleId) return false;
+  return (
+    student.circleId === circleId ||
+    (Array.isArray(student.extraCircleIds) &&
+      student.extraCircleIds.includes(circleId))
+  );
+};
+
+window.studentInAnyCircle = function (student, circleIds) {
+  return (circleIds || []).some((id) => studentInCircle(student, id));
+};
+
 // الإعدادات الافتراضية
 const SAFE_DEFAULT_SETTINGS = window.DEFAULT_SETTINGS || {
   orgName: "مَجْمَع عبدالله بن مهدي القرآني",

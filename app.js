@@ -797,6 +797,15 @@ function adjustSidebarAndViewsForRole(role) {
             t.isFinance === true,
         ));
 
+    // اسم خانة التسميع في القائمة: "كشف الطلاب" عند المعلم، و"التسميع" عند المدير
+    const tasmeeaNavLabel = document.querySelector(
+      '.sidebar .nav-link[data-target="view-tasmeea"] span',
+    );
+    if (tasmeeaNavLabel) {
+      tasmeeaNavLabel.textContent =
+        role === window.ROLES.TEACHER ? "كشف الطلاب" : "التسميع";
+    }
+
     if (role === window.ROLES.TEACHER) {
       // إخفاء كل عناصر (نav-admin-only) في كامل الصفحة وليس فقط الشريط الجانبي
       // (تشمل: سجل عمليات المعلمين، بطاقات لوحة تحكم خاصة بالإدارة، خيار المستهدف بالإشعار...)
@@ -1459,8 +1468,7 @@ function renderStudentData() {
     if (!n) return false;
     const rec = String(n.recipient || "").trim();
     if (rec === "all" || rec === "students") return true;
-    if (n.circleId && String(n.circleId) === String(student.circleId))
-      return true;
+    if (n.circleId && studentInCircle(student, String(n.circleId))) return true;
     if (rec === "specific_student") {
       const tId = String(n.targetId || "").trim();
       const sId = String(student.id || "").trim();
@@ -2133,7 +2141,7 @@ function renderDashboardView() {
     const teacherCircleIds = teacherCircles.map((c) => c.id);
 
     const teacherStudents = (window.appStore?.students || []).filter(
-      (s) => teacherCircleIds.includes(s.circleId) && s.status === "active",
+      (s) => studentInAnyCircle(s, teacherCircleIds) && s.status === "active",
     );
 
     const todayAtt = (window.appStore?.attendance || []).filter(
@@ -2277,7 +2285,7 @@ window.openTasmeeaDetailsModal = function (type) {
       )
       .map((c) => c.id);
     activeStudents = activeStudents.filter((s) =>
-      teacherCircleIds.includes(s.circleId),
+      studentInAnyCircle(s, teacherCircleIds),
     );
   }
 
