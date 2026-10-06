@@ -844,6 +844,8 @@ function adjustSidebarAndViewsForRole(role) {
       console.warn(e);
     }
     startScreenAccountFullscreen();
+    // الاستماع للتغييرات فقط (بدل مزامنة كاملة دورية) لتقليل القراءات
+    if (typeof startScreenLiveSync === "function") startScreenLiveSync();
   } else if (role === window.ROLES.STUDENT) {
     if (sidebar) sidebar.style.display = "none";
     if (mainContent) mainContent.style.marginRight = "0";
@@ -2079,6 +2081,8 @@ function refreshActiveView(viewId) {
     }
     if (viewId === "view-settings" && typeof renderThemePicker === "function")
       renderThemePicker();
+    if (viewId === "view-settings" && typeof renderBackupStatus === "function")
+      renderBackupStatus();
 
     updateCircleDropdowns();
     applyAppIdentity();
@@ -2566,6 +2570,14 @@ window.handleUserProfileSave = function (e) {
 
 window.handleLogout = function () {
   window.currentUser = null;
+  // إيقاف استماع شاشة العرض ومؤقتاتها حتى لا تستمر القراءات بعد الخروج
+  if (typeof stopScreenLiveSync === "function") stopScreenLiveSync();
+  ["screenFlipTimer", "screenDataRefreshTimer", "screenDayChangeTimer"].forEach(
+    (t) => {
+      if (window[t]) clearInterval(window[t]);
+      window[t] = null;
+    },
+  );
   if (window.autoLogoutTimer) clearTimeout(window.autoLogoutTimer);
   localStorage.removeItem("HALAQAT_SESSION_USER");
   localStorage.removeItem("HALAQAT_SESSION_TIME");

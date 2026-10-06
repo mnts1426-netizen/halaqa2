@@ -2292,25 +2292,52 @@
             <div class="card-header">
               <h3>💾 النسخة الاحتياطية</h3>
               <p class="theme-card-hint">
-                تنزيل نسخة كاملة من قاعدة البيانات (الطلاب، الحلقات، التسميع،
-                التحضير، الاختبارات، المعلمين، الحسابات، الإعدادات...) في ملف
-                واحد على جهازك. العملية للقراءة فقط ولا تغيّر أي بيانات.
+                تنزيل نسخة كاملة من بيانات النظام في ملف Excel واحد: لكل قسم ورقة
+                بجدول عربي مقروء (الطلاب، الحلقات، التسميع، التحضير، الاختبارات،
+                المعلمون، الحسابات، المالية...)، ومعها نسخة مطابقة محفوظة داخل
+                الملف لإعادة البيانات للنظام عند الحاجة. متاحة مرة واحدة كل
+                أسبوعين، ولا تستهلك أي قراءة إلا عند الضغط على الزر.
               </p>
             </div>
-            <div class="flex-align-gap" style="flex-wrap: wrap; padding: 0 1.2rem 1rem">
+            <div class="flex-align-gap" style="flex-wrap: wrap; padding: 0 1.2rem 0.6rem">
               <button
                 class="btn btn-primary"
                 id="btn-download-backup"
                 onclick="downloadFullBackup()"
               >
-                💾 تنزيل نسخة احتياطية الآن
+                💾 تنزيل نسخة احتياطية (Excel)
               </button>
               <small class="text-muted" id="backup-status"></small>
             </div>
+            <p
+              class="theme-card-hint"
+              id="backup-last-info"
+              style="padding: 0 1.2rem 0.6rem; margin: 0; font-weight: 700"
+            ></p>
             <p class="theme-card-hint" style="padding: 0 1.2rem 1rem; margin: 0">
-              ⚠️ الملف يحتوي على كلمات مرور الحسابات، فاحتفظ به في مكان آمن ولا
-              ترسله لأحد.
+              ⚠️ الملف يحتوي على كلمات مرور الحسابات (في النسخة المطابقة)، فاحتفظ
+              به في مكان آمن ولا ترسله لأحد، ولا تعدّل فيه.
             </p>
+          </div>
+          <div class="card nav-admin-only mb-3" id="admin-full-sync-card">
+            <div class="card-header">
+              <h3>🔄 مزامنة كاملة</h3>
+              <p class="theme-card-hint">
+                البرنامج يحمّل التغييرات فقط لتقليل القراءات، ويعيد تحميل كل
+                البيانات تلقائياً مرة كل أسبوع. استخدم هذا الزر فقط إذا لاحظت أن
+                بيانات لا تظهر على هذا الجهاز.
+              </p>
+            </div>
+            <div class="flex-align-gap" style="flex-wrap: wrap; padding: 0 1.2rem 1rem">
+              <button
+                class="btn btn-outline-brown"
+                id="btn-manual-full-sync"
+                onclick="runManualFullSync()"
+              >
+                🔄 مزامنة كاملة الآن
+              </button>
+              <small class="text-muted" id="manual-sync-status"></small>
+            </div>
           </div>
           <div class="card nav-admin-only" id="admin-theme-card">
             <div class="card-header">

@@ -198,6 +198,148 @@ function ensureTeacherLogsContainer() {
   dashboardView.appendChild(logsCard);
 }
 
+// ==========================================================================
+// سجل عمليات المعلمين للمدير: كان يعرض فقط ما حدث على جهاز المدير نفسه، لأن عمليات
+// المعلمين المحفوظة في Firestore لم تكن تُجلب أصلاً. الآن تُجلب للمدير فقط وعند فتح لوحة
+// التحكم فقط: أول مرة آخر 3 أيام، ثم الجديد فقط. تُحفظ في مفتاح مستقل عن بيانات النظام
+// (آخر 7 أيام) حتى لا تزاحمها في ذاكرة المتصفح، والأيام الأقدم تُجلب عند اختيارها فقط.
+// ==========================================================================
+const TEACHER_LOGS_CACHE_KEY = "HALAQAT_TEACHER_LOGS_CACHE_V1";
+const TEACHER_LOGS_INITIAL_DAYS = 3;
+const TEACHER_LOGS_KEEP_DAYS = 7;
+const TEACHER_LOGS_REFRESH_MS = 2 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+let teacherLogsCache = null;
+let teacherLogsFetchInFlight = null;
+const teacherLogsByOlderDate = {};
+
+function loadTeacherLogsCache() {
+  if (teacherLogsCache) return teacherLogsCache;
+  try {
+    const c = JSON.parse(localStorage.getItem(TEACHER_LOGS_CACHE_KEY) || "null");
+    if (c && c.v === 1 && Array.isArray(c.logs)) teacherLogsCache = c;
+  } catch (e) {}
+  if (!teacherLogsCache) {
+    teacherLogsCache = { v: 1, from: 0, cursor: null, lastFetchAt: 0, logs: [] };
+  }
+  return teacherLogsCache;
+}
+
+function saveTeacherLogsCache() {
+  try {
+    localStorage.setItem(TEACHER_LOGS_CACHE_KEY, JSON.stringify(teacherLogsCache));
+  } catch (e) {
+    // لا مساحة كافية: تبقى في الذاكرة فقط، وفي المرة القادمة تُجلب آخر 3 أيام من جديد
+    try {
+      localStorage.removeItem(TEACHER_LOGS_CACHE_KEY);
+    } catch (e2) {}
+  }
+}
+
+function localDateStrFromMs(ms) {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// يرجع true إذا وصلت عمليات جديدة
+async function refreshTeacherLogsFromCloud() {
+  if (!window.currentUser || window.currentUser.role !== "admin") return false;
+  if (typeof dbFirestore === "undefined" || !dbFirestore) return false;
+  if (teacherLogsFetchInFlight) return teacherLogsFetchInFlight;
+
+  const cache = loadTeacherLogsCache();
+  const now = Date.now();
+  if (now - (cache.lastFetchAt || 0) < TEACHER_LOGS_REFRESH_MS) return false;
+
+  teacherLogsFetchInFlight = (async () => {
+    try {
+      let docs;
+      // أول مرة، أو لم يُفتح السجل منذ أكثر من 3 أيام: آخر 3 أيام فقط بدل كل ما فات
+      const needWindow =
+        !cache.cursor ||
+        !cache.from ||
+        now - (cache.lastFetchAt || 0) > TEACHER_LOGS_INITIAL_DAYS * DAY_MS;
+      if (needWindow) {
+        const from = now - TEACHER_LOGS_INITIAL_DAYS * DAY_MS;
+        const snap = await dbFirestore
+          .collection("teacherLogs")
+          .where("timestamp", ">=", from)
+          .get();
+        docs = snap.docs;
+        if (!cache.cursor) cache.cursor = newSyncCursor();
+        cache.from = from;
+      } else {
+        docs = await fetchChangedCloudDocs("teacherLogs", cache.cursor, "updatedAt");
+      }
+
+      const byId = new Map(cache.logs.map((l) => [String(l.id), l]));
+      docs.forEach((doc) => {
+        advanceSyncCursor(cache.cursor, doc.data(), "updatedAt");
+        const item = cloudDocToLocalItem(doc);
+        byId.set(String(item.id), item);
+      });
+      const keepFrom = now - TEACHER_LOGS_KEEP_DAYS * DAY_MS;
+      cache.logs = Array.from(byId.values()).filter(
+        (l) => (l.timestamp || 0) >= keepFrom,
+      );
+      cache.from = Math.max(cache.from || 0, keepFrom);
+      cache.lastFetchAt = now;
+      saveTeacherLogsCache();
+      return docs.length > 0;
+    } catch (e) {
+      console.warn("تعذّر جلب سجل عمليات المعلمين:", e);
+      return false;
+    } finally {
+      teacherLogsFetchInFlight = null;
+    }
+  })();
+  return teacherLogsFetchInFlight;
+}
+
+// يوم أقدم من المحفوظ محلياً: يُجلب ذلك اليوم فقط عند اختياره (مرة واحدة لكل يوم في الجلسة)
+async function fetchTeacherLogsForOlderDate(dateStr) {
+  if (teacherLogsByOlderDate[dateStr]) return false;
+  if (typeof dbFirestore === "undefined" || !dbFirestore) return false;
+  teacherLogsByOlderDate[dateStr] = [];
+  try {
+    const snap = await dbFirestore
+      .collection("teacherLogs")
+      .where("date", "==", dateStr)
+      .get();
+    teacherLogsByOlderDate[dateStr] = snap.docs.map(cloudDocToLocalItem);
+    return true;
+  } catch (e) {
+    console.warn("تعذّر جلب عمليات هذا اليوم:", e);
+    delete teacherLogsByOlderDate[dateStr];
+    return false;
+  }
+}
+
+function getAllKnownTeacherLogs() {
+  const byId = new Map();
+  const add = (l) => {
+    if (l && l.id) byId.set(String(l.id), l);
+  };
+  (loadTeacherLogsCache().logs || []).forEach(add);
+  Object.values(teacherLogsByOlderDate).forEach((list) => list.forEach(add));
+  (window.appStore?.teacherLogs || []).forEach(add);
+  return Array.from(byId.values());
+}
+
+// بعد كل عرض للسجل: جلب الجديد (بحد أدنى دقيقتان بين كل جلبين)، وجلب يوم أقدم عند اختياره
+function scheduleTeacherLogsCloudRefresh(filterDate) {
+  refreshTeacherLogsFromCloud().then((changed) => {
+    if (changed) renderTeacherLogsTable();
+  });
+  const cache = loadTeacherLogsCache();
+  if (filterDate && cache.from && filterDate <= localDateStrFromMs(cache.from)) {
+    fetchTeacherLogsForOlderDate(filterDate).then((got) => {
+      if (got) renderTeacherLogsTable();
+    });
+  }
+}
+
 // عرض وتصفية آخر 50 عملية للمعلمين
 window.renderTeacherLogsTable = function () {
   if (!window.currentUser || window.currentUser.role !== "admin") return;
@@ -213,7 +355,9 @@ window.renderTeacherLogsTable = function () {
   const filterDate =
     document.getElementById("filter-teacher-logs-date")?.value || "";
 
-  let logs = window.appStore?.teacherLogs || [];
+  scheduleTeacherLogsCloudRefresh(filterDate);
+
+  const logs = getAllKnownTeacherLogs();
   logs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
   let filtered = logs.filter((log) => {
@@ -4492,18 +4636,48 @@ window.renderScreenView = function () {
       const curIdx = availableScreenSlides.indexOf(window.screenCurrentSlide);
       const nextIdx = (curIdx + 1) % availableScreenSlides.length;
       window.screenCurrentSlide = availableScreenSlides[nextIdx];
+      // وصلت تغييرات جديدة (استماع حساب الشاشة): تُعرض الشريحة التالية ببيانات محدَّثة
+      if (window.__screenDataDirty) {
+        window.__screenDataDirty = false;
+        renderScreenView();
+        return;
+      }
       displayCurrentSlide();
     }, 15000);
   }
 
-  if (window.screenDataRefreshTimer)
-    clearInterval(window.screenDataRefreshTimer);
-  window.screenDataRefreshTimer = setInterval(async () => {
-    if (typeof syncAndPurgeDataFromCloud === "function") {
-      await syncAndPurgeDataFromCloud();
-    }
-    renderScreenView();
-  }, 300000);
+  // المؤقت يُنشأ مرة واحدة (لا يُعاد ضبطه مع كل إعادة رسم للشاشة، وإلا لا يحين موعده أبداً
+  // إذا كانت التغييرات تصل باستمرار)
+  if (!window.screenDataRefreshTimer) {
+    window.screenDataRefreshTimer = setInterval(async () => {
+      const isScreenAccount =
+        window.currentUser && window.currentUser.role === window.ROLES.SCREEN;
+      const screenViewActive = document
+        .getElementById("view-screen")
+        ?.classList.contains("active");
+      // المدير غادر صفحة الشاشة: لا داعي لمزامنة دورية بعد الآن
+      if (!isScreenAccount && !screenViewActive) {
+        clearInterval(window.screenDataRefreshTimer);
+        window.screenDataRefreshTimer = null;
+        return;
+      }
+      if (
+        isScreenAccount &&
+        typeof isScreenLiveSyncActive === "function" &&
+        isScreenLiveSyncActive()
+      ) {
+        // حساب الشاشة يستمع للتغييرات أصلاً (بلا قراءات عند عدم وجود تغيير)؛ المزامنة هنا
+        // فقط عند حلول المزامنة الكاملة الأسبوعية
+        if (typeof isFullCloudSyncDue === "function" && isFullCloudSyncDue()) {
+          await syncAndPurgeDataFromCloud();
+          if (typeof startScreenLiveSync === "function") startScreenLiveSync();
+        }
+      } else if (typeof syncAndPurgeDataFromCloud === "function") {
+        await syncAndPurgeDataFromCloud();
+      }
+      renderScreenView();
+    }, 300000);
+  }
 
   if (!window.screenCurrentDateStr) {
     window.screenCurrentDateStr = new Date().toISOString().split("T")[0];
@@ -5744,7 +5918,9 @@ window.exportPayrollExcel = function () {
 
 
 // ==========================================================================
-// النسخة الاحتياطية الكاملة (للمدير فقط): قراءة فقط من Firestore ثم تنزيل ملف JSON
+// النسخة الاحتياطية الكاملة (للمدير فقط، مرة كل أسبوعين): قراءة فقط من Firestore ثم تنزيل
+// ملف Excel واحد: أوراق مقروءة بالعربي لكل قسم + ورقة مخفية فيها نسخة مطابقة 100% لكل
+// مستند (تُستخدم لاحقاً للاسترجاع، لأن جداول Excel قد تغيّر بعض القيم مثل أصفار الجوال)
 // ==========================================================================
 const BACKUP_COLLECTIONS = [
   "students",
@@ -5759,6 +5935,7 @@ const BACKUP_COLLECTIONS = [
   "teacherLogs",
   "tests",
   "notifications",
+  "messages",
   "payroll",
   "financeExpenses",
   "financeRevenues",
@@ -5768,6 +5945,461 @@ const BACKUP_COLLECTIONS = [
   "logs",
   "deletedTombstones",
 ];
+const BACKUP_MIN_INTERVAL_DAYS = 14;
+const BACKUP_STATUS_CACHE_KEY = "HALAQAT_LAST_BACKUP_INFO";
+const BACKUP_RESTORE_SHEET = "بيانات_الاسترجاع";
+const BACKUP_JSON_CHUNK = 30000;
+
+function backupFormatDateTime(ms) {
+  if (typeof ms !== "number" || !ms) return "";
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+// قيمة من Firestore إلى JSON مطابق (التواريخ من نوع Timestamp تُحفظ بصيغة {__ts})
+function backupPlainValue(v) {
+  if (v && typeof v.toMillis === "function") return { __ts: v.toMillis() };
+  if (Array.isArray(v)) return v.map(backupPlainValue);
+  if (v && typeof v === "object") {
+    const o = {};
+    Object.keys(v).forEach((k) => {
+      o[k] = backupPlainValue(v[k]);
+    });
+    return o;
+  }
+  return v;
+}
+
+function readLastBackupInfoCache() {
+  try {
+    return JSON.parse(localStorage.getItem(BACKUP_STATUS_CACHE_KEY) || "null");
+  } catch (e) {
+    return null;
+  }
+}
+
+function nextBackupAllowedAt(lastMs) {
+  return lastMs + BACKUP_MIN_INTERVAL_DAYS * 24 * 60 * 60 * 1000;
+}
+
+window.renderBackupStatus = function () {
+  const el = document.getElementById("backup-last-info");
+  if (!el) return;
+  const info = readLastBackupInfoCache();
+  if (!info || !info.lastMs) {
+    el.textContent = "";
+    return;
+  }
+  el.textContent = `آخر نسخة: ${backupFormatDateTime(info.lastMs)} — النسخة القادمة متاحة من: ${backupFormatDateTime(nextBackupAllowedAt(info.lastMs))}`;
+};
+
+// أوراق العرض المقروءة: [اسم الورقة، المجموعة، الأعمدة [العنوان، دالة القيمة]، ترتيب]
+function buildBackupReadableSheets(data) {
+  const byId = (col) => {
+    const m = new Map();
+    (data[col] || []).forEach((d) => m.set(String(d.id), d));
+    return m;
+  };
+  const students = byId("students");
+  const circles = byId("circles");
+  const teachers = byId("teachers");
+  const stuName = (id) => (students.get(String(id)) || {}).name || "";
+  const circleName = (id) => (circles.get(String(id)) || {}).name || "";
+  const teacherName = (id) => (teachers.get(String(id)) || {}).name || "";
+  const yesNo = (v) => (v === true ? "نعم" : v === false ? "لا" : "");
+  const attStatus = (v) =>
+    ({
+      present: "حاضر",
+      absent: "غائب",
+      late: "متأخر",
+      excused: "مستأذن",
+      "": "غير محدد",
+    })[v ?? ""] ??
+    v ??
+    "";
+  const recStatus = (v) =>
+    ({ active: "نشط", archived: "مؤرشف", suspended: "موقوف", inactive: "غير نشط" })[
+      v
+    ] ||
+    v ||
+    "";
+  const byWho = (v) =>
+    ({ admin: "المدير", teacher: "المعلم" })[v] || v || "";
+  const role = (v) =>
+    ({ admin: "مدير", teacher: "معلم", student: "طالب", screen: "شاشة العرض" })[
+      v
+    ] ||
+    v ||
+    "";
+  const txt = (k) => (d) => (d[k] === undefined || d[k] === null ? "" : d[k]);
+  const byDateDesc = (a, b) =>
+    String(b.date || "").localeCompare(String(a.date || "")) ||
+    circleName(a.circleId).localeCompare(circleName(b.circleId), "ar") ||
+    stuName(a.studentId).localeCompare(stuName(b.studentId), "ar");
+
+  const studentCountByCircle = {};
+  (data.students || []).forEach((s) => {
+    [s.circleId, ...(Array.isArray(s.extraCircleIds) ? s.extraCircleIds : [])]
+      .filter(Boolean)
+      .forEach((cid) => {
+        studentCountByCircle[cid] = (studentCountByCircle[cid] || 0) + 1;
+      });
+  });
+
+  return [
+    [
+      "الطلاب",
+      "students",
+      [
+        ["الاسم", txt("name")],
+        ["رقم الهوية", txt("nationalId")],
+        ["الحلقة", (d) => circleName(d.circleId)],
+        [
+          "حلقات إضافية",
+          (d) =>
+            (Array.isArray(d.extraCircleIds) ? d.extraCircleIds : [])
+              .map(circleName)
+              .filter(Boolean)
+              .join("، "),
+        ],
+        ["جوال الطالب", txt("phone")],
+        ["ولي الأمر", txt("parentName")],
+        ["صلة القرابة", txt("parentRelation")],
+        ["جوال ولي الأمر", txt("parentPhone")],
+        ["العمر", txt("age")],
+        ["مقدار الحفظ", txt("hifzAmount")],
+        ["السكن", txt("residence")],
+        ["الحالة", (d) => recStatus(d.status)],
+        ["تاريخ الإضافة", (d) => backupFormatDateTime(d.createdAt)],
+        ["آخر دخول", txt("lastLogin")],
+      ],
+      (a, b) =>
+        circleName(a.circleId).localeCompare(circleName(b.circleId), "ar") ||
+        String(a.name || "").localeCompare(String(b.name || ""), "ar"),
+    ],
+    [
+      "الحلقات",
+      "circles",
+      [
+        ["اسم الحلقة", txt("name")],
+        [
+          "المعلمون",
+          (d) =>
+            Array.from(
+              new Set([
+                ...(Array.isArray(d.teacherIds) ? d.teacherIds : []),
+                ...(d.teacherId ? [d.teacherId] : []),
+              ]),
+            )
+              .map(teacherName)
+              .filter(Boolean)
+              .join("، "),
+        ],
+        ["المسجد", txt("mosque")],
+        ["عدد الطلاب", (d) => studentCountByCircle[d.id] || 0],
+        ["الحالة", (d) => recStatus(d.status)],
+      ],
+      (a, b) => String(a.name || "").localeCompare(String(b.name || ""), "ar"),
+    ],
+    [
+      "المعلمون",
+      "teachers",
+      [
+        ["الاسم", txt("name")],
+        ["الجوال", txt("phone")],
+        ["الحالة", (d) => recStatus(d.status)],
+        ["مسؤول المالية", (d) => yesNo(d.isFinance)],
+        ["آخر دخول", txt("lastLogin")],
+      ],
+      (a, b) => String(a.name || "").localeCompare(String(b.name || ""), "ar"),
+    ],
+    [
+      "الحسابات",
+      "users",
+      [
+        ["الاسم", txt("name")],
+        ["اسم المستخدم", txt("username")],
+        ["الصلاحية", (d) => role(d.role)],
+        ["الحالة", (d) => recStatus(d.status)],
+        ["الجوال", txt("phone")],
+        ["آخر دخول", txt("lastLogin")],
+      ],
+      (a, b) =>
+        role(a.role).localeCompare(role(b.role), "ar") ||
+        String(a.name || "").localeCompare(String(b.name || ""), "ar"),
+    ],
+    [
+      "التسميع",
+      "tasmeea",
+      [
+        ["التاريخ", txt("date")],
+        ["الطالب", (d) => stuName(d.studentId)],
+        ["الحلقة", (d) => circleName(d.circleId)],
+        ["الدرس الجديد", txt("hifzSurah")],
+        ["تقدير الدرس", txt("hifzRating")],
+        ["المراجعة", txt("murajaaSurah")],
+        ["تقدير المراجعة", txt("murajaaRating")],
+        ["التلاوة", txt("tilawaSurah")],
+        ["تقدير التلاوة", txt("tilawaRating")],
+        ["درس الغد", txt("nextHifz")],
+        ["مراجعة الغد", txt("nextMurajaa")],
+        ["تلاوة الغد", txt("nextTilawa")],
+        ["ملاحظة للطالب", txt("studentNotes")],
+        ["ملاحظة للإدارة", txt("adminNotes")],
+        ["بواسطة", (d) => byWho(d.updatedBy)],
+      ],
+      byDateDesc,
+    ],
+    [
+      "التحضير",
+      "attendance",
+      [
+        ["التاريخ", txt("date")],
+        ["الطالب", (d) => stuName(d.studentId)],
+        ["الحلقة", (d) => circleName(d.circleId)],
+        ["الحالة", (d) => attStatus(d.status)],
+        ["ملاحظات", txt("notes")],
+        ["بواسطة", (d) => byWho(d.updatedBy)],
+      ],
+      byDateDesc,
+    ],
+    [
+      "سجل تعديل التحضير",
+      "attendanceHistory",
+      [
+        ["التاريخ", txt("date")],
+        ["الطالب", (d) => stuName(d.studentId)],
+        ["الحلقة", (d) => circleName(d.circleId)],
+        ["الحالة السابقة", (d) => attStatus(d.previousStatus)],
+        ["الملاحظة السابقة", txt("previousNotes")],
+        ["عدّلها", txt("changedByName")],
+        [
+          "وقت التعديل",
+          (d) =>
+            typeof d.savedAt === "number"
+              ? backupFormatDateTime(d.savedAt)
+              : d.savedAt || "",
+        ],
+      ],
+      byDateDesc,
+    ],
+    [
+      "تحضير المعلمين",
+      "teacherAttendance",
+      [
+        ["التاريخ", txt("date")],
+        ["المعلم", (d) => d.teacherName || teacherName(d.teacherId)],
+        ["الحالة", (d) => attStatus(d.status)],
+        ["الوقت", txt("time")],
+        ["ملاحظات", txt("notes")],
+      ],
+      (a, b) =>
+        String(b.date || "").localeCompare(String(a.date || "")) ||
+        String(a.teacherName || "").localeCompare(
+          String(b.teacherName || ""),
+          "ar",
+        ),
+    ],
+    [
+      "الاختبارات",
+      "tests",
+      [
+        ["الطالب", (d) => stuName(d.studentId)],
+        ["الحلقة", (d) => circleName(d.circleId)],
+        ["المرحلية", txt("type")],
+        ["الدرجة", txt("score")],
+        ["التقدير", txt("rating")],
+        ["الجائزة", txt("prize")],
+        ["التاريخ", txt("date")],
+      ],
+      (a, b) =>
+        (typeof marhaliyaOrder === "function"
+          ? marhaliyaOrder(a.type) - marhaliyaOrder(b.type)
+          : 0) || stuName(a.studentId).localeCompare(stuName(b.studentId), "ar"),
+    ],
+    [
+      "كشف المرحليات",
+      "tasmeeaKashf",
+      [
+        ["الطالب", (d) => stuName(d.studentId)],
+        ["الحلقة", (d) => circleName(d.circleId)],
+        ["المرحلية", txt("detail")],
+        ["عدد الصفحات الباقي", txt("remainingPages")],
+        ["ملاحظات", txt("notes")],
+        ["الصفحات الباقية سابقاً", txt("previousRemainingPages")],
+        ["الملاحظة السابقة", txt("previousNotes")],
+        ["آخر تعديل بواسطة", txt("updatedByName")],
+      ],
+      (a, b) =>
+        circleName(a.circleId).localeCompare(circleName(b.circleId), "ar") ||
+        stuName(a.studentId).localeCompare(stuName(b.studentId), "ar"),
+    ],
+    [
+      "سجل عمليات المعلمين",
+      "teacherLogs",
+      [
+        ["التاريخ", txt("date")],
+        ["الوقت", txt("time")],
+        ["المعلم", txt("teacherName")],
+        ["الإجراء", txt("action")],
+        ["الحلقة", txt("circleName")],
+        ["التفاصيل", txt("details")],
+      ],
+      (a, b) => (b.timestamp || 0) - (a.timestamp || 0),
+    ],
+    [
+      "الإشعارات",
+      "notifications",
+      [
+        ["التاريخ", txt("date")],
+        ["العنوان", txt("title")],
+        ["النص", txt("body")],
+        ["المرسل", txt("sender")],
+        ["المستلم", (d) => d.targetName || d.recipient || ""],
+      ],
+      (a, b) => (b.createdAt || 0) - (a.createdAt || 0),
+    ],
+    [
+      "الرواتب",
+      "payroll",
+      [
+        ["الشهر", txt("month")],
+        ["المعلم", (d) => teacherName(d.teacherId)],
+        ["الراتب الأساسي", txt("baseSalary")],
+        ["المكافأة", txt("bonus")],
+      ],
+      (a, b) => String(b.month || "").localeCompare(String(a.month || "")),
+    ],
+    [
+      "الإيرادات",
+      "financeRevenues",
+      [
+        ["التاريخ", txt("date")],
+        ["المصدر", txt("source")],
+        ["المبلغ", txt("amount")],
+        ["بواسطة", txt("createdBy")],
+      ],
+      (a, b) => String(b.date || "").localeCompare(String(a.date || "")),
+    ],
+    [
+      "المصروفات",
+      "financeExpenses",
+      [
+        ["التاريخ", txt("date")],
+        ["البند", txt("category")],
+        ["المبلغ", txt("amount")],
+        ["ملاحظات", txt("notes")],
+        ["بواسطة", txt("createdBy")],
+      ],
+      (a, b) => String(b.date || "").localeCompare(String(a.date || "")),
+    ],
+  ];
+}
+
+function buildBackupWorkbook(data, meta) {
+  const wb = XLSX.utils.book_new();
+  const sheetNames = [];
+  const addSheet = (name, rows, widths) => {
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    if (widths) ws["!cols"] = widths.map((w) => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, ws, name);
+    sheetNames.push(name);
+  };
+
+  const readable = buildBackupReadableSheets(data);
+  const labels = {};
+  readable.forEach(([name, col]) => {
+    labels[col] = name;
+  });
+
+  // 1. ملخص
+  const summary = [
+    ["النسخة الاحتياطية - المنصة الإلكترونية للمَجْمَع القرآني"],
+    [],
+    ["تاريخ النسخة", backupFormatDateTime(meta.createdAtMs)],
+    ["بواسطة", meta.createdBy || ""],
+    ["إجمالي السجلات", meta.total],
+    [],
+    ["القسم", "عدد السجلات"],
+  ];
+  BACKUP_COLLECTIONS.forEach((col) => {
+    summary.push([labels[col] || `بيانات النظام (${col})`, (data[col] || []).length]);
+  });
+  summary.push([]);
+  summary.push([
+    "ملاحظة",
+    "هذا الملف للحفظ والاطلاع. احتفظ به كما هو بدون تعديل، فهو يحتوي نسخة مطابقة من كل البيانات (منها كلمات مرور الحسابات) لإعادتها للنظام عند الحاجة.",
+  ]);
+  addSheet("ملخص", summary, [28, 60]);
+
+  // 2. الأوراق المقروءة
+  readable.forEach(([name, col, columns, sorter]) => {
+    const docs = (data[col] || []).slice();
+    if (sorter) docs.sort(sorter);
+    const rows = [columns.map(([title]) => title)];
+    docs.forEach((d) => {
+      rows.push(
+        columns.map(([, fn]) => {
+          const v = fn(d);
+          return v === undefined || v === null ? "" : v;
+        }),
+      );
+    });
+    addSheet(
+      name,
+      rows,
+      columns.map(([title]) => Math.max(12, Math.min(40, title.length + 8))),
+    );
+  });
+
+  // 3. الإعدادات (بند / قيمة)
+  const settingLabels = {
+    orgName: "اسم المَجْمَع",
+    subTitle: "الاسم الفرعي",
+    directorName: "اسم المدير",
+    location: "الموقع",
+    headerFontSize: "حجم خط الترويسة",
+    logoNew: "الشعار",
+    logoOld: "الشعار القديم",
+    logoLogin: "شعار صفحة الدخول",
+  };
+  const settingsRows = [["المستند", "البند", "القيمة"]];
+  (data.settings || []).forEach((doc) => {
+    Object.keys(doc)
+      .filter((k) => k !== "id" && k !== "updatedAt" && k !== "_srvAt")
+      .forEach((k) => {
+        const v = doc[k];
+        settingsRows.push([
+          doc.id,
+          settingLabels[k] || k,
+          v && typeof v === "object" ? JSON.stringify(backupPlainValue(v)) : v,
+        ]);
+      });
+  });
+  addSheet("الإعدادات", settingsRows, [16, 24, 50]);
+
+  // 4. ورقة الاسترجاع المخفية: مستند في كل صف (المجموعة، المعرف، ثم نص JSON مقسّماً)
+  const restoreRows = [["المجموعة", "المعرف", "البيانات"]];
+  BACKUP_COLLECTIONS.forEach((col) => {
+    (data[col] || []).forEach((doc) => {
+      const json = JSON.stringify(backupPlainValue(doc));
+      const row = [col, String(doc.id)];
+      for (let i = 0; i < json.length; i += BACKUP_JSON_CHUNK) {
+        row.push(json.slice(i, i + BACKUP_JSON_CHUNK));
+      }
+      restoreRows.push(row);
+    });
+  });
+  addSheet(BACKUP_RESTORE_SHEET, restoreRows);
+
+  wb.Workbook = {
+    Views: [{ RTL: true }],
+    Sheets: sheetNames.map((n) => ({
+      Hidden: n === BACKUP_RESTORE_SHEET ? 1 : 0,
+    })),
+  };
+  return wb;
+}
 
 window.downloadFullBackup = async function () {
   const user = window.currentUser;
@@ -5775,59 +6407,135 @@ window.downloadFullBackup = async function () {
     alert("⚠️ النسخة الاحتياطية متاحة لمدير المَجْمَع فقط.");
     return;
   }
-  const btn = document.getElementById("btn-download-backup");
-  const status = document.getElementById("backup-status");
+  if (typeof XLSX === "undefined") {
+    alert("⚠️ مكتبة Excel غير متوفرة، تأكد من الاتصال بالإنترنت ثم أعد تحميل الصفحة.");
+    return;
+  }
   const firestoreDb =
-    window.db || (typeof firebase !== "undefined" ? firebase.firestore() : null);
+    typeof dbFirestore !== "undefined" && dbFirestore
+      ? dbFirestore
+      : typeof firebase !== "undefined"
+        ? firebase.firestore()
+        : null;
   if (!firestoreDb || !navigator.onLine) {
     alert("⚠️ يلزم اتصال بالإنترنت لأخذ النسخة الاحتياطية.");
     return;
   }
 
-  if (btn) btn.disabled = true;
+  const btn = document.getElementById("btn-download-backup");
+  const status = document.getElementById("backup-status");
   const setStatus = (msg) => {
     if (status) status.textContent = msg;
   };
+  if (btn) btn.disabled = true;
 
   try {
-    const backup = {
-      app: "halaqa2",
-      createdAt: new Date().toISOString(),
-      createdBy: user.name || "",
-      counts: {},
-      collections: {},
-    };
-
-    for (let i = 0; i < BACKUP_COLLECTIONS.length; i++) {
-      const col = BACKUP_COLLECTIONS[i];
-      setStatus(`جاري قراءة ${col} (${i + 1}/${BACKUP_COLLECTIONS.length})...`);
-      const snap = await firestoreDb.collection(col).get();
-      backup.collections[col] = snap.docs.map((d) => ({ id: d.id, data: d.data() }));
-      backup.counts[col] = snap.size;
+    // مرة واحدة كل أسبوعين: يُتحقق من آخر نسخة مسجّلة في قاعدة البيانات (قراءة واحدة)
+    setStatus("جاري التحقق من آخر نسخة...");
+    const statusRef = firestoreDb.collection("meta").doc("backupStatus");
+    const statusDoc = await statusRef.get();
+    if (statusDoc.exists) {
+      const s = statusDoc.data() || {};
+      const lastMs =
+        (s.lastAt && typeof s.lastAt.toMillis === "function"
+          ? s.lastAt.toMillis()
+          : 0) ||
+        s.lastAtMs ||
+        0;
+      if (lastMs) {
+        try {
+          localStorage.setItem(
+            BACKUP_STATUS_CACHE_KEY,
+            JSON.stringify({ lastMs, by: s.by || "" }),
+          );
+        } catch (e) {}
+        renderBackupStatus();
+        if (Date.now() < nextBackupAllowedAt(lastMs)) {
+          setStatus("");
+          alert(
+            `⚠️ النسخة الاحتياطية متاحة مرة واحدة كل أسبوعين.\n\nآخر نسخة: ${backupFormatDateTime(lastMs)}\nالنسخة القادمة متاحة من: ${backupFormatDateTime(nextBackupAllowedAt(lastMs))}`,
+          );
+          return;
+        }
+      }
     }
 
-    const total = Object.values(backup.counts).reduce((a, b) => a + b, 0);
-    const blob = new Blob([JSON.stringify(backup)], {
-      type: "application/json;charset=utf-8",
-    });
-    const stamp = new Date()
-      .toISOString()
-      .slice(0, 16)
-      .replace("T", "_")
-      .replace(":", "-");
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `halaqa2_backup_${stamp}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+    const data = {};
+    let total = 0;
+    for (let i = 0; i < BACKUP_COLLECTIONS.length; i++) {
+      const col = BACKUP_COLLECTIONS[i];
+      setStatus(`جاري قراءة البيانات (${i + 1}/${BACKUP_COLLECTIONS.length})...`);
+      const snap = await firestoreDb.collection(col).get();
+      data[col] = snap.docs.map((d) => {
+        const item = { id: d.id, ...backupPlainValue(d.data()) };
+        delete item._srvAt;
+        return item;
+      });
+      total += snap.size;
+    }
 
+    setStatus("جاري تجهيز ملف Excel...");
+    const createdAtMs = Date.now();
+    const wb = buildBackupWorkbook(data, {
+      createdAtMs,
+      createdBy: user.name || "",
+      total,
+    });
+    const d = new Date(createdAtMs);
+    const fileName = `نسخة_احتياطية_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}.xlsx`;
+
+    // تسجيل موعد النسخة قبل التنزيل حتى يُطبَّق حد الأسبوعين
+    try {
+      await statusRef.set(
+        {
+          lastAt: firebase.firestore.FieldValue.serverTimestamp(),
+          lastAtMs: createdAtMs,
+          by: user.name || "",
+          total,
+        },
+        { merge: true },
+      );
+    } catch (e) {
+      console.warn("تعذّر تسجيل موعد النسخة الاحتياطية:", e);
+    }
+    try {
+      localStorage.setItem(
+        BACKUP_STATUS_CACHE_KEY,
+        JSON.stringify({ lastMs: createdAtMs, by: user.name || "" }),
+      );
+    } catch (e) {}
+
+    XLSX.writeFile(wb, fileName);
+    renderBackupStatus();
     setStatus(`✅ تم تنزيل النسخة (${total} سجل)`);
   } catch (e) {
     console.error("فشل أخذ النسخة الاحتياطية:", e);
     setStatus("");
     alert("❌ تعذر أخذ النسخة الاحتياطية، تأكد من الاتصال وحاول مرة أخرى.");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+};
+
+// مزامنة كاملة يدوية (للمدير): تعيد قراءة كل البيانات مرة واحدة الآن
+window.runManualFullSync = async function () {
+  const user = window.currentUser;
+  if (!user || user.role !== window.ROLES.ADMIN) return;
+  if (
+    !confirm(
+      "سيتم تحميل كل البيانات من قاعدة البيانات الآن (مثل أول تشغيل على الجهاز).\nاستخدمها فقط إذا لاحظت أن بيانات لا تظهر على هذا الجهاز.\n\nمتابعة؟",
+    )
+  )
+    return;
+  const btn = document.getElementById("btn-manual-full-sync");
+  const status = document.getElementById("manual-sync-status");
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = "جاري المزامنة الكاملة...";
+  try {
+    const mode = await syncAndPurgeDataFromCloud({ forceFull: true });
+    if (status)
+      status.textContent =
+        mode === "full" ? "✅ تمت المزامنة الكاملة" : "⚠️ تعذّرت المزامنة، حاول لاحقاً";
   } finally {
     if (btn) btn.disabled = false;
   }
