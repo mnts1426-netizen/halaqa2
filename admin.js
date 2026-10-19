@@ -385,7 +385,7 @@ window.renderTeacherLogsTable = function () {
     html += `
       <tr>
         <td style="text-align: center;">${idx + 1}</td>
-        <td dir="ltr" style="text-align: center; font-size: 0.85rem; font-weight: 700;">${item.date} (${item.time})</td>
+        <td dir="ltr" style="text-align: center; font-size: 0.85rem; font-weight: 700;">${formatHijriDate(item.date)} (${item.time})</td>
         <td style="font-weight: 700; color: var(--primary-brown);">${item.teacherName}</td>
         <td><span class="badge badge-active">${item.action}</span></td>
         <td><span style="font-weight: 600;">${item.circleName || "—"}</span></td>
@@ -410,7 +410,7 @@ window.exportTeacherLogsExcel = function () {
   const wb = XLSX.utils.table_to_book(table, { sheet: "عمليات_المعلمين" });
   XLSX.writeFile(
     wb,
-    `سجل_عمليات_المعلمين_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `سجل_عمليات_المعلمين_${hijriFileStamp()}.xlsx`,
   );
 };
 
@@ -430,11 +430,7 @@ window.buildOfficialPrintChrome = function (
   leftSubText,
 ) {
   const now = new Date();
-  const dateDisplay = now.toLocaleDateString("ar-SA", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const dateDisplay = formatHijriDate(now);
   const timeDisplay = now.toLocaleTimeString("ar-SA", {
     hour: "2-digit",
     minute: "2-digit",
@@ -619,7 +615,7 @@ window.directDownloadPDF = function (elementId, filename, title) {
 
     const opt = {
       margin: [6, 6, 6, 6],
-      filename: `${filename}_${new Date().toISOString().split("T")[0]}.pdf`,
+      filename: `${filename}_${hijriFileStamp()}.pdf`,
       image: { type: "jpeg", quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
@@ -795,7 +791,7 @@ window.generateMultiPagePDF = async function (
   }
 
   pdfDoc.deletePage(1);
-  pdfDoc.save(`${filename}_${new Date().toISOString().split("T")[0]}.pdf`);
+  pdfDoc.save(`${filename}_${hijriFileStamp()}.pdf`);
 };
 
 window.printTeachersTable = function () {
@@ -840,7 +836,7 @@ window.exportTeachersExcel = function () {
   const wb = XLSX.utils.table_to_book(table, { sheet: "المعلمون" });
   XLSX.writeFile(
     wb,
-    `قائمة_المعلمين_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `قائمة_المعلمين_${hijriFileStamp()}.xlsx`,
   );
 };
 
@@ -862,7 +858,7 @@ window.exportTeachersAttendanceExcel = function () {
   const wb = XLSX.utils.table_to_book(table, { sheet: "تحضير_المعلمين" });
   XLSX.writeFile(
     wb,
-    `تحضير_المعلمين_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `تحضير_المعلمين_${hijriFileStamp()}.xlsx`,
   );
 };
 
@@ -892,7 +888,7 @@ window.exportAttendanceExcel = function () {
   const wb = XLSX.utils.table_to_book(table, { sheet: "تحضير_الطلاب" });
   XLSX.writeFile(
     wb,
-    `تحضير_الطلاب_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `تحضير_الطلاب_${hijriFileStamp()}.xlsx`,
   );
 };
 
@@ -914,7 +910,7 @@ window.exportAccountsExcel = function () {
   const wb = XLSX.utils.table_to_book(table, { sheet: "الحسابات" });
   XLSX.writeFile(
     wb,
-    `حسابات_النظام_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `حسابات_النظام_${hijriFileStamp()}.xlsx`,
   );
 };
 
@@ -936,7 +932,7 @@ window.exportTestsExcel = function () {
   const wb = XLSX.utils.table_to_book(table, { sheet: "الاختبارات" });
   XLSX.writeFile(
     wb,
-    `سجل_الاختبارات_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `سجل_الاختبارات_${hijriFileStamp()}.xlsx`,
   );
 };
 
@@ -959,7 +955,7 @@ window.exportTeacherNotesExcel = function () {
   const wb = XLSX.utils.table_to_book(table, { sheet: "ملاحظات_المعلمين" });
   XLSX.writeFile(
     wb,
-    `ملاحظات_المعلمين_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `ملاحظات_المعلمين_${hijriFileStamp()}.xlsx`,
   );
 };
 
@@ -984,7 +980,7 @@ window.openStudentsFollowupModal = function () {
     document.getElementById("dashboard-date-select")?.value ||
     new Date().toISOString().split("T")[0];
 
-  if (titleEl) titleEl.textContent = `📋 متابعة الطلاب ليوم (${targetDateStr})`;
+  if (titleEl) titleEl.textContent = `📋 متابعة الطلاب ليوم (${formatHijriDate(targetDateStr)})`;
 
   if (thead) {
     thead.innerHTML = `
@@ -1094,7 +1090,7 @@ window.exportStudentsFollowupExcel = function () {
   const wb = XLSX.utils.table_to_book(table, { sheet: "متابعة_الطلاب" });
   XLSX.writeFile(
     wb,
-    `متابعة_الطلاب_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `متابعة_الطلاب_${hijriFileStamp()}.xlsx`,
   );
 };
 
@@ -1145,7 +1141,7 @@ window.openDashboardDetailsModal = function (type) {
           <td>${s.nationalId || "—"}</td>
           <td>${s.parentPhone || s.phone || "—"}</td>
           <td>${circle ? circle.name : "غير مسجل"}</td>
-          <td dir="ltr" style="text-align: right;">${s.lastLogin || "لم يدخل بعد"}</td>
+          <td dir="ltr" style="text-align: right;">${formatHijriInText(s.lastLogin) || "لم يدخل بعد"}</td>
           <td><span class="badge badge-active">نشط</span></td>
         </tr>
       `;
@@ -1181,7 +1177,7 @@ window.openDashboardDetailsModal = function (type) {
           <td style="font-weight: 700;">${t.name}</td>
           <td>${t.phone || "—"}</td>
           <td>${circleNames}</td>
-          <td dir="ltr" style="text-align: right;">${t.lastLogin || "لم يدخل بعد"}</td>
+          <td dir="ltr" style="text-align: right;">${formatHijriInText(t.lastLogin) || "لم يدخل بعد"}</td>
         </tr>
       `;
     });
@@ -1227,7 +1223,7 @@ window.openDashboardDetailsModal = function (type) {
       '<tr><td colspan="5" class="text-center text-muted p-4">لا توجد حلقات معرفة</td></tr>';
   } else if (type === "present") {
     if (titleEl)
-      titleEl.textContent = `🟢 كشف الطلاب الحاضرين ليوم (${targetDateStr})`;
+      titleEl.textContent = `🟢 كشف الطلاب الحاضرين ليوم (${formatHijriDate(targetDateStr)})`;
     thead.innerHTML = `
       <tr>
         <th style="width: 45px; text-align: center;">م</th>
@@ -1298,7 +1294,7 @@ window.exportDashboardDetailsExcel = function () {
   const wb = XLSX.utils.table_to_book(table, { sheet: "بيانات_لوحة_النظام" });
   XLSX.writeFile(
     wb,
-    `لوحة_النظام_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `لوحة_النظام_${hijriFileStamp()}.xlsx`,
   );
 };
 
@@ -1803,7 +1799,7 @@ window.renderTeachersTable = function () {
         <td style="font-weight: 700;">${escapeHtml(t.name)} ${financeBadge}</td>
         <td>${escapeHtml(t.phone) || "—"}</td>
         <td><span style="font-weight: 600; color: var(--text-dark);">${escapeHtml(circleNamesStr)}</span></td>
-        <td dir="ltr" class="text-muted" style="text-align: right;">${t.lastLogin || "لم يدخل بعد"}</td>
+        <td dir="ltr" class="text-muted" style="text-align: right;">${formatHijriInText(t.lastLogin) || "لم يدخل بعد"}</td>
         <td>
           <div style="display: flex; gap: 0.35rem;">
             <button class="btn btn-outline-brown btn-sm" onclick="openModalEditTeacher('${t.id}')">تعديل</button>
@@ -2440,7 +2436,7 @@ window.renderStudentsTable = function () {
         <td>${escapeHtml(s.parentRelation) || "—"}</td>
         <td style="color: var(--primary-brown); font-weight: 700;">${escapeHtml(s.parentPhone) || "—"}</td>
         <td><span style="font-weight: 600; color: var(--text-dark);">${circleName}</span></td>
-        <td dir="ltr" class="text-muted" style="text-align: right;">${s.lastLogin || "لم يدخل بعد"}</td>
+        <td dir="ltr" class="text-muted" style="text-align: right;">${formatHijriInText(s.lastLogin) || "لم يدخل بعد"}</td>
         <td>
           <span class="badge ${s.status === "active" ? "badge-active" : "badge-danger"}">
             ${s.status === "active" ? "نشط" : "موقوف"}
@@ -2763,7 +2759,7 @@ window.executeBulkExportStudentsExcel = function () {
   const wb = XLSX.utils.table_to_book(table, { sheet: "الطلاب" });
   XLSX.writeFile(
     wb,
-    `كشف_الطلاب_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `كشف_الطلاب_${hijriFileStamp()}.xlsx`,
   );
 };
 
@@ -3394,7 +3390,7 @@ window.openAttendanceHistoryModal = async function () {
         (s) => s.id === e.studentId,
       );
       const stuName = student ? escapeHtml(student.name) : e.studentId;
-      const when = new Date(e.savedAt).toLocaleString("ar-SA");
+      const when = formatHijriDate(e.savedAt, { withTime: true });
       return `
         <tr>
           <td style="font-weight:700;">${stuName}</td>
@@ -3678,7 +3674,7 @@ window.renderTeacherNotesTable = function () {
     html += `
       <tr>
         <td style="text-align: center;">${idx + 1}</td>
-        <td>${t.date || "—"}</td>
+        <td>${escapeHtml(formatHijriDate(t.date)) || "—"}</td>
         <td style="font-weight: 700;">${escapeHtml(teacherName)}</td>
         <td><span style="font-weight: 600; color: var(--text-dark);">${escapeHtml(circle ? circle.name : "—")}</span></td>
         <td style="font-weight: 700; color: var(--primary-brown);">${escapeHtml(student ? student.name : "طالب")}</td>
@@ -3702,6 +3698,8 @@ function getFilteredSortedTests() {
     document.getElementById("filter-test-circle")?.value || "all";
   const marhaliyaFilter =
     document.getElementById("filter-test-marhaliya")?.value || "all";
+  const weekFilter =
+    document.getElementById("filter-test-week")?.value || "all";
   const students = window.appStore?.students || [];
   const circles = window.appStore?.circles || [];
 
@@ -3721,6 +3719,7 @@ function getFilteredSortedTests() {
       if (!matchesCircle) return false;
       if (marhaliyaFilter !== "all" && !sameMarhaliya(test.type, marhaliyaFilter))
         return false;
+      if (!testMatchesStudyWeek(test, weekFilter)) return false;
       if (!searchVal) return true;
       return [studentName, circleName, test.type, test.prize].some(
         (v) => v && String(v).toLowerCase().includes(searchVal),
@@ -3769,6 +3768,19 @@ window.renderTestsTable = function () {
       : "all";
   }
 
+  const weekFilterSelect = document.getElementById("filter-test-week");
+  if (weekFilterSelect) {
+    const currentWeek = weekFilterSelect.value || "all";
+    weekFilterSelect.innerHTML = buildStudyWeekOptionsHtml(
+      (window.appStore?.tests || []).map((t) => t.date),
+    );
+    weekFilterSelect.value = [...weekFilterSelect.options].some(
+      (o) => o.value === currentWeek,
+    )
+      ? currentWeek
+      : "all";
+  }
+
   const rows = getFilteredSortedTests();
 
   let html = rows.length
@@ -3783,7 +3795,7 @@ window.renderTestsTable = function () {
         <td style="font-weight: 700; color: var(--primary-brown);">${escapeHtml(t.score) || "0"} / 100</td>
         <td><span class="badge badge-active">${escapeHtml(t.rating) || "—"}</span></td>
         <td>${escapeHtml(t.prize) || "—"}</td>
-        <td>${escapeHtml(t.date) || "—"}</td>
+        <td>${escapeHtml(formatHijriDate(t.date)) || "—"}</td>
         <td class="no-print">
           <button class="btn btn-outline-brown btn-sm" onclick="openModalEditTest('${t.id}')">تعديل</button>
           <button class="btn btn-danger btn-sm" onclick="deleteTest('${t.id}')">حذف</button>
@@ -3825,7 +3837,7 @@ window.generateTestsReport = function () {
           <td style="${cell} font-weight: 700;">${escapeHtml(t.score) || "0"} / 100</td>
           <td style="${cell}">${escapeHtml(t.rating) || "—"}</td>
           <td style="${cell}">${escapeHtml(t.prize) || "—"}</td>
-          <td style="${cell}">${escapeHtml(t.date) || "—"}</td>
+          <td style="${cell}">${escapeHtml(formatHijriDate(t.date)) || "—"}</td>
         </tr>
       `;
     });
@@ -4097,9 +4109,12 @@ function getSundayToWednesdayDatesForWeek(weekOption = "current") {
   const dayOfWeek = now.getDay();
 
   if (weekOption === "screen_cycle") {
-    const offsetFromWednesday = (dayOfWeek + 4) % 7;
+    // أسبوع التميز المعروض (الشاشة ورسالة الطالب): من الخميس حتى الأربعاء التالي يُعرض
+    // أسبوع الأحد-الأربعاء الذي انتهى، أي آخر أربعاء قبل اليوم (يوم الأربعاء نفسه يعرض
+    // الأسبوع السابق لأن تسميعه لم يكتمل بعد)
+    const daysSinceWednesday = (dayOfWeek - 3 + 7) % 7 || 7;
     const referenceWednesday = new Date(now);
-    referenceWednesday.setDate(now.getDate() - offsetFromWednesday);
+    referenceWednesday.setDate(now.getDate() - daysSinceWednesday);
     const sunday = new Date(referenceWednesday);
     sunday.setDate(referenceWednesday.getDate() - 3);
     const days = [];
@@ -4134,6 +4149,79 @@ function getSundayToWednesdayDatesForWeek(weekOption = "current") {
   }
   return days;
 }
+
+// رقم أسبوع التميز وفترته بالهجري، مثال: "الأسبوع 6 من الأحد 22 ربيع الآخر إلى الأربعاء
+// 25 ربيع الآخر 1448هـ" - الترقيم مستمر من الأحد 30 أغسطس 2026
+const TAMAYUZ_WEEK_EPOCH_SUNDAY = new Date(2026, 7, 30);
+// أسابيع الدوام: الأسبوع 1 يبدأ الأحد 30 أغسطس 2026 (أول يوم دوام)، وكل أسبوع من الأحد إلى
+// السبت، فما يُسجَّل في الخميس-السبت (الإجازة) يتبع الأسبوع الذي انتهى
+window.getStudyWeekNumber = function (dateStr) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateStr || ""));
+  if (!m) return null;
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  const diffDays = Math.round((d - TAMAYUZ_WEEK_EPOCH_SUNDAY) / 86400000);
+  return Math.floor(diffDays / 7) + 1;
+};
+
+window.getStudyWeekRange = function (weekNum) {
+  const sunday = new Date(TAMAYUZ_WEEK_EPOCH_SUNDAY);
+  sunday.setDate(sunday.getDate() + (weekNum - 1) * 7);
+  const wednesday = new Date(sunday);
+  wednesday.setDate(sunday.getDate() + 3);
+  const fmt = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { sunday: fmt(sunday), wednesday: fmt(wednesday) };
+};
+
+window.getStudyWeekLabel = function (weekNum) {
+  if (weekNum < 1) return "قبل بداية الدوام";
+  const r = getStudyWeekRange(weekNum);
+  return `الأسبوع ${weekNum} (${formatHijriDate(r.sunday)} – ${formatHijriDate(r.wednesday)})`;
+};
+
+// خيارات قائمة الأسابيع: "كل الأسابيع" ثم من الأسبوع 1 حتى الأسبوع الحالي (الأحدث أولاً)،
+// مع أي أسبوع آخر فيه سجلات
+window.buildStudyWeekOptionsHtml = function (extraDates) {
+  const current = getStudyWeekNumber(
+    `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+  );
+  const weeks = new Set();
+  for (let w = 1; w <= Math.max(1, current); w++) weeks.add(w);
+  (extraDates || []).forEach((d) => {
+    const w = getStudyWeekNumber(d);
+    if (w !== null) weeks.add(w < 1 ? 0 : w);
+  });
+  let html = '<option value="all">كل الأسابيع</option>';
+  Array.from(weeks)
+    .sort((a, b) => b - a)
+    .forEach((w) => {
+      html += `<option value="${w}">${getStudyWeekLabel(w)}</option>`;
+    });
+  return html;
+};
+
+window.testMatchesStudyWeek = function (test, weekFilter) {
+  if (!weekFilter || weekFilter === "all") return true;
+  const w = getStudyWeekNumber(test && test.date);
+  if (w === null) return false;
+  return String(w < 1 ? 0 : w) === String(weekFilter);
+};
+
+window.getTamayuzDisplayWeekLabel = function () {
+  const days = getSundayToWednesdayDatesForWeek("screen_cycle");
+  if (!days || days.length < 4) return "";
+  const [sy, sm, sd] = days[0].split("-").map(Number);
+  const [, wm, wd] = days[3].split("-").map(Number);
+  const sundayDate = new Date(sy, sm - 1, sd);
+  const diffDays = Math.round(
+    (sundayDate - TAMAYUZ_WEEK_EPOCH_SUNDAY) / (24 * 60 * 60 * 1000),
+  );
+  const weekNum = Math.max(1, Math.floor(diffDays / 7) + 1);
+  if (window.HIJRI_SUPPORTED) {
+    return `الأسبوع ${weekNum} من الأحد ${formatHijriDate(days[0])} إلى الأربعاء ${formatHijriDate(days[3])}`;
+  }
+  return `الأسبوع ${weekNum} من الأحد ${sd} / ${sm} إلى الأربعاء ${wd} / ${wm}`;
+};
 
 function isStudentTamayuzForWeek(studentId, weekOption = "current") {
   const weekDays = getSundayToWednesdayDatesForWeek(weekOption);
@@ -4371,26 +4459,13 @@ window.renderScreenView = function () {
       const dayName = new Intl.DateTimeFormat("ar", {
         weekday: "long",
       }).format(dateObj);
+      if (window.HIJRI_SUPPORTED) return `يوم ${dayName} ${formatHijriDate(dateObj)}`;
       return day && month && year
         ? `يوم ${dayName} ${day} / ${month} / ${year}هـ`
         : "";
     } catch (e) {
       return "";
     }
-  };
-
-  const SCREEN_TAMAYUZ_EPOCH_SUNDAY = new Date(2026, 7, 30);
-  const buildTamayuzWeekPeriodLabel = () => {
-    const days = getSundayToWednesdayDatesForWeek("screen_cycle");
-    if (!days || days.length < 4) return "";
-    const [sy, sm, sd] = days[0].split("-").map(Number);
-    const [, wm, wd] = days[3].split("-").map(Number);
-    const sundayDate = new Date(sy, sm - 1, sd);
-    const diffDays = Math.round(
-      (sundayDate - SCREEN_TAMAYUZ_EPOCH_SUNDAY) / (24 * 60 * 60 * 1000),
-    );
-    const weekNum = Math.max(1, Math.floor(diffDays / 7) + 1);
-    return `الأسبوع ${weekNum} من الأحد ${sd} / ${sm} إلى الأربعاء ${wd} / ${wm}`;
   };
 
   const displayCurrentSlide = () => {
@@ -4465,7 +4540,7 @@ window.renderScreenView = function () {
                 <div class="screen-board-title">
                   <h2>المتميزون في الحلقات</h2>
                   <p>الحضور كامل الاسبوع وحصول الطالب على تقدير ممتاز على المنهج لكل الاسبوع</p>
-                  <p class="screen-board-period">${buildTamayuzWeekPeriodLabel()}</p>
+                  <p class="screen-board-period">${getTamayuzDisplayWeekLabel()}</p>
                 </div>
                 <img src="report_logo_left.png" alt="شعار المَجْمَع" />
               </div>
@@ -5334,7 +5409,7 @@ window.renderNotificationsView = function () {
             <p class="text-muted" style="font-size: 0.9rem; margin-bottom: 6px;">${n.body}</p>
             <div class="flex-between" style="font-size: 0.75rem; color: #888;">
               <span>من: ${n.sender || "الإدارة"}</span>
-              <span>${n.date || ""}</span>
+              <span>${escapeHtml(n.createdAt ? formatHijriDate(n.createdAt) : formatHijriInText(n.date || ""))}</span>
             </div>
           </div>
         `,
@@ -5605,7 +5680,7 @@ window.renderFinanceReports = function () {
           .map(
             (r) => `
         <tr>
-          <td>${escapeHtml(r.date) || "—"}</td>
+          <td>${escapeHtml(formatHijriDate(r.date)) || "—"}</td>
           <td>${escapeHtml(r.source) || "—"}</td>
           <td style="color:#2e7d32; font-weight:800;">${fmt(parseFloat(r.amount) || 0)}</td>
           <td class="nav-admin-only">${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="deleteFinanceRevenue('${r.id}')">حذف</button>` : ""}</td>
@@ -5621,7 +5696,7 @@ window.renderFinanceReports = function () {
           .map(
             (e) => `
         <tr>
-          <td>${escapeHtml(e.date) || "—"}</td>
+          <td>${escapeHtml(formatHijriDate(e.date)) || "—"}</td>
           <td>${escapeHtml(e.category) || "—"}</td>
           <td>${escapeHtml(e.notes) || "—"}</td>
           <td style="color:#c62828; font-weight:800;">${fmt(parseFloat(e.amount) || 0)}</td>
@@ -5731,7 +5806,7 @@ window.exportFinanceRevenuesExcel = function () {
   const wb = XLSX.utils.table_to_book(table, { sheet: "الإيرادات" });
   XLSX.writeFile(
     wb,
-    `سجل_الإيرادات_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `سجل_الإيرادات_${hijriFileStamp()}.xlsx`,
   );
 };
 
@@ -5744,7 +5819,7 @@ window.exportFinanceExpensesExcel = function () {
   const wb = XLSX.utils.table_to_book(table, { sheet: "المصروفات" });
   XLSX.writeFile(
     wb,
-    `سجل_المصروفات_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `سجل_المصروفات_${hijriFileStamp()}.xlsx`,
   );
 };
 
@@ -5912,7 +5987,7 @@ window.exportPayrollExcel = function () {
   const wb = XLSX.utils.table_to_book(table, { sheet: "مسير الرواتب" });
   XLSX.writeFile(
     wb,
-    `مسير_الرواتب_${new Date().toISOString().split("T")[0]}.xlsx`,
+    `مسير_الرواتب_${hijriFileStamp()}.xlsx`,
   );
 };
 
@@ -5952,6 +6027,8 @@ const BACKUP_JSON_CHUNK = 30000;
 
 function backupFormatDateTime(ms) {
   if (typeof ms !== "number" || !ms) return "";
+  if (typeof formatHijriDate === "function")
+    return formatHijriDate(ms, { withTime: true });
   const d = new Date(ms);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
@@ -6032,6 +6109,12 @@ function buildBackupReadableSheets(data) {
     v ||
     "";
   const txt = (k) => (d) => (d[k] === undefined || d[k] === null ? "" : d[k]);
+  const hijriTxt = (k) => (d) =>
+    d[k] === undefined || d[k] === null || d[k] === ""
+      ? ""
+      : typeof formatHijriDate === "function"
+        ? formatHijriDate(d[k])
+        : d[k];
   const byDateDesc = (a, b) =>
     String(b.date || "").localeCompare(String(a.date || "")) ||
     circleName(a.circleId).localeCompare(circleName(b.circleId), "ar") ||
@@ -6071,7 +6154,7 @@ function buildBackupReadableSheets(data) {
         ["السكن", txt("residence")],
         ["الحالة", (d) => recStatus(d.status)],
         ["تاريخ الإضافة", (d) => backupFormatDateTime(d.createdAt)],
-        ["آخر دخول", txt("lastLogin")],
+        ["آخر دخول", (d) => formatHijriInText(d.lastLogin || "")],
       ],
       (a, b) =>
         circleName(a.circleId).localeCompare(circleName(b.circleId), "ar") ||
@@ -6109,7 +6192,7 @@ function buildBackupReadableSheets(data) {
         ["الجوال", txt("phone")],
         ["الحالة", (d) => recStatus(d.status)],
         ["مسؤول المالية", (d) => yesNo(d.isFinance)],
-        ["آخر دخول", txt("lastLogin")],
+        ["آخر دخول", (d) => formatHijriInText(d.lastLogin || "")],
       ],
       (a, b) => String(a.name || "").localeCompare(String(b.name || ""), "ar"),
     ],
@@ -6122,7 +6205,7 @@ function buildBackupReadableSheets(data) {
         ["الصلاحية", (d) => role(d.role)],
         ["الحالة", (d) => recStatus(d.status)],
         ["الجوال", txt("phone")],
-        ["آخر دخول", txt("lastLogin")],
+        ["آخر دخول", (d) => formatHijriInText(d.lastLogin || "")],
       ],
       (a, b) =>
         role(a.role).localeCompare(role(b.role), "ar") ||
@@ -6132,7 +6215,7 @@ function buildBackupReadableSheets(data) {
       "التسميع",
       "tasmeea",
       [
-        ["التاريخ", txt("date")],
+        ["التاريخ", hijriTxt("date")],
         ["الطالب", (d) => stuName(d.studentId)],
         ["الحلقة", (d) => circleName(d.circleId)],
         ["الدرس الجديد", txt("hifzSurah")],
@@ -6154,7 +6237,7 @@ function buildBackupReadableSheets(data) {
       "التحضير",
       "attendance",
       [
-        ["التاريخ", txt("date")],
+        ["التاريخ", hijriTxt("date")],
         ["الطالب", (d) => stuName(d.studentId)],
         ["الحلقة", (d) => circleName(d.circleId)],
         ["الحالة", (d) => attStatus(d.status)],
@@ -6167,7 +6250,7 @@ function buildBackupReadableSheets(data) {
       "سجل تعديل التحضير",
       "attendanceHistory",
       [
-        ["التاريخ", txt("date")],
+        ["التاريخ", hijriTxt("date")],
         ["الطالب", (d) => stuName(d.studentId)],
         ["الحلقة", (d) => circleName(d.circleId)],
         ["الحالة السابقة", (d) => attStatus(d.previousStatus)],
@@ -6187,7 +6270,7 @@ function buildBackupReadableSheets(data) {
       "تحضير المعلمين",
       "teacherAttendance",
       [
-        ["التاريخ", txt("date")],
+        ["التاريخ", hijriTxt("date")],
         ["المعلم", (d) => d.teacherName || teacherName(d.teacherId)],
         ["الحالة", (d) => attStatus(d.status)],
         ["الوقت", txt("time")],
@@ -6210,7 +6293,7 @@ function buildBackupReadableSheets(data) {
         ["الدرجة", txt("score")],
         ["التقدير", txt("rating")],
         ["الجائزة", txt("prize")],
-        ["التاريخ", txt("date")],
+        ["التاريخ", hijriTxt("date")],
       ],
       (a, b) =>
         (typeof marhaliyaOrder === "function"
@@ -6238,7 +6321,7 @@ function buildBackupReadableSheets(data) {
       "سجل عمليات المعلمين",
       "teacherLogs",
       [
-        ["التاريخ", txt("date")],
+        ["التاريخ", hijriTxt("date")],
         ["الوقت", txt("time")],
         ["المعلم", txt("teacherName")],
         ["الإجراء", txt("action")],
@@ -6251,7 +6334,7 @@ function buildBackupReadableSheets(data) {
       "الإشعارات",
       "notifications",
       [
-        ["التاريخ", txt("date")],
+        ["التاريخ", hijriTxt("date")],
         ["العنوان", txt("title")],
         ["النص", txt("body")],
         ["المرسل", txt("sender")],
@@ -6274,7 +6357,7 @@ function buildBackupReadableSheets(data) {
       "الإيرادات",
       "financeRevenues",
       [
-        ["التاريخ", txt("date")],
+        ["التاريخ", hijriTxt("date")],
         ["المصدر", txt("source")],
         ["المبلغ", txt("amount")],
         ["بواسطة", txt("createdBy")],
@@ -6285,7 +6368,7 @@ function buildBackupReadableSheets(data) {
       "المصروفات",
       "financeExpenses",
       [
-        ["التاريخ", txt("date")],
+        ["التاريخ", hijriTxt("date")],
         ["البند", txt("category")],
         ["المبلغ", txt("amount")],
         ["ملاحظات", txt("notes")],
@@ -6482,7 +6565,7 @@ window.downloadFullBackup = async function () {
       total,
     });
     const d = new Date(createdAtMs);
-    const fileName = `نسخة_احتياطية_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}.xlsx`;
+    const fileName = `نسخة_احتياطية_${hijriFileStamp()}.xlsx`;
 
     // تسجيل موعد النسخة قبل التنزيل حتى يُطبَّق حد الأسبوعين
     try {

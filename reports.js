@@ -77,7 +77,7 @@ function populateReportWeekRangeDropdowns() {
 
   let optionsHtml = "";
   for (let n = 1; n <= currentWeekNum; n++) {
-    const hijriLabel = getHijriShortLabel(getSundayDateForWeekNumber(n));
+    const hijriLabel = formatHijriDate(getSundayDateForWeekNumber(n));
     optionsHtml += `<option value="${n}">الأسبوع ${n}${hijriLabel ? ` (${hijriLabel})` : ""}</option>`;
   }
 
@@ -150,6 +150,21 @@ function handleReportTypeChange() {
   if (wrapper) wrapper.style.display = "none";
 
   if (circleGroup) circleGroup.style.display = "block";
+
+  // فلتر الأسبوع يظهر في تقرير الاختبارات فقط
+  const testWeekGroup = document.getElementById("report-test-week-group");
+  const testWeekSelect = document.getElementById("report-test-week-select");
+  if (testWeekGroup) {
+    const usesWeek =
+      reportType === "marhaliyat_report" || reportType === "exams_report";
+    testWeekGroup.style.display = usesWeek ? "block" : "none";
+    if (usesWeek && testWeekSelect) {
+      testWeekSelect.innerHTML = buildStudyWeekOptionsHtml(
+        (window.appStore?.tests || []).map((t) => t.date),
+      );
+      testWeekSelect.value = "all";
+    }
+  }
 
   // فلتر المرحلية يظهر في تقرير الاختبارات فقط (كشف المرحليات بحث عادي بالحلقة)
   const marhaliyaGroup = document.getElementById("report-marhaliya-group");
@@ -242,9 +257,7 @@ function formatArabicDayAndDate(dateStr) {
     "السبت",
   ];
   const dayName = days[d.getDay()];
-  const m = d.getMonth() + 1;
-  const day = d.getDate();
-  return `${dayName} ${m}/${day}`;
+  return `${dayName} ${formatHijriDate(dateStr)}`;
 }
 
 // بناء ترويسة وتذييل التقارير الرسمية المطابقة للنماذج المعتمدة
@@ -414,7 +427,7 @@ function generateReport() {
 
     const studentDailyPeriodText =
       dateFrom && dateTo
-        ? `من ${dateFrom} إلى ${dateTo}`
+        ? `من ${formatHijriDate(dateFrom)} إلى ${formatHijriDate(dateTo)}`
         : "كامل الفترة المسجلة";
     headerLeftText = `الفترة / ${studentDailyPeriodText}`;
 
@@ -566,7 +579,7 @@ function generateReport() {
     reportTitle = "تقرير شامل";
     const periodText =
       dateFrom && dateTo
-        ? `من ${dateFrom} إلى ${dateTo}`
+        ? `من ${formatHijriDate(dateFrom)} إلى ${formatHijriDate(dateTo)}`
         : "كامل الفترة المسجلة";
     headerLeftText = `الفترة / ${periodText}`;
 
@@ -827,6 +840,10 @@ function generateReport() {
 
     const marhaliyaFilter =
       document.getElementById("report-marhaliya-select")?.value || "all";
+    const testWeekFilter =
+      document.getElementById("report-test-week-select")?.value || "all";
+    if (testWeekFilter !== "all")
+      headerLeftText = getStudyWeekLabel(Number(testWeekFilter));
     const allStudents = window.appStore.students || [];
     const allCircles = window.appStore.circles || [];
     const rows = (window.appStore.tests || [])
@@ -849,6 +866,7 @@ function generateReport() {
         ({ t }) =>
           marhaliyaFilter === "all" || sameMarhaliya(t.type, marhaliyaFilter),
       )
+      .filter(({ t }) => testMatchesStudyWeek(t, testWeekFilter))
       .sort(
         (a, b) =>
           marhaliyaOrder(a.t.type) - marhaliyaOrder(b.t.type) ||
@@ -869,7 +887,7 @@ function generateReport() {
             <td style="${cellStyle} font-weight: 700;">${escapeHtml(t.score) || "0"} / 100</td>
             <td style="${cellStyle}">${escapeHtml(t.rating) || "—"}</td>
             <td style="${cellStyle}">${escapeHtml(t.prize) || "—"}</td>
-            <td style="${cellStyle}">${escapeHtml(t.date) || "—"}</td>
+            <td style="${cellStyle}">${escapeHtml(formatHijriDate(t.date)) || "—"}</td>
             ${withSignature ? `<td style="${cellStyle} height: 34px;"></td>` : ""}
           </tr>
         `;
@@ -929,7 +947,7 @@ function exportReportExcel() {
     return;
   }
   const wb = XLSX.utils.table_to_book(table, { sheet: "التقرير" });
-  XLSX.writeFile(wb, `تقرير_${toLocalDateStr(new Date())}.xlsx`);
+  XLSX.writeFile(wb, `تقرير_${hijriFileStamp()}.xlsx`);
 }
 
 async function imageToDataUri(url) {
@@ -1004,7 +1022,7 @@ async function downloadReportWord() {
   });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `${safeFilename}_${toLocalDateStr(new Date())}.doc`;
+  link.download = `${safeFilename}_${hijriFileStamp()}.doc`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -1050,7 +1068,7 @@ function downloadReportPDF() {
   } else if (typeof html2pdf !== "undefined") {
     const opt = {
       margin: [8, 8, 8, 8],
-      filename: `${safeFilename}_${toLocalDateStr(new Date())}.pdf`,
+      filename: `${safeFilename}_${hijriFileStamp()}.pdf`,
       image: { type: "jpeg", quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: "mm", format: "a4", orientation: orientation },

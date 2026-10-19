@@ -33,6 +33,9 @@
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#0a5c71" />
     <link rel="apple-touch-icon" href="logo12.jpeg" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="حلقات الهدى" />
     <!-- مكتبة إشعارات Push الفورية (OneSignal) -->
     <script
       src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
@@ -82,9 +85,14 @@
               <div class="form-group">
                 <label for="login-password">كلمة المرور</label>
                 <input
-                  type="password"
+                  type="text"
                   id="login-password"
-                  class="form-control"
+                  class="form-control no-browser-save-password"
+                  data-masked-password="1"
+                  autocomplete="off"
+                  autocapitalize="off"
+                  autocorrect="off"
+                  spellcheck="false"
                   placeholder="••••••••"
                   required
                 />
@@ -173,9 +181,14 @@
               <div class="form-group">
                 <label for="stu-login-password">الرقم السري للطالب</label>
                 <input
-                  type="password"
+                  type="text"
                   id="stu-login-password"
-                  class="form-control"
+                  class="form-control no-browser-save-password"
+                  data-masked-password="1"
+                  autocomplete="off"
+                  autocapitalize="off"
+                  autocorrect="off"
+                  spellcheck="false"
                   placeholder="الرقم السري (1111)..."
                   required
                 />
@@ -1636,6 +1649,13 @@
               >
                 <option value="all">كل المرحليات</option>
               </select>
+              <select
+                id="filter-test-week"
+                class="form-control select-input"
+                onchange="renderTestsTable()"
+              >
+                <option value="all">كل الأسابيع</option>
+              </select>
             </div>
             <div class="table-responsive">
               <table class="data-table" id="tests-table-element">
@@ -1687,6 +1707,12 @@
                 <label>المرحلية</label>
                 <select id="report-marhaliya-select" class="form-control">
                   <option value="all">كل المرحليات</option>
+                </select>
+              </div>
+              <div class="form-group" id="report-test-week-group" style="display: none">
+                <label>الأسبوع</label>
+                <select id="report-test-week-select" class="form-control">
+                  <option value="all">كل الأسابيع</option>
                 </select>
               </div>
               <div class="form-group" id="report-student-group">

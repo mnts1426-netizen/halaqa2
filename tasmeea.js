@@ -812,6 +812,21 @@ function toggleTasmeeaAccordion(studentId) {
 
   const isHidden =
     details.style.display === "none" || details.style.display === "";
+
+  // فتح طالب يُغلق شريط الطالب المفتوح قبله (ما كُتب فيه يبقى محفوظاً في مكانه ولا يُمسح)
+  if (isHidden) {
+    document
+      .querySelectorAll('#tasmeea-students-container [id^="tasmeea-details-"]')
+      .forEach((other) => {
+        if (other === details || other.style.display !== "block") return;
+        other.style.display = "none";
+        const otherArrow = document.getElementById(
+          other.id.replace("tasmeea-details-", "tasmeea-arrow-"),
+        );
+        if (otherArrow) otherArrow.textContent = "▼";
+      });
+  }
+
   details.style.display = isHidden ? "block" : "none";
   if (arrow) {
     arrow.textContent = isHidden ? "▲" : "▼";

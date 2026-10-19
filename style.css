@@ -2242,3 +2242,58 @@ body.screen-only-mode #view-screen #mosque-screen-grid {
     color: #e9c877;
   }
 }
+
+/* حقلا كلمة المرور في صفحتي الدخول: يُظهران نقاطاً لكن لا يتعرّف عليهما المتصفح كحقل كلمة
+   مرور، فلا يسأل "حفظ كلمة المرور؟" ولا يحذّر من كلمة مرور مسرّبة عند كل دخول. يُعرض
+   سؤال الحفظ فقط بعد أن يغيّر الشخص كلمة مرور حسابه (راجع offerBrowserToSavePassword) */
+.no-browser-save-password {
+  -webkit-text-security: disc;
+}
+
+/* خانات التاريخ الهجري (يوم / شهر / سنة) بدل خانة التاريخ الميلادي */
+.hijri-native-hidden {
+  display: none !important;
+}
+
+.hijri-date-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.form-group .hijri-date-picker {
+  display: flex;
+}
+
+/* تتقلّص القوائم الثلاث مع الشاشة الضيقة (الجوال) وتنزل لسطر ثانٍ عند الحاجة بدل أن تتجاوز العرض */
+.form-group:has(> .hijri-date-picker),
+.flex-1:has(> .hijri-date-picker) {
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .hijri-date-picker {
+    flex-wrap: wrap;
+  }
+  .hijri-date-picker select.form-control {
+    font-size: 0.85rem;
+  }
+}
+
+.hijri-date-picker select.form-control {
+  width: auto;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding-inline: 0.45rem;
+  font-weight: 700;
+}
+
+.hijri-date-picker select.hijri-day {
+  flex: 0 1 4.6rem;
+}
+
+.hijri-date-picker select.hijri-year {
+  flex: 0 1 5.4rem;
+}

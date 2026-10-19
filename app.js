@@ -125,6 +125,41 @@ document.addEventListener("DOMContentLoaded", () => {
   checkSavedSession();
 });
 
+// المتصفحات التي لا تدعم إخفاء النص بالنقاط: يرجع الحقل كلمة مرور عادية حتى لا يظهر مكشوفاً
+document.addEventListener("DOMContentLoaded", () => {
+  const canMask =
+    window.CSS &&
+    typeof CSS.supports === "function" &&
+    CSS.supports("-webkit-text-security", "disc");
+  if (!canMask) {
+    document
+      .querySelectorAll('input[data-masked-password="1"]')
+      .forEach((el) => {
+        el.type = "password";
+      });
+  }
+});
+
+// سؤال المتصفح "حفظ كلمة المرور؟" يظهر فقط بعد تغيير الشخص لكلمة مرور حسابه (المتصفحات
+// الداعمة: Chrome وEdge)، وليس عند كل تسجيل دخول
+window.offerBrowserToSavePassword = function (user, newPass) {
+  try {
+    if (!user || !newPass || !window.PasswordCredential || !navigator.credentials)
+      return;
+    const loginId = user.username || user.nationalId || user.phone;
+    if (!loginId) return;
+    navigator.credentials
+      .store(
+        new PasswordCredential({
+          id: String(loginId),
+          password: String(newPass),
+          name: user.name || String(loginId),
+        }),
+      )
+      .catch(() => {});
+  } catch (e) {}
+};
+
 // محرك توثيق عمليات المعلمين في النظام
 window.logTeacherActivity = function (
   action,
@@ -167,6 +202,64 @@ window.logTeacherActivity = function (
   } catch (e) {}
 
   if (typeof renderTeacherLogsTable === "function") renderTeacherLogsTable();
+};
+
+// ==========================================================================
+// حظر الحسابات الموقوفة: الطالب الموقوف (مؤرشف) أو طلب الالتحاق غير المقبول بعد، والمعلم
+// الموقوف، لا يدخلون بأي طريقة (برقم الهوية أو الجوال أو اسم المستخدم)، ومن كان داخلاً
+// منهم يُخرج عند فتح البرنامج أو بعد المزامنة التالية. المدير وحساب الشاشة لا يُحظران.
+// ==========================================================================
+const BLOCKED_ACCOUNT_STATUSES = ["archived", "suspended", "pending"];
+function isBlockedAccountStatus(status) {
+  return BLOCKED_ACCOUNT_STATUSES.includes(String(status || "").trim());
+}
+
+window.isAccountBlocked = function (sessionUser) {
+  if (!sessionUser) return false;
+  const role = sessionUser.role;
+  if (role !== window.ROLES.STUDENT && role !== window.ROLES.TEACHER)
+    return false;
+  const users = window.appStore?.users || [];
+  // حساب الدخول المرتبط: يُعدّ موقوفاً فقط إذا أوقفه المدير صراحةً (موقوف/مؤرشف) في كل نسخه.
+  // حالة "قيد المراجعة" في حساب الدخول لا تمنع: الحسابات القديمة التي أُنشئت تلقائياً لطلبات
+  // التحاق ثم قبلها المدير تبقى قادرة على الدخول، والمرجع في القبول هو سجل الطالب نفسه
+  const userRecsBlocked = (ids) => {
+    const recs = users.filter((u) => ids.includes(u.id));
+    return (
+      recs.length > 0 &&
+      recs.every((u) =>
+        ["archived", "suspended"].includes(String(u.status || "").trim()),
+      )
+    );
+  };
+
+  if (role === window.ROLES.STUDENT) {
+    const student = (window.appStore?.students || []).find(
+      (st) => st.id === sessionUser.id,
+    );
+    if (student && isBlockedAccountStatus(student.status)) return true;
+    return userRecsBlocked([sessionUser.id]);
+  }
+
+  const teacher = (window.appStore?.teachers || []).find(
+    (t) =>
+      t.id === sessionUser.teacherId ||
+      t.id === sessionUser.id ||
+      (sessionUser.userId && t.userId === sessionUser.userId),
+  );
+  if (teacher && isBlockedAccountStatus(teacher.status)) return true;
+  const ids = [sessionUser.userId, teacher && teacher.userId].filter(Boolean);
+  return ids.length > 0 && userRecsBlocked(ids);
+};
+
+window.enforceBlockedAccountLogout = function () {
+  const user = window.currentUser;
+  if (user && window.isAccountBlocked(user)) {
+    alert("⚠️ هذا الحساب موقوف حالياً. يرجى مراجعة إدارة المَجْمَع.");
+    if (typeof handleLogout === "function") handleLogout();
+    return true;
+  }
+  return false;
 };
 
 // دالة تسجيل الدخول الموحدة مع التحقق الصارم
@@ -259,7 +352,15 @@ window.handleLoginFormSubmit = function (e) {
   );
 
   if (foundTeacher) {
-    if (foundTeacher.status === "suspended") {
+    if (
+      foundTeacher.status === "suspended" ||
+      window.isAccountBlocked({
+        role: window.ROLES.TEACHER,
+        id: foundTeacher.id,
+        teacherId: foundTeacher.id,
+        userId: foundTeacher.userId,
+      })
+    ) {
       alert("⚠️ هذا الحساب موقوف حالياً.");
       return false;
     }
@@ -303,8 +404,15 @@ window.handleLoginFormSubmit = function (e) {
   );
 
   if (foundStudent) {
-    if (foundStudent.status === "archived") {
-      alert("⚠️ هذا الحساب موقوف (مؤرشف).");
+    if (
+      foundStudent.status === "archived" ||
+      window.isAccountBlocked({ role: window.ROLES.STUDENT, id: foundStudent.id })
+    ) {
+      alert(
+        foundStudent.status === "pending"
+          ? "⚠️ طلب الالتحاق لم يُقبل بعد من إدارة المَجْمَع."
+          : "⚠️ هذا الحساب موقوف (مؤرشف).",
+      );
       return false;
     }
 
@@ -348,6 +456,22 @@ window.handleLoginFormSubmit = function (e) {
       alert("❌ الرقم السري غير صحيح!");
       return false;
     }
+    // هذا المسار كان يُدخل أي حساب بلا فحص لحالته (فيدخل الطالب الموقوف عبر اسم المستخدم)
+    if (
+      (foundUser.role === window.ROLES.STUDENT ||
+        foundUser.role === window.ROLES.TEACHER) &&
+      (["archived", "suspended"].includes(
+        String(foundUser.status || "").trim(),
+      ) ||
+        window.isAccountBlocked({
+          ...foundUser,
+          teacherId: foundUser.teacherId || foundUser.id,
+          userId: foundUser.id,
+        }))
+    ) {
+      alert("⚠️ هذا الحساب موقوف حالياً. يرجى مراجعة إدارة المَجْمَع.");
+      return false;
+    }
     doLogin(foundUser, false);
     return false;
   }
@@ -388,8 +512,15 @@ window.handleStudentLoginFormSubmit = function (e) {
   );
 
   if (foundStudent) {
-    if (foundStudent.status === "archived") {
-      alert("⚠️ هذا الحساب موقوف (مؤرشف).");
+    if (
+      foundStudent.status === "archived" ||
+      window.isAccountBlocked({ role: window.ROLES.STUDENT, id: foundStudent.id })
+    ) {
+      alert(
+        foundStudent.status === "pending"
+          ? "⚠️ طلب الالتحاق لم يُقبل بعد من إدارة المَجْمَع."
+          : "⚠️ هذا الحساب موقوف (مؤرشف).",
+      );
       return false;
     }
 
@@ -597,6 +728,7 @@ window.handleSaveMyProfile = function (e) {
   window._pendingMyProfilePhotoRemoved = false;
 
   closeModal("modal-edit-my-profile");
+  if (newPass) offerBrowserToSavePassword(user, newPass);
   alert("✅ تم حفظ تعديلات حسابك بنجاح!");
 };
 
@@ -673,22 +805,25 @@ window.doLogin = function (user, isAutoSession = false) {
     console.warn(e);
   }
 
-  // مؤقت الخروج التلقائي الصارم بعد ساعتين (7,200,000 مللي ثانية)
+  // مؤقت الخروج التلقائي الصارم بعد ساعتين (7,200,000 مللي ثانية) - ما عدا حساب شاشة
+  // العرض: لا يخرج إلا بلمسة على الشاشة
   if (window.autoLogoutTimer) clearTimeout(window.autoLogoutTimer);
-  const sessionStartTime = parseInt(
-    localStorage.getItem("HALAQAT_SESSION_TIME") || Date.now().toString(),
-    10,
-  );
-  const elapsed = Date.now() - sessionStartTime;
-  const twoHoursMs = 2 * 60 * 60 * 1000;
-  const remaining = Math.max(0, twoHoursMs - elapsed);
-
-  window.autoLogoutTimer = setTimeout(() => {
-    alert(
-      "⚠️ انتهت جلستك الحالية (مرت ساعتان). تم تسجيل الخروج تلقائياً لأسباب أمنية.",
+  if (user.role !== window.ROLES.SCREEN) {
+    const sessionStartTime = parseInt(
+      localStorage.getItem("HALAQAT_SESSION_TIME") || Date.now().toString(),
+      10,
     );
-    handleLogout();
-  }, remaining);
+    const elapsed = Date.now() - sessionStartTime;
+    const twoHoursMs = 2 * 60 * 60 * 1000;
+    const remaining = Math.max(0, twoHoursMs - elapsed);
+
+    window.autoLogoutTimer = setTimeout(() => {
+      alert(
+        "⚠️ انتهت جلستك الحالية (مرت ساعتان). تم تسجيل الخروج تلقائياً لأسباب أمنية.",
+      );
+      handleLogout();
+    }, remaining);
+  }
 
   const loginView = document.getElementById("view-login");
   const stuLoginView = document.getElementById("view-student-login");
@@ -753,21 +888,33 @@ function startScreenAccountFullscreen() {
     window.currentUser && window.currentUser.role === window.ROLES.SCREEN;
 
   window.__screenWantsFullscreen = !!request;
-  window.__screenTryEnter = () => {
+  // viaTap: محاولة ناتجة عن لمسة. إن رفضها المتصفح حتى مع اللمسة فملء الشاشة غير متاح على
+  // هذا الجهاز، فتُصبح اللمسة التالية للخروج من الحساب كالمعتاد
+  window.__screenTryEnter = (viaTap) => {
     if (!request || document.fullscreenElement || !isScreenUser()) return;
+    const onFail = () => {
+      window.__screenWantsFullscreen = !viaTap;
+    };
     try {
       const result = request.call(target);
-      if (result && typeof result.catch === "function") {
-        result.catch(() => {
-          window.__screenWantsFullscreen = true;
-        });
+      if (result && typeof result.then === "function") {
+        result
+          .then(() => {
+            // زر Esc في لوحة المفاتيح لا يُخرج من ملء الشاشة (حيث يدعم المتصفح ذلك)
+            try {
+              if (navigator.keyboard && navigator.keyboard.lock) {
+                navigator.keyboard.lock(["Escape"]).catch(() => {});
+              }
+            } catch (e) {}
+          })
+          .catch(onFail);
       }
     } catch (e) {
-      window.__screenWantsFullscreen = true;
+      onFail();
     }
   };
 
-  window.__screenTryEnter();
+  window.__screenTryEnter(false);
 
   if (window.__screenAccountBound) return;
   window.__screenAccountBound = true;
@@ -779,7 +926,7 @@ function startScreenAccountFullscreen() {
       // أول نقرة بعد رفض المتصفح لملء الشاشة تُدخل ملء الشاشة فقط ولا تُخرج من الحساب
       if (!document.fullscreenElement && window.__screenWantsFullscreen) {
         window.__screenWantsFullscreen = false;
-        window.__screenTryEnter();
+        window.__screenTryEnter(true);
         return;
       }
       if (
@@ -802,14 +949,20 @@ function startScreenAccountFullscreen() {
         window.__screenWantsFullscreen
       ) {
         window.__screenWantsFullscreen = false;
-        window.__screenTryEnter();
+        window.__screenTryEnter(true);
       }
     },
     true,
   );
 
   document.addEventListener("fullscreenchange", () => {
-    if (document.fullscreenElement) window.__screenWantsFullscreen = false;
+    if (document.fullscreenElement) {
+      window.__screenWantsFullscreen = false;
+    } else if (isScreenUser()) {
+      // خرجت الشاشة من ملء الشاشة بغير اللمسة (مثلاً من المتصفح نفسه): تبقى داخل الحساب،
+      // واللمسة التالية تعيدها لملء الشاشة بدل الخروج من الحساب
+      window.__screenWantsFullscreen = true;
+    }
   });
 }
 
@@ -1082,12 +1235,7 @@ function syncHeaderDateTime() {
   const headerDateEl = document.getElementById("header-date");
   if (headerDateEl) {
     const now = new Date();
-    headerDateEl.textContent = now.toLocaleDateString("ar-SA", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    headerDateEl.textContent = `${now.toLocaleDateString("ar-SA", { weekday: "long" })}، ${formatHijriDate(now)}`;
   }
 }
 
@@ -1101,7 +1249,11 @@ function checkSavedSession() {
   const twoHoursMs = 2 * 60 * 60 * 1000;
 
   if (savedUserStr) {
-    if (sessionTime && Date.now() - sessionTime > twoHoursMs) {
+    let savedIsScreen = false;
+    try {
+      savedIsScreen = JSON.parse(savedUserStr).role === window.ROLES.SCREEN;
+    } catch (e) {}
+    if (!savedIsScreen && sessionTime && Date.now() - sessionTime > twoHoursMs) {
       localStorage.removeItem("HALAQAT_SESSION_USER");
       localStorage.removeItem("HALAQAT_SESSION_TIME");
       showMainLoginView();
@@ -1109,6 +1261,13 @@ function checkSavedSession() {
     }
     try {
       const user = JSON.parse(savedUserStr);
+      // حساب أُوقف بعد دخول صاحبه: لا تُستعاد جلسته
+      if (window.isAccountBlocked(user)) {
+        localStorage.removeItem("HALAQAT_SESSION_USER");
+        localStorage.removeItem("HALAQAT_SESSION_TIME");
+        showMainLoginView();
+        return;
+      }
       doLogin(user, true);
     } catch (e) {
       showMainLoginView();
@@ -1351,7 +1510,7 @@ function studentNotifCardHtml(n) {
     <div class="mb-2 p-2" style="background:#f4f9f9; border: 1px solid var(--border-color); border-radius: 6px;">
       <div class="flex-between">
         <strong style="color:var(--primary-brown); font-size:0.92rem;">${escapeHtml(n.title) || "تنبيه"}</strong>
-        <small class="text-muted">${escapeHtml(n.date) || ""}</small>
+        <small class="text-muted">${escapeHtml(n.createdAt ? formatHijriDate(n.createdAt) : formatHijriInText(n.date || ""))}</small>
       </div>
       <p style="margin: 4px 0 0 0; font-size: 0.88rem; color: #333;">${escapeHtml(n.body) || ""}</p>
       <div style="font-size:0.75rem; color:#777; margin-top:3px;">المرسل: ${escapeHtml(n.sender) || "إدارة المَجْمَع"}</div>
@@ -1469,7 +1628,16 @@ function renderStudentData() {
   const tilawaJayyid = countRating(studentTasmeea, "tilawaRating", "جيد");
   const tilawaRe = countRating(studentTasmeea, "tilawaRating", "يعيد");
 
-  const isDistinguishedThisWeek = checkStudentCurrentWeekTamayuz(studentId);
+  // رسالة التميز: تظهر من الخميس إلى الأربعاء التالي عن أسبوع (الأحد-الأربعاء) المنتهي،
+  // بنفس أسبوع شاشة العرض
+  const isDistinguishedThisWeek =
+    typeof isStudentTamayuzForWeek === "function"
+      ? isStudentTamayuzForWeek(studentId, "screen_cycle")
+      : checkStudentCurrentWeekTamayuz(studentId);
+  const tamayuzWeekLabel =
+    typeof getTamayuzDisplayWeekLabel === "function"
+      ? getTamayuzDisplayWeekLabel()
+      : "";
 
   const todayStr = new Date().toISOString().split("T")[0];
   const todayRecord = studentTasmeea.find((t) => t.date === todayStr) || {};
@@ -1581,7 +1749,7 @@ function renderStudentData() {
     .filter((t) => t.studentNotes && String(t.studentNotes).trim() !== "")
     .map((t) => ({
       id: `tasm_note_${t.id || t.date}`,
-      title: `💬 توجيه وملاحظة المعلم (تسميع ${t.date || "اليوم"})`,
+      title: `💬 توجيه وملاحظة المعلم (تسميع ${t.date ? formatHijriDate(t.date) : "اليوم"})`,
       body: t.studentNotes,
       sender: "معلم الحلقة",
       date: t.date || "",
@@ -1631,6 +1799,7 @@ function renderStudentData() {
       <p style="color: #6d4c41; font-size: 0.85rem; margin: 0; font-weight: 700;">
         نظير التزامك بحضور 4 أيام كاملة من الأحد للأربعاء وتقييم ممتاز في جميع المقررات.
       </p>
+      ${tamayuzWeekLabel ? `<p style="color: #8d6e63; font-size: 0.75rem; margin: 6px 0 0; font-weight: 700;">${escapeHtml(tamayuzWeekLabel)}</p>` : ""}
     </div>
   `;
 
@@ -1643,7 +1812,7 @@ function renderStudentData() {
         🎉 مبارك حصولك على الدرجة (${latestTest.score || "0"}/100) 🌟
       </h3>
       <p style="color: #33691e; font-size: 0.85rem; margin: 0; font-weight: 700;">
-        في اختبار (${latestTest.type || "اختبار مرحلي"}) بتاريخ ${latestTest.date || "—"}
+        في اختبار (${latestTest.type || "اختبار مرحلي"}) بتاريخ ${latestTest.date ? formatHijriDate(latestTest.date) : "—"}
       </p>
     </div>
   `
@@ -1676,7 +1845,7 @@ function renderStudentData() {
                   <td style="font-weight: 700;">${test.type || "اختبار مرحلي"}</td>
                   <td style="text-align: center; font-weight: 800; color: var(--primary-brown);">${test.score || "0"} / 100</td>
                   <td style="text-align: center;"><span class="badge badge-active">${test.rating || "ممتاز"}</span></td>
-                  <td>${test.date || "—"}</td>
+                  <td>${test.date ? escapeHtml(formatHijriDate(test.date)) : "—"}</td>
                 </tr>
               `,
                 )
@@ -1787,7 +1956,7 @@ function renderStudentData() {
       title="اضغطي لعرض سجل الحضور للأيام السابقة"
     >
       <div style="display: flex; align-items: center; gap: 0.6rem;">
-        <span style="font-weight: 800; color: var(--primary-brown); font-size: 0.95rem;">📅 حالة الحضور اليوم (${todayStr}):</span>
+        <span style="font-weight: 800; color: var(--primary-brown); font-size: 0.95rem;">📅 حالة الحضور اليوم (${formatHijriDate(todayStr)}):</span>
         ${attStatusBadge}
       </div>
       <span
@@ -1814,7 +1983,7 @@ function renderStudentData() {
                     .map(
                       (a) => `
               <tr>
-                <td>${escapeHtml(a.date)}</td>
+                <td>${escapeHtml(formatHijriDate(a.date))}</td>
                 <td>${attStatusLabels[a.status || ""] || "—"}</td>
               </tr>
             `,
@@ -1953,7 +2122,7 @@ function renderStudentData() {
                     .map(
                       (t) => `
                   <tr>
-                    <td>${escapeHtml(t.date)}</td>
+                    <td>${escapeHtml(formatHijriDate(t.date))}</td>
                     <td>${escapeHtml(t.hifzSurah) || "—"}</td>
                     <td>${escapeHtml(t.hifzRating) || "—"}</td>
                     <td>${escapeHtml(t.murajaaSurah) || "—"}</td>
@@ -2385,11 +2554,11 @@ window.openTasmeeaDetailsModal = function (type) {
   let list = [];
   if (type === "recited") {
     if (titleEl)
-      titleEl.textContent = `📖 قائمة الطلاب الذين سمّعوا ليوم (${todayStr})`;
+      titleEl.textContent = `📖 قائمة الطلاب الذين سمّعوا ليوم (${formatHijriDate(todayStr)})`;
     list = activeStudents.filter((s) => tasmeeaMap.has(s.id));
   } else {
     if (titleEl)
-      titleEl.textContent = `⏳ قائمة الطلاب الذين لم يسمّعوا ليوم (${todayStr})`;
+      titleEl.textContent = `⏳ قائمة الطلاب الذين لم يسمّعوا ليوم (${formatHijriDate(todayStr)})`;
     list = activeStudents.filter((s) => !tasmeeaMap.has(s.id));
   }
 
@@ -2565,6 +2734,7 @@ window.handleUserProfileSave = function (e) {
   if (typeof updateSidebarUserAvatar === "function")
     updateSidebarUserAvatar(user);
 
+  if (newPass) offerBrowserToSavePassword(user, newPass);
   alert("✅ تم حفظ وتحديث البيانات الشخصية للمدير بنجاح!");
 };
 
@@ -2593,3 +2763,150 @@ window.closeModal = function (modalId) {
   const modal = document.getElementById(modalId);
   if (modal) modal.classList.remove("active");
 };
+
+// ==========================================================================
+// خانات اختيار التاريخ بالهجري: كل <input type="date"> في البرنامج تُعرض كثلاث قوائم (اليوم،
+// الشهر، السنة الهجرية). الخانة الأصلية تبقى في الصفحة مخفية وتحمل التاريخ الميلادي نفسه
+// (YYYY-MM-DD) كما كانت تماماً، فكل الحفظ والبحث والفلاتر تعمل بلا أي تغيير. تُطبَّق تلقائياً
+// على الخانات التي تُضاف لاحقاً أيضاً. إن لم يدعم المتصفح التقويم الهجري تبقى الخانة كما هي.
+// ==========================================================================
+(function initHijriDatePickers() {
+  if (!window.HIJRI_SUPPORTED || typeof hijriPartsFromGregorianStr !== "function")
+    return;
+  const nativeValue = Object.getOwnPropertyDescriptor(
+    HTMLInputElement.prototype,
+    "value",
+  );
+  const pad2 = (n) => String(n).padStart(2, "0");
+
+  function currentHijriYear() {
+    const p = hijriPartsFromGregorianStr(localGregorianStr(new Date()));
+    return p ? p.y : 1448;
+  }
+
+  function enhance(input) {
+    if (!input || input.dataset.hijriPicker || input.type !== "date") return;
+    input.dataset.hijriPicker = "1";
+
+    const wrap = document.createElement("span");
+    wrap.className = "hijri-date-picker";
+    const mk = (cls, label) => {
+      const sel = document.createElement("select");
+      sel.className = `form-control hijri-${cls}`;
+      sel.setAttribute("aria-label", label);
+      sel.title = label;
+      return sel;
+    };
+    const daySel = mk("day", "اليوم (هجري)");
+    const monthSel = mk("month", "الشهر (هجري)");
+    const yearSel = mk("year", "السنة (هجري)");
+    wrap.append(daySel, monthSel, yearSel);
+    if (input.title) wrap.title = input.title;
+
+    // الإلزام ينتقل للقوائم الظاهرة (الخانة المخفية الإلزامية تمنع الإرسال بلا رسالة)
+    if (input.required) {
+      input.required = false;
+      input.dataset.hijriRequired = "1";
+      [daySel, monthSel, yearSel].forEach((s) => (s.required = true));
+    }
+    input.classList.add("hijri-native-hidden");
+    input.insertAdjacentElement("afterend", wrap);
+
+    const buildDayOptions = (len, selected) => {
+      let html = '<option value="">اليوم</option>';
+      for (let d = 1; d <= len; d++) html += `<option value="${d}">${pad2(d)}</option>`;
+      daySel.innerHTML = html;
+      daySel.value = selected && selected <= len ? String(selected) : "";
+    };
+
+    const render = () => {
+      const g = nativeValue.get.call(input);
+      const p = g ? hijriPartsFromGregorianStr(g) : null;
+      const cy = currentHijriYear();
+      const years = new Set();
+      for (let y = cy - 3; y <= cy + 1; y++) years.add(y);
+      if (p) years.add(p.y);
+      let yHtml = '<option value="">السنة</option>';
+      Array.from(years)
+        .sort((a, b) => a - b)
+        .forEach((y) => {
+          yHtml += `<option value="${y}">${y}</option>`;
+        });
+      yearSel.innerHTML = yHtml;
+      let mHtml = '<option value="">الشهر</option>';
+      for (let m = 1; m <= 12; m++)
+        mHtml += `<option value="${m}">${pad2(m)} - ${window.HIJRI_MONTH_NAMES[m - 1]}</option>`;
+      monthSel.innerHTML = mHtml;
+      yearSel.value = p ? String(p.y) : "";
+      monthSel.value = p ? String(p.m) : "";
+      buildDayOptions(p ? hijriMonthLength(p.y, p.m) : 30, p ? p.d : null);
+    };
+
+    const commit = (ev) => {
+      // إفراغ أي قائمة = إفراغ التاريخ كله (للخانات الاختيارية مثل "من تاريخ")
+      if (ev && ev.target && ev.target.value === "") {
+        daySel.value = "";
+        monthSel.value = "";
+        yearSel.value = "";
+        if (nativeValue.get.call(input) !== "") {
+          nativeValue.set.call(input, "");
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        return;
+      }
+      const y = parseInt(yearSel.value, 10);
+      const m = parseInt(monthSel.value, 10);
+      let d = parseInt(daySel.value, 10);
+      if (y && m) {
+        const len = hijriMonthLength(y, m);
+        if (d > len) d = len;
+        buildDayOptions(len, d);
+      }
+      if (!y || !m || !d) return; // لم يكتمل الاختيار بعد
+      const g = hijriToGregorianStr(y, m, d);
+      if (!g) return;
+      if (g !== nativeValue.get.call(input)) {
+        nativeValue.set.call(input, g);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    };
+    [daySel, monthSel, yearSel].forEach((s) =>
+      s.addEventListener("change", commit),
+    );
+
+    // أي ضبط برمجي للتاريخ (مثل وضع تاريخ اليوم تلقائياً) يُحدّث القوائم الهجرية فوراً
+    Object.defineProperty(input, "value", {
+      configurable: true,
+      get() {
+        return nativeValue.get.call(this);
+      },
+      set(v) {
+        nativeValue.set.call(this, v);
+        render();
+      },
+    });
+    if (input.form) {
+      input.form.addEventListener("reset", () => setTimeout(render, 0));
+    }
+
+    render();
+  }
+
+  function scan(root) {
+    if (!root || !root.querySelectorAll) return;
+    if (root.matches && root.matches('input[type="date"]')) enhance(root);
+    root.querySelectorAll('input[type="date"]').forEach(enhance);
+  }
+
+  const start = () => {
+    scan(document);
+    new MutationObserver((mutations) => {
+      mutations.forEach((mu) => mu.addedNodes.forEach((n) => scan(n)));
+    }).observe(document.body, { childList: true, subtree: true });
+  };
+  if (document.readyState === "loading")
+    document.addEventListener("DOMContentLoaded", start);
+  else start();
+})();

@@ -100,6 +100,143 @@ window.studentInAnyCircle = function (student, circleIds) {
   return (circleIds || []).some((id) => studentInCircle(student, id));
 };
 
+// ==========================================================================
+// التاريخ الهجري (أم القرى) لكل البرنامج: العرض والإدخال فقط بالهجري، أما الحفظ في قاعدة
+// البيانات فيبقى بالميلادي (YYYY-MM-DD) كما هو تماماً، فلا يتغير شيء في البيانات.
+// الصيغة: 1448/04/22هـ. إن كان المتصفح لا يدعم تقويم أم القرى يبقى العرض ميلادياً كالسابق.
+// ==========================================================================
+const HIJRI_PARTS_FMT = (() => {
+  try {
+    return new Intl.DateTimeFormat("en-u-ca-islamic-umalqura-nu-latn", {
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+  } catch (e) {
+    return null;
+  }
+})();
+const hijriPartsCache = new Map();
+
+// تاريخ ميلادي (YYYY-MM-DD) ← {y, m, d} هجري
+function hijriPartsFromGregorianStr(gStr) {
+  if (!HIJRI_PARTS_FMT) return null;
+  if (hijriPartsCache.has(gStr)) return hijriPartsCache.get(gStr);
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(gStr || ""));
+  if (!m) return null;
+  let result = null;
+  try {
+    const parts = HIJRI_PARTS_FMT.formatToParts(
+      new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12)),
+    );
+    const get = (t) => parseInt(parts.find((p) => p.type === t)?.value, 10);
+    const y = get("year");
+    const mo = get("month");
+    const d = get("day");
+    if (y && mo && d) result = { y, m: mo, d };
+  } catch (e) {}
+  hijriPartsCache.set(gStr, result);
+  return result;
+}
+
+window.HIJRI_SUPPORTED = (() => {
+  const p = hijriPartsFromGregorianStr("2026-10-11");
+  return !!(p && p.y >= 1440 && p.y <= 1500);
+})();
+
+function gregorianStrFromUTCms(ms) {
+  const d = new Date(ms);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+// تاريخ هجري ← ميلادي (YYYY-MM-DD)، أو null إن لم يكن اليوم موجوداً (مثل 30 في شهر 29 يوماً)
+window.hijriToGregorianStr = function (hy, hm, hd) {
+  if (!window.HIJRI_SUPPORTED || !hy || !hm || !hd) return null;
+  const epoch = Date.UTC(622, 6, 16, 12);
+  const approxDays = Math.round(
+    (hy - 1) * 354.36667 + (hm - 1) * 29.5306 + (hd - 1),
+  );
+  for (let delta = 0; delta <= 20; delta++) {
+    for (const sign of delta === 0 ? [0] : [1, -1]) {
+      const g = gregorianStrFromUTCms(
+        epoch + (approxDays + sign * delta) * 86400000,
+      );
+      const p = hijriPartsFromGregorianStr(g);
+      if (p && p.y === hy && p.m === hm && p.d === hd) return g;
+    }
+  }
+  return null;
+};
+
+window.hijriMonthLength = function (hy, hm) {
+  return window.hijriToGregorianStr(hy, hm, 30) ? 30 : 29;
+};
+
+window.HIJRI_MONTH_NAMES = [
+  "محرم",
+  "صفر",
+  "ربيع الأول",
+  "ربيع الآخر",
+  "جمادى الأولى",
+  "جمادى الآخرة",
+  "رجب",
+  "شعبان",
+  "رمضان",
+  "شوال",
+  "ذو القعدة",
+  "ذو الحجة",
+];
+
+function localGregorianStr(dateObj) {
+  return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}-${String(dateObj.getDate()).padStart(2, "0")}`;
+}
+
+// عرض أي تاريخ بالهجري: يقبل "YYYY-MM-DD" أو وقتاً بالملي ثانية أو Date. أي نص غير تاريخ
+// يُرجع كما هو. withTime: يضيف الساعة لوقت الملي ثانية/Date
+window.formatHijriDate = function (value, opts) {
+  if (value === undefined || value === null || value === "") return "";
+  let gStr = null;
+  let dateObj = null;
+  if (value instanceof Date) dateObj = value;
+  else if (typeof value === "number") dateObj = new Date(value);
+  else if (/^\d{4}-\d{2}-\d{2}/.test(String(value)))
+    gStr = String(value).slice(0, 10);
+  else return String(value);
+  if (dateObj) {
+    if (isNaN(dateObj.getTime())) return "";
+    gStr = localGregorianStr(dateObj);
+  }
+  const p = hijriPartsFromGregorianStr(gStr);
+  let out = p
+    ? `${p.y}/${String(p.m).padStart(2, "0")}/${String(p.d).padStart(2, "0")}هـ`
+    : gStr;
+  if (opts && opts.withTime && dateObj) {
+    out += ` ${String(dateObj.getHours()).padStart(2, "0")}:${String(dateObj.getMinutes()).padStart(2, "0")}`;
+  }
+  return out;
+};
+
+// تحويل أي تاريخ ميلادي مكتوب داخل نص (مثل "2026/10/03 (٠٢:١٢ م)" لآخر دخول) إلى هجري
+window.formatHijriInText = function (text) {
+  if (text === undefined || text === null) return "";
+  return String(text).replace(
+    /\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b/g,
+    (whole, y, m, d) =>
+      formatHijriDate(
+        `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
+      ),
+  );
+};
+
+// تاريخ اليوم الهجري لأسماء الملفات المنزّلة (بدون "/" غير المسموحة في الأسماء)
+window.hijriFileStamp = function () {
+  const p = hijriPartsFromGregorianStr(localGregorianStr(new Date()));
+  return p
+    ? `${p.y}-${String(p.m).padStart(2, "0")}-${String(p.d).padStart(2, "0")}`
+    : localGregorianStr(new Date());
+};
+
 // الإعدادات الافتراضية
 const SAFE_DEFAULT_SETTINGS = window.DEFAULT_SETTINGS || {
   orgName: "مَجْمَع عبدالله بن مهدي القرآني",
@@ -378,6 +515,8 @@ function migrateAllPasswordsRoleBased() {
 
   if (Array.isArray(window.appStore.students)) {
     window.appStore.students.forEach((stu) => {
+      // طلب التحاق لم يقبله المدير بعد: لا يُنشأ له حساب دخول (يُنشأ عند القبول فقط)
+      if (stu.status === "pending") return;
       let userRec = (window.appStore.users || []).find((u) => u.id === stu.id);
       if (!userRec) {
         userRec = {
@@ -882,6 +1021,9 @@ async function syncAndPurgeDataFromCloud(options) {
         const activeViewId = document.querySelector(".content-view.active")?.id;
         refreshActiveView(activeViewId);
       }
+      // حساب أُوقف (أو طلب التحاق لم يُقبل) وصاحبه داخل حالياً: يُخرج فوراً
+      if (typeof enforceBlockedAccountLogout === "function")
+        enforceBlockedAccountLogout();
       return mode;
     } catch (err) {
       console.warn(
