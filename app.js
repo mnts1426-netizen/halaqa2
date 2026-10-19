@@ -979,6 +979,16 @@ function adjustSidebarAndViewsForRole(role) {
     role === window.ROLES.SCREEN,
   );
 
+  // خيارات القوائم الخاصة بالمدير (مثل التقرير المالي): تُخفى وتُعطَّل لغير المدير
+  document.querySelectorAll("option.nav-admin-only").forEach((opt) => {
+    const hide = role !== window.ROLES.ADMIN;
+    opt.hidden = hide;
+    opt.disabled = hide;
+    if (hide && opt.selected && opt.parentElement) {
+      opt.parentElement.selectedIndex = 0;
+    }
+  });
+
   if (role === window.ROLES.SCREEN) {
     // حساب الشاشة: لوحة التميز فقط بملء الشاشة بلا قائمة جانبية ولا ترويسة ولا أزرار
     if (adminNav) adminNav.style.display = "none";
@@ -1809,7 +1819,7 @@ function renderStudentData() {
       ? `
     <div class="card" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border: 2px solid #2e7d32; border-radius: 10px; padding: 1.15rem; text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center; margin-bottom: 0;">
       <h3 style="color: #2e7d32; font-weight: 900; font-size: 1.15rem; margin-bottom: 4px;">
-        🎉 مبارك حصولك على الدرجة (${latestTest.score || "0"}/100) 🌟
+        🎉 ${String(latestTest.score ?? "").trim() ? `مبارك حصولك على الدرجة (${escapeHtml(latestTest.score)}/100)` : "مبارك لك"} 🌟
       </h3>
       <p style="color: #33691e; font-size: 0.85rem; margin: 0; font-weight: 700;">
         في اختبار (${latestTest.type || "اختبار مرحلي"}) بتاريخ ${latestTest.date ? formatHijriDate(latestTest.date) : "—"}
@@ -1843,8 +1853,8 @@ function renderStudentData() {
                   (test) => `
                 <tr>
                   <td style="font-weight: 700;">${test.type || "اختبار مرحلي"}</td>
-                  <td style="text-align: center; font-weight: 800; color: var(--primary-brown);">${test.score || "0"} / 100</td>
-                  <td style="text-align: center;"><span class="badge badge-active">${test.rating || "ممتاز"}</span></td>
+                  <td style="text-align: center; font-weight: 800; color: var(--primary-brown);">${formatTestScore(test.score)}</td>
+                  <td style="text-align: center;">${test.rating ? `<span class="badge badge-active">${escapeHtml(test.rating)}</span>` : ""}</td>
                   <td>${test.date ? escapeHtml(formatHijriDate(test.date)) : "—"}</td>
                 </tr>
               `,

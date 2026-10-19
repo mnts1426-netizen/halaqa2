@@ -1739,6 +1739,9 @@
                   <option value="tamayuz">تقرير التميز الأسبوعي</option>
                   <option value="tasmeea_kashf">تقرير كشف المرحليات</option>
                   <option value="exams_report">تقرير الاختبارات</option>
+                  <option value="finance_report" class="nav-admin-only">
+                    التقرير المالي
+                  </option>
                 </select>
               </div>
               <div class="form-group style-hidden" id="report-week-range-group">
@@ -2945,20 +2948,20 @@
                 <select id="test-type" class="form-control" required></select>
               </div>
               <div class="form-group flex-1">
-                <label>الدرجة من (100)</label>
+                <label>الدرجة من (100) <small class="text-muted">(اختياري)</small></label>
                 <input
                   type="number"
                   id="test-score"
                   class="form-control"
                   min="0"
                   max="100"
-                  required
                 />
               </div>
             </div>
             <div class="form-group">
-              <label>التقدير</label>
-              <select id="test-rating" class="form-control" required>
+              <label>التقدير <small class="text-muted">(اختياري)</small></label>
+              <select id="test-rating" class="form-control">
+                <option value="">— بدون تقدير —</option>
                 <option value="ممتاز مرتفع">ممتاز مرتفع</option>
                 <option value="ممتاز">ممتاز</option>
                 <option value="جيد جداً مرتفع">جيد جداً مرتفع</option>

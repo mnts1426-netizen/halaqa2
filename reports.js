@@ -208,6 +208,17 @@ function handleReportTypeChange() {
     if (dateFromGroup) dateFromGroup.style.display = "none";
     if (dateToGroup) dateToGroup.style.display = "none";
     populateReportWeekRangeDropdowns();
+  } else if (reportType === "finance_report") {
+    // التقرير المالي: لا حلقة ولا طالب، فقط الفترة (من - إلى)
+    if (circleGroup) circleGroup.style.display = "none";
+    if (studentGroup) studentGroup.style.display = "none";
+    if (weekRangeGroup) weekRangeGroup.classList.add("style-hidden");
+    if (dateFromGroup) {
+      dateFromGroup.style.display = "block";
+      const lbl = dateFromGroup.querySelector("label");
+      if (lbl) lbl.textContent = "من تاريخ";
+    }
+    if (dateToGroup) dateToGroup.style.display = "block";
   } else if (reportType === "tasmeea_kashf") {
     // تقرير كشف المرحليات: كشف شامل لكل طلاب الحلقة، غير مرتبط بتاريخ محدد
     if (studentGroup) studentGroup.style.display = "none";
@@ -316,10 +327,21 @@ function generateReport() {
   const wrapper = document.getElementById("report-results-wrapper");
   if (!wrapper) return;
 
+  // التقرير المالي للمدير فقط
+  if (
+    reportType === "finance_report" &&
+    !(window.currentUser && window.currentUser.role === "admin")
+  ) {
+    alert("⚠️ التقرير المالي متاح لمدير المَجْمَع فقط.");
+    wrapper.style.display = "none";
+    return;
+  }
+
   const allowsAllCircles =
     reportType === "marhaliyat_report" ||
     reportType === "exams_report" ||
-    reportType === "tasmeea_kashf";
+    reportType === "tasmeea_kashf" ||
+    reportType === "finance_report";
   if (circleId === "all" && !allowsAllCircles) {
     alert("⚠️ يرجى اختيار الحلقة أولاً قبل استخراج التقرير.");
     wrapper.style.display = "none";
@@ -884,9 +906,9 @@ function generateReport() {
             <td style="${cellStyle} font-weight: 800; text-align: right; white-space: nowrap;">${escapeHtml(studentName)}</td>
             <td style="${cellStyle}">${escapeHtml(circleName)}</td>
             <td style="${cellStyle}">${escapeHtml(t.type) || "—"}</td>
-            <td style="${cellStyle} font-weight: 700;">${escapeHtml(t.score) || "0"} / 100</td>
-            <td style="${cellStyle}">${escapeHtml(t.rating) || "—"}</td>
-            <td style="${cellStyle}">${escapeHtml(t.prize) || "—"}</td>
+            <td style="${cellStyle} font-weight: 700;">${formatTestScore(t.score)}</td>
+            <td style="${cellStyle}">${escapeHtml(t.rating)}</td>
+            <td style="${cellStyle}">${escapeHtml(t.prize)}</td>
             <td style="${cellStyle}">${escapeHtml(formatHijriDate(t.date)) || "—"}</td>
             ${withSignature ? `<td style="${cellStyle} height: 34px;"></td>` : ""}
           </tr>
@@ -895,10 +917,134 @@ function generateReport() {
     }
   }
 
+  // 9. التقرير المالي (للمدير فقط): الإيرادات والمصروفات في الفترة المختارة، مجمّعة حسب
+  // المصدر/البند مع المجاميع والصافي. الرواتب غير مضمّنة (تبقى في شاشة المالية فقط)
+  else if (reportType === "finance_report") {
+    reportTitle = "التقرير المالي";
+    headerRightText = "الإيرادات والمصروفات";
+    const fromD = dateFrom || "";
+    const toD = dateTo || "";
+    const periodText =
+      fromD && toD
+        ? `من ${formatHijriDate(fromD)} إلى ${formatHijriDate(toD)}`
+        : fromD
+          ? `من ${formatHijriDate(fromD)}`
+          : toD
+            ? `حتى ${formatHijriDate(toD)}`
+            : "كامل الفترة المسجلة";
+    headerLeftText = `الفترة / ${periodText}`;
+
+    const inRange = (d) =>
+      (!fromD || String(d || "") >= fromD) && (!toD || String(d || "") <= toD);
+    const fmt = (n) =>
+      (Math.round((n + Number.EPSILON) * 100) / 100).toLocaleString("ar-SA");
+    const amountOf = (x) => parseFloat(x.amount) || 0;
+    const cell = "padding: 8px; border: 1px solid #2E657E; text-align: center;";
+    const th = "padding: 10px 8px; text-align: center; border: 1px solid #2E657E;";
+
+    headHtml = `
+      <tr style="background: #2E657E; color: #ffffff;">
+        <th style="width: 40px; ${th}">م</th>
+        <th style="${th}">التاريخ</th>
+        <th style="${th}">المصدر / البند</th>
+        <th style="${th}">ملاحظات</th>
+        <th style="${th}">بواسطة</th>
+        <th style="${th}">المبلغ</th>
+      </tr>
+    `;
+
+    const sectionRow = (title, color) =>
+      `<tr><td colspan="6" style="${cell} text-align: right; font-weight: 900; font-size: 1rem; color: ${color}; background: #DDECF3;">${title}</td></tr>`;
+    const subtotalRow = (label, value, color) =>
+      `<tr><td colspan="5" style="${cell} text-align: left; font-weight: 800; background: #f7f3e8;">${label}</td><td style="${cell} font-weight: 900; color: ${color}; background: #f7f3e8;">${fmt(value)}</td></tr>`;
+
+    // قسم (إيرادات أو مصروفات): مجموعات حسب المصدر/البند، وداخل كل مجموعة بالتاريخ
+    const buildSection = (list, groupKey, emptyText, color, totalLabel) => {
+      if (list.length === 0) {
+        return {
+          html: `<tr><td colspan="6" style="${cell} color: #777;">${emptyText}</td></tr>`,
+          total: 0,
+        };
+      }
+      const groups = new Map();
+      list.forEach((x) => {
+        const key = String(x[groupKey] || "").trim() || "غير محدد";
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(x);
+      });
+      let html = "";
+      let idx = 0;
+      let total = 0;
+      Array.from(groups.keys())
+        .sort((a, b) => a.localeCompare(b, "ar"))
+        .forEach((key) => {
+          const items = groups
+            .get(key)
+            .slice()
+            .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+          let groupTotal = 0;
+          items.forEach((x) => {
+            idx++;
+            groupTotal += amountOf(x);
+            html += `
+          <tr style="text-align: center; font-size: 0.9rem;">
+            <td style="${cell}">${idx}</td>
+            <td style="${cell}">${escapeHtml(formatHijriDate(x.date)) || "—"}</td>
+            <td style="${cell} font-weight: 700;">${escapeHtml(key)}</td>
+            <td style="${cell} text-align: right;">${escapeHtml(x.notes) || "—"}</td>
+            <td style="${cell}">${escapeHtml(x.createdBy) || "—"}</td>
+            <td style="${cell} font-weight: 800; color: ${color};">${fmt(amountOf(x))}</td>
+          </tr>`;
+          });
+          if (groups.size > 1) html += subtotalRow(`مجموع (${escapeHtml(key)})`, groupTotal, color);
+          total += groupTotal;
+        });
+      html += subtotalRow(totalLabel, total, color);
+      return { html, total };
+    };
+
+    const revenues = (window.appStore.financeRevenues || []).filter((r) =>
+      inRange(r.date),
+    );
+    const expenses = (window.appStore.financeExpenses || []).filter((e) =>
+      inRange(e.date),
+    );
+    const rev = buildSection(
+      revenues,
+      "source",
+      "لا توجد إيرادات مسجلة في هذه الفترة",
+      "#2e7d32",
+      "إجمالي الإيرادات",
+    );
+    const exp = buildSection(
+      expenses,
+      "category",
+      "لا توجد مصروفات مسجلة في هذه الفترة",
+      "#c62828",
+      "إجمالي المصروفات",
+    );
+    const net = rev.total - exp.total;
+
+    bodyHtml =
+      sectionRow("📥 الإيرادات", "#2e7d32") +
+      rev.html +
+      sectionRow("📤 المصروفات", "#c62828") +
+      exp.html +
+      sectionRow("📊 الملخص", "#2E657E") +
+      subtotalRow("إجمالي الإيرادات", rev.total, "#2e7d32") +
+      subtotalRow("إجمالي المصروفات", exp.total, "#c62828") +
+      subtotalRow(
+        net >= 0 ? "الصافي (فائض)" : "الصافي (عجز)",
+        net,
+        net >= 0 ? "#2e7d32" : "#c62828",
+      );
+  }
+
   // بناء التقرير داخل الحاوية وإظهارها فوراً
   wrapper.style.display = "block";
   wrapper.dataset.reportTitle = reportTitle;
-  wrapper.dataset.reportCircle = selectedCircleName;
+  wrapper.dataset.reportCircle =
+    reportType === "finance_report" ? "الإيرادات_والمصروفات" : selectedCircleName;
 
   const chrome = window.buildOfficialPrintChrome(
     reportTitle,

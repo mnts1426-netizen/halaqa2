@@ -3686,6 +3686,12 @@ window.renderTeacherNotesTable = function () {
   tbody.innerHTML = html;
 };
 
+// الدرجة "90 / 100"، أو لا شيء إطلاقاً إن لم تُكتب درجة
+window.formatTestScore = function (score) {
+  const v = String(score ?? "").trim();
+  return v ? `${escapeHtml(v)} / 100` : "";
+};
+
 // الاختبارات
 // قائمة الاختبارات بعد تطبيق البحث (اسم الطالب/الحلقة/المرحلية/الجائزة) وفلتر
 // الحلقة والمرحلية، مرتبة بالمرحلية (من الأولى إلى الخامسة عشرة) ثم باسم الطالب - مشتركة بين
@@ -3792,9 +3798,9 @@ window.renderTestsTable = function () {
         <td style="font-weight: 700;">${escapeHtml(studentName)}</td>
         <td><span style="font-weight: 600; color: var(--text-dark);">${escapeHtml(circleName)}</span></td>
         <td>${escapeHtml(t.type) || "—"}</td>
-        <td style="font-weight: 700; color: var(--primary-brown);">${escapeHtml(t.score) || "0"} / 100</td>
-        <td><span class="badge badge-active">${escapeHtml(t.rating) || "—"}</span></td>
-        <td>${escapeHtml(t.prize) || "—"}</td>
+        <td style="font-weight: 700; color: var(--primary-brown);">${formatTestScore(t.score)}</td>
+        <td>${t.rating ? `<span class="badge badge-active">${escapeHtml(t.rating)}</span>` : ""}</td>
+        <td>${escapeHtml(t.prize)}</td>
         <td>${escapeHtml(formatHijriDate(t.date)) || "—"}</td>
         <td class="no-print">
           <button class="btn btn-outline-brown btn-sm" onclick="openModalEditTest('${t.id}')">تعديل</button>
@@ -3834,9 +3840,9 @@ window.generateTestsReport = function () {
           <td style="${cell} font-weight: 800; text-align: right; white-space: nowrap;">${escapeHtml(studentName)}</td>
           <td style="${cell}">${escapeHtml(circleName)}</td>
           <td style="${cell}">${escapeHtml(t.type) || "—"}</td>
-          <td style="${cell} font-weight: 700;">${escapeHtml(t.score) || "0"} / 100</td>
-          <td style="${cell}">${escapeHtml(t.rating) || "—"}</td>
-          <td style="${cell}">${escapeHtml(t.prize) || "—"}</td>
+          <td style="${cell} font-weight: 700;">${formatTestScore(t.score)}</td>
+          <td style="${cell}">${escapeHtml(t.rating)}</td>
+          <td style="${cell}">${escapeHtml(t.prize)}</td>
           <td style="${cell}">${escapeHtml(formatHijriDate(t.date)) || "—"}</td>
         </tr>
       `;
@@ -3916,10 +3922,10 @@ window.openModalAddTest = function () {
   }
 
   const scoreInput = document.getElementById("test-score");
-  if (scoreInput) scoreInput.value = "100";
+  if (scoreInput) scoreInput.value = "";
 
   const ratingSelect = document.getElementById("test-rating");
-  if (ratingSelect) ratingSelect.value = "ممتاز";
+  if (ratingSelect) ratingSelect.value = "";
 
   const prizeInput = document.getElementById("test-prize");
   if (prizeInput) prizeInput.value = "";
@@ -3960,7 +3966,7 @@ window.openModalEditTest = function (testId) {
 
   const ratingSelect = document.getElementById("test-rating");
   if (ratingSelect) {
-    const rating = test.rating || "ممتاز";
+    const rating = test.rating || "";
     if (![...ratingSelect.options].some((o) => o.value === rating)) {
       ratingSelect.insertAdjacentHTML(
         "beforeend",
@@ -4025,8 +4031,9 @@ window.handleSaveTest = function (e) {
 
   const studentId = document.getElementById("test-student-select")?.value || "";
   const type = (document.getElementById("test-type")?.value || "").trim();
-  const score = document.getElementById("test-score")?.value || "100";
-  const rating = document.getElementById("test-rating")?.value || "ممتاز";
+  // الدرجة والتقدير والجائزة اختيارية: ما لم يُكتب يبقى فارغاً
+  const score = (document.getElementById("test-score")?.value || "").trim();
+  const rating = document.getElementById("test-rating")?.value || "";
   const prize = (document.getElementById("test-prize")?.value || "").trim();
 
   const student = (window.appStore?.students || []).find(
