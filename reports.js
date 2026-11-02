@@ -95,9 +95,13 @@ function populateReportStudentsDropdown() {
 
   const user = window.currentUser;
   const currentVal = studentSelect.value || "all";
-  let students = (window.appStore.students || []).filter(
-    (s) => s.status === "active",
-  );
+  let students = (window.appStore.students || [])
+    .filter(
+      (s) =>
+        s.status === "active" ||
+        (s.status !== "pending" && studentHasRecordsInRange(s.id, "", "")),
+    )
+    .map(markInactiveStudentName);
 
   if (user && user.role === "teacher") {
     const teacherObj = (window.appStore?.teachers || []).find(
@@ -314,6 +318,34 @@ function buildPdfTemplateChrome(titleText, circleName, centerSubHtml) {
   return { header, footer };
 }
 
+// الطالب الموقوف (المؤرشف) يبقى ظاهراً في التقارير للفترة التي كان فيها نشطاً، أي إن كان له
+// سجل حضور أو تسميع داخل فترة التقرير، وبجانب اسمه (موقوف). طلبات الالتحاق لا تظهر أبداً
+function studentHasRecordsInRange(studentId, from, to) {
+  const inRange = (d) =>
+    (!from || String(d || "") >= from) && (!to || String(d || "") <= to);
+  return (
+    (window.appStore.attendance || []).some(
+      (a) => a.studentId === studentId && inRange(a.date),
+    ) ||
+    (window.appStore.tasmeea || []).some(
+      (t) => t.studentId === studentId && inRange(t.date),
+    )
+  );
+}
+
+function isStudentInReport(s, from, to) {
+  if (!s || s.status === "pending") return false;
+  if (s.status !== "archived") return true;
+  return studentHasRecordsInRange(s.id, from, to);
+}
+
+// نسخة للعرض فقط (لا تُحفظ): اسم الطالب غير النشط مع علامة (موقوف)
+function markInactiveStudentName(s) {
+  return s.status === "active" || !s.status
+    ? s
+    : { ...s, name: `${s.name || ""} (موقوف)` };
+}
+
 // دالة استخراج وتوليد التقارير
 function generateReport() {
   const reportType = document.getElementById("report-type-select")?.value;
@@ -387,9 +419,9 @@ function generateReport() {
       .filter(
         (s) =>
           studentInCircle(s, circleId) &&
-          s.status !== "pending" &&
-          s.status !== "archived",
+          isStudentInReport(s, targetDate, targetDate),
       )
+      .map(markInactiveStudentName)
       .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
 
     if (students.length === 0) {
@@ -418,11 +450,11 @@ function generateReport() {
             <td style="padding: 8px; border: 1px solid #2E657E;">${idx + 1}</td>
             <td style="padding: 8px; font-weight: 800; text-align: right; border: 1px solid #2E657E; font-size: 14px; white-space: nowrap;">${escapeHtml(s.name)}</td>
             <td style="padding: 8px; border: 1px solid #2E657E;">${attStatus}</td>
-            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.hifzSurah) || "لا يوجد"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${tasmeeaSectionDisplay(tasm, "hifz", "لا يوجد")}</td>
             <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.hifzRating) || "—"}</td>
-            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.murajaaSurah) || "لا يوجد"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${tasmeeaSectionDisplay(tasm, "murajaa", "لا يوجد")}</td>
             <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.murajaaRating) || "—"}</td>
-            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.tilawaSurah) || "لا يوجد"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${tasmeeaSectionDisplay(tasm, "tilawa", "لا يوجد")}</td>
             <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.tilawaRating) || "—"}</td>
           </tr>
         `;
@@ -501,11 +533,11 @@ function generateReport() {
           <tr style="border-bottom: 1px solid #2E657E; text-align: center; font-size: 0.9rem;">
             <td style="padding: 8px; font-weight: 700; border: 1px solid #2E657E;">${dayFormatted}</td>
             <td style="padding: 8px; border: 1px solid #2E657E;">${attStatus}</td>
-            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.hifzSurah) || "لا يوجد"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${tasmeeaSectionDisplay(tasm, "hifz", "لا يوجد")}</td>
             <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.hifzRating) || "لا يوجد"}</td>
-            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.murajaaSurah) || "لا يوجد"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${tasmeeaSectionDisplay(tasm, "murajaa", "لا يوجد")}</td>
             <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.murajaaRating) || "لا يوجد"}</td>
-            <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.tilawaSurah) || "لا يوجد"}</td>
+            <td style="padding: 8px; border: 1px solid #2E657E;">${tasmeeaSectionDisplay(tasm, "tilawa", "لا يوجد")}</td>
             <td style="padding: 8px; border: 1px solid #2E657E;">${escapeHtml(tasm.tilawaRating) || "لا يوجد"}</td>
           </tr>
         `;
@@ -531,12 +563,11 @@ function generateReport() {
       </tr>
     `;
 
-    let students = (window.appStore.students || []).filter(
-      (s) =>
-        studentInCircle(s, circleId) &&
-        s.status !== "pending" &&
-        s.status !== "archived",
-    );
+    let students = (window.appStore.students || [])
+      .filter(
+        (s) => studentInCircle(s, circleId) && isStudentInReport(s, "", ""),
+      )
+      .map(markInactiveStudentName);
     if (selectedStudentId !== "all") {
       students = students.filter((s) => s.id === selectedStudentId);
     }
@@ -553,15 +584,20 @@ function generateReport() {
 
         tasmList.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
-        const hifzWithVal = tasmList.filter(
-          (t) => t.hifzSurah && t.hifzSurah.trim() !== "",
+        // الدروس المعتمدة فعلاً فقط: أيام "متوقف" (بالزر أو مكتوبة يدوياً) لا تُحسب بداية ولا نهاية
+        const isRealLesson = (t, section) => {
+          const field = window.TASMEEA_SECTION_FIELDS[section].surah;
+          return (
+            t[field] &&
+            String(t[field]).trim() !== "" &&
+            !isTasmeeaSectionStopped(t, section)
+          );
+        };
+        const hifzWithVal = tasmList.filter((t) => isRealLesson(t, "hifz"));
+        const murajaaWithVal = tasmList.filter((t) =>
+          isRealLesson(t, "murajaa"),
         );
-        const murajaaWithVal = tasmList.filter(
-          (t) => t.murajaaSurah && t.murajaaSurah.trim() !== "",
-        );
-        const tilawaWithVal = tasmList.filter(
-          (t) => t.tilawaSurah && t.tilawaSurah.trim() !== "",
-        );
+        const tilawaWithVal = tasmList.filter((t) => isRealLesson(t, "tilawa"));
 
         const hifzStart = hifzWithVal[0]?.hifzSurah || "—";
         const hifzEnd = hifzWithVal[hifzWithVal.length - 1]?.hifzSurah || "—";
@@ -622,12 +658,13 @@ function generateReport() {
       </tr>
     `;
 
-    let students = (window.appStore.students || []).filter(
-      (s) =>
-        studentInCircle(s, circleId) &&
-        s.status !== "pending" &&
-        s.status !== "archived",
-    );
+    let students = (window.appStore.students || [])
+      .filter(
+        (s) =>
+          studentInCircle(s, circleId) &&
+          isStudentInReport(s, dateFrom || "", dateTo || ""),
+      )
+      .map(markInactiveStudentName);
     if (selectedStudentId !== "all") {
       students = students.filter((s) => s.id === selectedStudentId);
     }
@@ -734,9 +771,14 @@ function generateReport() {
       </tr>
     `;
 
-    let students = (window.appStore.students || []).filter(
-      (s) => studentInCircle(s, circleId) && s.status === "active",
-    );
+    let students = (window.appStore.students || [])
+      .filter(
+        (s) =>
+          studentInCircle(s, circleId) &&
+          (s.status === "active" ||
+            (s.status !== "pending" && studentHasRecordsInRange(s.id, "", ""))),
+      )
+      .map(markInactiveStudentName);
     if (selectedStudentId !== "all") {
       students = students.filter((s) => s.id === selectedStudentId);
     }
@@ -1141,6 +1183,7 @@ async function downloadReportWord() {
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
         <meta charset="utf-8" />
+        ${typeof printBaseHref === "function" ? `<base href="${printBaseHref()}" />` : ""}
         <title>${reportTitle}</title>
         <!--[if gte mso 9]>
         <xml>
@@ -1258,6 +1301,7 @@ function printOfficialReport() {
     <html dir="rtl" lang="ar">
       <head>
         <meta charset="utf-8" />
+        ${typeof printBaseHref === "function" ? `<base href="${printBaseHref()}" />` : ""}
         <title>${reportTitle}</title>
         <style>
           @page {

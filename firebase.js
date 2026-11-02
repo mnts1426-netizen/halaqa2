@@ -401,9 +401,24 @@ function loadInitialData() {
     seedProductionAdminOnly();
   }
 
-  // مزامنة السحابة
+  // مزامنة السحابة (جلسة طالب أو ولي أمر محفوظة: لا تُحمَّل بيانات المجمع كله، بل بيانات
+  // الطالب فقط بعد استعادة الجلسة - راجع startStudentScopedSync)
   if (isFirebaseOnline && dbFirestore) {
-    syncAndPurgeDataFromCloud();
+    const savedSession = readSavedSessionUser();
+    // بوابة الطالب (?portal=student) لا يدخل منها إلا طالب أو ولي أمر، فلا داعي لتحميل الكل
+    const isStudentPortal =
+      !savedSession &&
+      (new URLSearchParams(window.location.search).get("portal") ===
+        "student" ||
+        window.location.hash === "#student");
+    if (
+      (savedSession && savedSession.role === SAFE_ROLES.STUDENT) ||
+      isStudentPortal
+    ) {
+      window.__studentScopedMode = true;
+    } else {
+      syncAndPurgeDataFromCloud();
+    }
     watchForAppUpdates();
     watchAppTheme();
   }
@@ -869,6 +884,11 @@ async function runFullCloudSync() {
   }
 
   for (const col of CLOUD_SYNC_COLLECTIONS) {
+    // دخل طالب أو ولي أمر أثناء التحميل الكامل: يتوقف (لا تُكتب مؤشرات مزامنة، فالمزامنة
+    // القادمة لأي مدير أو معلم على هذا الجهاز تكون كاملة كالمعتاد)
+    if (window.__studentScopedMode) {
+      throw new Error("توقف التحميل الكامل: جهاز طالب يحمّل بياناته فقط");
+    }
     const deletedIds = deletedSets[col];
     const cursor = newSyncCursor();
     const snapshot = await dbFirestore.collection(col).get();
@@ -973,6 +993,8 @@ let cloudSyncInFlight = null;
 // options.forceFull: مزامنة كاملة الآن (زر المدير) متجاوزة الحد الأدنى بين مزامنتين
 async function syncAndPurgeDataFromCloud(options) {
   if (!dbFirestore) return;
+  // جهاز الطالب أو ولي الأمر يحمّل بيانات الطالب فقط
+  if (window.__studentScopedMode) return;
   const forceFull = !!(options && options.forceFull);
 
   // مزامنة واحدة فقط في نفس الوقت (كانت تبدأ مزامنتان كاملتان معاً عند الدخول ثم فتح
@@ -1212,6 +1234,578 @@ window.startScreenLiveSync = async function () {
   return true;
 };
 
+// ==========================================================================
+// التحديث اللحظي لجهاز المدير والمعلم: نفس طريقة شاشة العرض (الاستماع للتغييرات فقط بعد آخر
+// مزامنة)، فأي تعديل من جوال آخر يصل خلال ثوانٍ ويُعاد رسم الشاشة المفتوحة. لا تُحسب قراءة
+// إلا للمستند الذي تغيّر فعلاً. الدمج نفسه (المحلي يبقى إلا إذا كانت السحابية أحدث) وشواهد
+// الحذف كما هي. إن لم تكن المزامنة السابقة سليمة لا يبدأ الاستماع ويبقى السلوك القديم كما هو.
+// ==========================================================================
+const USER_LIVE_TEACHER_COLLECTIONS = [
+  "users",
+  "students",
+  "teachers",
+  "circles",
+  "settings",
+  "attendance",
+  "teacherAttendance",
+  "tasmeea",
+  "tasmeeaKashf",
+  "tests",
+  "notifications",
+  "messages",
+  "screenOrder",
+];
+const USER_LIVE_RESTART_MS = 2 * 60 * 60 * 1000;
+
+let userLiveUnsubs = [];
+let userLiveState = null;
+let userLiveBroken = false;
+let userLiveRestartTimer = null;
+let userLivePersistTimer = null;
+let userLiveRenderTimer = null;
+let userLiveSpecialTimers = {};
+let userLiveStarting = null;
+
+function persistUserLiveState() {
+  if (!userLiveState) return;
+  if (!saveLocalStore()) return;
+  const stored = readSyncState();
+  if (stored && stored.cursors && stored.tombs) {
+    Object.keys(userLiveState.cursors).forEach((col) => {
+      const a = userLiveState.cursors[col];
+      const b = stored.cursors[col];
+      if (b) {
+        a.srv = Math.max(a.srv || 0, b.srv || 0);
+        a.upd = Math.max(a.upd || 0, b.upd || 0);
+      }
+    });
+    Object.keys(stored.cursors).forEach((col) => {
+      if (!userLiveState.cursors[col])
+        userLiveState.cursors[col] = stored.cursors[col];
+    });
+    Object.keys(stored.tombs).forEach((col) => {
+      const set = new Set(userLiveState.tombs[col] || []);
+      (stored.tombs[col] || []).forEach((id) => set.add(id));
+      userLiveState.tombs[col] = Array.from(set);
+    });
+    userLiveState.lastFullAt = Math.max(
+      userLiveState.lastFullAt || 0,
+      stored.lastFullAt || 0,
+    );
+  }
+  writeSyncState(userLiveState);
+}
+
+// إعادة رسم الشاشة المفتوحة بعد وصول تغييرات - تُؤجَّل ما دام المستخدم يكتب أو يختار داخلها
+function scheduleUserLiveRender(delay = 800) {
+  clearTimeout(userLiveRenderTimer);
+  userLiveRenderTimer = setTimeout(() => {
+    const active = document.querySelector(".content-view.active");
+    const focused = document.activeElement;
+    if (
+      active &&
+      focused &&
+      active.contains(focused) &&
+      ["INPUT", "TEXTAREA", "SELECT"].includes(focused.tagName)
+    ) {
+      scheduleUserLiveRender(2000);
+      return;
+    }
+    if (typeof refreshActiveView === "function" && active) {
+      refreshActiveView(active.id);
+    }
+    if (typeof enforceBlockedAccountLogout === "function")
+      enforceBlockedAccountLogout();
+  }, delay);
+}
+
+function handleUserLiveDocs(col, docs) {
+  if (!userLiveState || docs.length === 0) return;
+  const updField = col === "deletedTombstones" ? "deletedAt" : "updatedAt";
+  const cursor =
+    userLiveState.cursors[col] || (userLiveState.cursors[col] = newSyncCursor());
+  docs.forEach((doc) => advanceSyncCursor(cursor, doc.data(), updField));
+
+  if (col === "deletedTombstones") {
+    docs.forEach((doc) => {
+      const d = doc.data();
+      if (!d || !d.collection || !d.docId) return;
+      if (!userLiveState.tombs[d.collection])
+        userLiveState.tombs[d.collection] = [];
+      if (!userLiveState.tombs[d.collection].includes(String(d.docId)))
+        userLiveState.tombs[d.collection].push(String(d.docId));
+      removeTombstonedLocalItems(d.collection, new Set([String(d.docId)]));
+    });
+  } else if (SPECIAL_SYNC_COLLECTIONS.includes(col)) {
+    clearTimeout(userLiveSpecialTimers[col]);
+    userLiveSpecialTimers[col] = setTimeout(async () => {
+      try {
+        const snapshot = await dbFirestore.collection(col).get();
+        if (!snapshot.empty && userLiveState) {
+          applySpecialCloudCollection(col, snapshot.docs.map(cloudDocToLocalItem));
+          if (col === "settings" && typeof applyAppIdentity === "function")
+            applyAppIdentity();
+          clearTimeout(userLivePersistTimer);
+          userLivePersistTimer = setTimeout(persistUserLiveState, 3000);
+          scheduleUserLiveRender();
+        }
+      } catch (e) {
+        console.warn("تعذّر تحديث الإعدادات:", e);
+      }
+    }, 1500);
+    return;
+  } else {
+    const deletedIds = new Set((userLiveState.tombs[col] || []).map(String));
+    mergeCloudItemsIntoLocal(col, docs.map(cloudDocToLocalItem), deletedIds);
+  }
+  clearTimeout(userLivePersistTimer);
+  userLivePersistTimer = setTimeout(persistUserLiveState, 3000);
+  scheduleUserLiveRender();
+}
+
+window.stopUserLiveSync = function () {
+  userLiveUnsubs.forEach((unsub) => {
+    try {
+      unsub();
+    } catch (e) {}
+  });
+  userLiveUnsubs = [];
+  clearTimeout(userLiveRestartTimer);
+  userLiveRestartTimer = null;
+  clearTimeout(userLiveRenderTimer);
+  Object.keys(userLiveSpecialTimers).forEach((k) =>
+    clearTimeout(userLiveSpecialTimers[k]),
+  );
+  userLiveSpecialTimers = {};
+  if (userLiveState) {
+    clearTimeout(userLivePersistTimer);
+    persistUserLiveState();
+  }
+  userLiveState = null;
+  userLiveBroken = false;
+};
+
+window.isUserLiveSyncActive = function () {
+  return userLiveUnsubs.length > 0 && !userLiveBroken;
+};
+
+window.startUserLiveSync = function () {
+  if (userLiveStarting) return userLiveStarting;
+  userLiveStarting = (async () => {
+    // انتظار دورة واحدة على الأقل: حتى لا يُنفَّذ finally قبل حفظ الوعد في userLiveStarting
+    // (فيبقى عالقاً ولا يُعاد تشغيل الاستماع بعدها أبداً)
+    await null;
+    try {
+      if (!dbFirestore || !DELTA_SYNC_ENABLED) return false;
+      const role = window.currentUser && window.currentUser.role;
+      if (role !== SAFE_ROLES.ADMIN && role !== SAFE_ROLES.TEACHER) return false;
+      const stillSameRole = () =>
+        window.currentUser && window.currentUser.role === role;
+
+      window.stopUserLiveSync();
+      if (cloudSyncInFlight) await cloudSyncInFlight;
+      // يبدأ الاستماع فقط بعد مزامنة سليمة (كاملة أو تغييرات) حتى تكون المؤشرات صحيحة
+      if (!isDeltaSyncUsable(readSyncState())) {
+        await syncAndPurgeDataFromCloud();
+      }
+      const state = readSyncState();
+      if (!stillSameRole() || !isDeltaSyncUsable(state)) return false;
+      userLiveState = state;
+      userLiveBroken = false;
+
+      const cols =
+        role === SAFE_ROLES.ADMIN
+          ? CLOUD_SYNC_COLLECTIONS
+          : USER_LIVE_TEACHER_COLLECTIONS;
+      [...cols, "deletedTombstones"].forEach((col) => {
+        const cursor = userLiveState.cursors[col] || newSyncCursor();
+        const unsub = dbFirestore
+          .collection(col)
+          .where(
+            SERVER_STAMP_FIELD,
+            ">",
+            firebase.firestore.Timestamp.fromMillis(
+              Math.max(0, cursor.srv - DELTA_OVERLAP_SERVER_MS),
+            ),
+          )
+          .onSnapshot(
+            (snap) => {
+              const changed = snap
+                .docChanges()
+                .filter((ch) => ch.type !== "removed")
+                .map((ch) => ch.doc);
+              handleUserLiveDocs(col, changed);
+            },
+            (err) => {
+              console.warn(`تعذّر الاستماع لتغييرات ${col}:`, err);
+              userLiveBroken = true;
+            },
+          );
+        userLiveUnsubs.push(unsub);
+      });
+
+      userLiveRestartTimer = setTimeout(() => {
+        if (stillSameRole()) window.startUserLiveSync();
+      }, USER_LIVE_RESTART_MS);
+      return true;
+    } catch (e) {
+      console.warn("تعذّر تشغيل التحديث اللحظي:", e);
+      return false;
+    } finally {
+      userLiveStarting = null;
+    }
+  })();
+  return userLiveStarting;
+};
+
+// ==========================================================================
+// جهاز الطالب / ولي الأمر: يحمّل بيانات الطالب نفسه فقط (حضوره وتسميعه واختباراته وكشفه) مع
+// الحلقات والإعدادات والإشعارات، بدل تحميل بيانات المجمع كله. أسرع بكثير وبقراءات أقل بكثير،
+// ولا تظهر أصفار أثناء التحميل. سجلات الطالب تصل وتتحدّث لحظياً بالاستماع لها.
+// - النسخة المحلية لا تُستبدل إلا بإجابة كاملة من الخادم نفسه (لا من ذاكرة مؤقتة)، وعند أي
+//   فشل تبقى بيانات الجهاز كما هي تماماً وتُعاد المحاولة لاحقاً.
+// - لا تُكتب مؤشرات "المزامنة الكاملة"، فإن دخل مدير أو معلم من نفس الجهاز لاحقاً تجري له
+//   مزامنته المعتادة كاملة دون أي نقص.
+// ==========================================================================
+const STUDENT_OWN_COLLECTIONS = ["attendance", "tasmeea", "tests", "tasmeeaKashf"];
+const STUDENT_RECENT_LOCAL_WRITE_MS = 5 * 60 * 1000;
+let studentScoped = null;
+let studentScopedRetryTimer = null;
+window.__studentScopedMode = false;
+window.studentDataStatus = "idle";
+
+function setStudentDataStatus(status) {
+  if (window.studentDataStatus === status) return;
+  window.studentDataStatus = status;
+  if (
+    document.getElementById("view-student-home")?.classList.contains("active") &&
+    typeof renderStudentData === "function"
+  ) {
+    renderStudentData();
+  }
+}
+
+// الجلسة المحفوظة (بنفس شرط انتهائها بعد ساعتين في checkSavedSession)
+function readSavedSessionUser() {
+  try {
+    const user = JSON.parse(
+      localStorage.getItem("HALAQAT_SESSION_USER") || "null",
+    );
+    if (!user) return null;
+    const t = parseInt(localStorage.getItem("HALAQAT_SESSION_TIME") || "0", 10);
+    if (t && Date.now() - t > 2 * 60 * 60 * 1000) return null;
+    return user;
+  } catch (e) {
+    return null;
+  }
+}
+
+function studentHasLocalRecords(sid) {
+  return STUDENT_OWN_COLLECTIONS.some((col) =>
+    (window.appStore[col] || []).some((it) => it && it.studentId === sid),
+  );
+}
+
+// سجلات هذا الطالب في مجموعة: تصبح مطابقة لإجابة الخادم الكاملة (فيُزال ما حُذف في الخادم)،
+// مع إبقاء أي سجل حُفظ محلياً للتو وقد يكون ما زال في طريقه للخادم. سجلات بقية الطلاب لا تُمس
+function replaceStudentSubset(col, sid, serverItems) {
+  const local = Array.isArray(window.appStore[col]) ? window.appStore[col] : [];
+  const serverIds = new Set(serverItems.map((it) => String(it.id)));
+  const now = Date.now();
+  window.appStore[col] = local.filter((it) => {
+    if (!it || it.studentId !== sid) return true;
+    if (serverIds.has(String(it.id))) return true;
+    return (
+      typeof it.updatedAt === "number" &&
+      now - it.updatedAt < STUDENT_RECENT_LOCAL_WRITE_MS
+    );
+  });
+  mergeCloudItemsIntoLocal(col, serverItems, null);
+}
+
+// الإشعارات: نفس المبدأ لكامل المجموعة (الاستهداف يتم في الجهاز حسب الحلقة والطالب)
+function replaceWholeCollection(col, serverItems) {
+  const local = Array.isArray(window.appStore[col]) ? window.appStore[col] : [];
+  const serverIds = new Set(serverItems.map((it) => String(it.id)));
+  const now = Date.now();
+  window.appStore[col] = local.filter(
+    (it) =>
+      it &&
+      (serverIds.has(String(it.id)) ||
+        (typeof it.updatedAt === "number" &&
+          now - it.updatedAt < STUDENT_RECENT_LOCAL_WRITE_MS)),
+  );
+  mergeCloudItemsIntoLocal(col, serverItems, null);
+}
+
+let studentScopedRenderTimer = null;
+function scheduleStudentPersistAndRender() {
+  clearTimeout(studentScopedRenderTimer);
+  studentScopedRenderTimer = setTimeout(() => {
+    saveLocalStore();
+    if (
+      document.getElementById("view-student-home")?.classList.contains("active") &&
+      typeof renderStudentData === "function"
+    ) {
+      renderStudentData();
+    }
+    if (typeof enforceBlockedAccountLogout === "function")
+      enforceBlockedAccountLogout();
+  }, 300);
+}
+
+function scheduleStudentScopedRetry() {
+  clearTimeout(studentScopedRetryTimer);
+  studentScopedRetryTimer = setTimeout(() => {
+    const u = window.currentUser;
+    if (u && u.role === SAFE_ROLES.STUDENT && !document.hidden) {
+      window.startStudentScopedSync(u);
+    }
+  }, 60 * 1000);
+}
+
+window.stopStudentScopedSync = function () {
+  if (studentScoped) {
+    studentScoped.unsubs.forEach((unsub) => {
+      try {
+        unsub();
+      } catch (e) {}
+    });
+  }
+  studentScoped = null;
+  clearTimeout(studentScopedRetryTimer);
+  clearTimeout(studentScopedRenderTimer);
+};
+
+window.startStudentScopedSync = async function (user) {
+  if (!dbFirestore || !user || user.role !== SAFE_ROLES.STUDENT) return false;
+  window.stopStudentScopedSync();
+  window.__studentScopedMode = true;
+  const sid = String(user.id);
+  const st = (studentScoped = { sid, unsubs: [], loaded: new Set(), broken: false });
+  const isCurrent = () => studentScoped === st;
+  const hadLocal = studentHasLocalRecords(sid);
+  setStudentDataStatus(hadLocal ? "ready" : "loading");
+
+  const onFailure = (e) => {
+    console.warn("تعذّر تحميل بيانات الطالب الآن (تبقى بيانات الجهاز كما هي):", e);
+    if (!isCurrent()) return;
+    st.broken = true;
+    setStudentDataStatus(studentHasLocalRecords(sid) ? "stale" : "error");
+    scheduleStudentScopedRetry();
+  };
+
+  try {
+    const [stuDoc, userDoc, circlesSnap, settingsSnap, orderSnap, notifSnap] =
+      await Promise.all([
+        dbFirestore.collection("students").doc(sid).get(),
+        dbFirestore.collection("users").doc(sid).get(),
+        dbFirestore.collection("circles").get(),
+        dbFirestore.collection("settings").get(),
+        dbFirestore.collection("screenOrder").get(),
+        dbFirestore.collection("notifications").get(),
+      ]);
+    if (!isCurrent()) return false;
+    // سجل الطالب وحسابه: نسخة الخادم هي المرجع (الطالب لا يعدّلهما إلا بوقت الدخول وصورته)
+    const takeServerDoc = (col, doc) => {
+      if (!doc.exists) return;
+      const item = cloudDocToLocalItem(doc);
+      if (!Array.isArray(window.appStore[col])) window.appStore[col] = [];
+      const idx = window.appStore[col].findIndex(
+        (it) => it && String(it.id) === String(item.id),
+      );
+      if (idx > -1)
+        window.appStore[col][idx] = { ...window.appStore[col][idx], ...item };
+      else window.appStore[col].push(item);
+    };
+    takeServerDoc("students", stuDoc);
+    takeServerDoc("users", userDoc);
+    mergeCloudItemsIntoLocal(
+      "circles",
+      circlesSnap.docs.map(cloudDocToLocalItem),
+      null,
+    );
+    if (!settingsSnap.empty) {
+      applySpecialCloudCollection(
+        "settings",
+        settingsSnap.docs.map(cloudDocToLocalItem),
+      );
+      if (typeof applyAppIdentity === "function") applyAppIdentity();
+    }
+    if (!orderSnap.empty) {
+      applySpecialCloudCollection(
+        "screenOrder",
+        orderSnap.docs.map(cloudDocToLocalItem),
+      );
+    }
+    replaceWholeCollection(
+      "notifications",
+      notifSnap.docs.map(cloudDocToLocalItem),
+    );
+    scheduleStudentPersistAndRender();
+  } catch (e) {
+    onFailure(e);
+    return false;
+  }
+
+  // سجلات الطالب نفسه: أول إجابة = تحميلها كاملة، وبعدها يصل أي تعديل من المعلم أو المدير لحظياً
+  STUDENT_OWN_COLLECTIONS.forEach((col) => {
+    const unsub = dbFirestore
+      .collection(col)
+      .where("studentId", "==", sid)
+      .onSnapshot(
+        (snap) => {
+          if (!isCurrent()) return;
+          // نسخة من ذاكرة مؤقتة (لا اتصال بالخادم) قد تكون ناقصة: لا تُستبدل بها بيانات الجهاز
+          if (snap.metadata && snap.metadata.fromCache) return;
+          replaceStudentSubset(col, sid, snap.docs.map(cloudDocToLocalItem));
+          st.loaded.add(col);
+          if (st.loaded.size === STUDENT_OWN_COLLECTIONS.length && !st.broken) {
+            setStudentDataStatus("ready");
+          }
+          scheduleStudentPersistAndRender();
+        },
+        (err) => onFailure(err),
+      );
+    st.unsubs.push(unsub);
+  });
+  return true;
+};
+
+window.isStudentScopedSyncBroken = function () {
+  return !studentScoped || studentScoped.broken;
+};
+
+// بعد الدخول: الطالب يحمّل بياناته فقط، والمدير والمعلم يبدأ عندهما التحديث اللحظي
+window.startLiveUpdatesForUser = function (user) {
+  if (!user) return;
+  if (user.role === SAFE_ROLES.STUDENT) {
+    window.startStudentScopedSync(user);
+  } else if (user.role === SAFE_ROLES.ADMIN || user.role === SAFE_ROLES.TEACHER) {
+    window.__studentScopedMode = false;
+    window.startUserLiveSync();
+  }
+};
+
+window.stopLiveUpdatesForUser = function () {
+  window.stopUserLiveSync();
+  window.stopStudentScopedSync();
+  window.__studentScopedMode = false;
+  window.studentDataStatus = "idle";
+};
+
+// الرجوع للبرنامج من الخلفية: إن انقطع الاستماع لأي سبب يُعاد تشغيله
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") return;
+  const u = window.currentUser;
+  if (!u) return;
+  if (u.role === SAFE_ROLES.STUDENT) {
+    if (window.isStudentScopedSyncBroken()) window.startStudentScopedSync(u);
+  } else if (u.role === SAFE_ROLES.ADMIN || u.role === SAFE_ROLES.TEACHER) {
+    if (!window.isUserLiveSyncActive()) window.startUserLiveSync();
+  }
+});
+
+// تسجيل دخول طالب أو ولي أمر من جهاز لم تكتمل فيه بيانات الطلاب بعد (أول مرة على الجهاز):
+// يُبحث عن الطالب في الخادم مباشرة برقم الهوية أو الجوال أو جوال ولي الأمر أو الاسم، ثم تُعاد
+// محاولة الدخول نفسها مرة واحدة. لا يُكتب أي شيء في الخادم
+const studentLoginLookupDone = new Set();
+window.tryCloudStudentLookupThenRetry = function (identifier, retry) {
+  const key = String(identifier || "").trim();
+  if (!key || !dbFirestore || studentLoginLookupDone.has(key)) return false;
+  studentLoginLookupDone.add(key);
+  (async () => {
+    try {
+      const fields = ["nationalId", "phone", "parentPhone", "name"];
+      const snaps = await Promise.all(
+        fields.map((f) =>
+          dbFirestore.collection("students").where(f, "==", key).get(),
+        ),
+      );
+      const found = new Map();
+      snaps.forEach((s) => s.docs.forEach((d) => found.set(d.id, d)));
+      if (found.size > 0) {
+        mergeCloudItemsIntoLocal(
+          "students",
+          Array.from(found.values()).map(cloudDocToLocalItem),
+          null,
+        );
+        const userDocs = await Promise.all(
+          Array.from(found.keys()).map((id) =>
+            dbFirestore.collection("users").doc(id).get(),
+          ),
+        );
+        const unameSnaps = await Promise.all(
+          Array.from(found.values())
+            .map((d) => String((d.data() || {}).nationalId || "").trim())
+            .filter(Boolean)
+            .map((nat) =>
+              dbFirestore.collection("users").where("username", "==", nat).get(),
+            ),
+        );
+        const users = userDocs.filter((d) => d.exists).map(cloudDocToLocalItem);
+        unameSnaps.forEach((s) =>
+          s.docs.forEach((d) => users.push(cloudDocToLocalItem(d))),
+        );
+        if (users.length) mergeCloudItemsIntoLocal("users", users, null);
+      }
+    } catch (e) {
+      console.warn("تعذّر البحث عن الطالب في الخادم:", e);
+      // مشكلة اتصال وليست "غير مسجل": رسالة واضحة، ويُسمح بإعادة المحاولة
+      studentLoginLookupDone.delete(key);
+      alert(
+        "📶 تعذّر الاتصال بالخادم الآن. تأكد من اتصال الإنترنت ثم أعد محاولة الدخول.",
+      );
+      return;
+    }
+    retry();
+  })();
+  return true;
+};
+
+// دخول مدير أو معلم من جهاز لم تكتمل فيه البيانات بعد (مثلاً جوال ولي أمر، أو التحميل الأول ما
+// زال جارياً): تُنتظر/تُجرى المزامنة المعتادة ثم تُعاد محاولة الدخول مرة واحدة
+let fullDataLoginRetryDone = false;
+window.ensureFullDataThenRetry = function (retry) {
+  if (!dbFirestore || fullDataLoginRetryDone) return false;
+  if (!cloudSyncInFlight && isDeltaSyncUsable(readSyncState())) return false;
+  fullDataLoginRetryDone = true;
+  (async () => {
+    try {
+      window.__studentScopedMode = false;
+      if (cloudSyncInFlight) await cloudSyncInFlight;
+      if (!isDeltaSyncUsable(readSyncState())) {
+        await syncAndPurgeDataFromCloud({ forceFull: true });
+      }
+    } catch (e) {
+      console.warn("تعذّر تحميل البيانات قبل الدخول:", e);
+    }
+    retry();
+    fullDataLoginRetryDone = false;
+  })();
+  return true;
+};
+
+const ADMIN_EDIT_MARKED_COLLECTIONS = ["attendance", "tasmeea", "tests"];
+
+// نص علامة تعديل المدير للعرض عند المعلم (فارغ إن لم يعدّله المدير)
+window.adminEditBadgeHtml = function (record, what) {
+  if (!record || !record.editedByAdminAt) return "";
+  const at = new Date(record.editedByAdminAt);
+  if (isNaN(at.getTime())) return "";
+  const time = at.toLocaleTimeString("ar-SA", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const day =
+    typeof formatHijriDate === "function" &&
+    typeof localGregorianStr === "function"
+      ? formatHijriDate(localGregorianStr(at))
+      : "";
+  const label = what ? `عدّل المدير ${what}` : "عدّله المدير";
+  return `<span class="badge" title="عدّل المدير هذا السجل" style="background:#ede7f6; color:#4527a0; font-size:0.72rem; margin-right:4px;">✏️ ${escapeHtml(label)} ${escapeHtml(day ? `${day} ${time}` : time)}</span>`;
+};
+
 // دالة الحفظ السحابي المحمية من الأخطاء وحفظ النسخة المحلية فوراً
 async function saveToCloud(collectionName, docId, data, isDelete = false) {
   if (!collectionName || !docId) return;
@@ -1222,6 +1816,16 @@ async function saveToCloud(collectionName, docId, data, isDelete = false) {
   // محلياً حديثاً جداً لحالته القديمة إن قرأت المزامنة الدورية نسخة سحابية لم تتحدّث بعد
   if (!isDelete && data && typeof data === "object") {
     data.updatedAt = Date.now();
+    // علامة "عدّله المدير": سجلات الطلاب اليومية (التحضير والتسميع والاختبارات) إذا حفظها المدير
+    // تظهر عند المعلم بعلامة ✏️ مع وقت التعديل، وتزول إذا حفظ المعلم السجل نفسه بعد ذلك
+    if (ADMIN_EDIT_MARKED_COLLECTIONS.includes(collectionName)) {
+      const role = window.currentUser && window.currentUser.role;
+      if (role === SAFE_ROLES.ADMIN) {
+        data.editedByAdminAt = data.updatedAt;
+      } else if (role === SAFE_ROLES.TEACHER) {
+        data.editedByAdminAt = null;
+      }
+    }
   }
 
   // تحديث المخزن المحلي فوراً

@@ -58,6 +58,7 @@ window.ROLE_PERMISSIONS = {
     "view-accounts",
     "view-tests",
     "view-reports",
+    "view-remote-tasmeea",
     "view-finance",
     "view-notifications",
     "view-settings",
@@ -425,6 +426,13 @@ window.handleLoginFormSubmit = function (e) {
 
     const expectedStudentPass = studentUserRec ? studentUserRec.pass : "1111";
     if (passVal !== expectedStudentPass) {
+      // جهاز لم تكتمل فيه البيانات (مثل جوال ولي أمر): قد يكون الداخل معلماً رقمه يطابق جوال
+      // طالب، فتُحمَّل البيانات أولاً ثم تُعاد المحاولة مرة واحدة
+      if (
+        typeof ensureFullDataThenRetry === "function" &&
+        ensureFullDataThenRetry(() => handleLoginFormSubmit())
+      )
+        return false;
       alert("❌ الرقم السري للطالب غير صحيح! (الرقم السري الافتراضي: 1111)");
       return false;
     }
@@ -475,6 +483,19 @@ window.handleLoginFormSubmit = function (e) {
     doLogin(foundUser, false);
     return false;
   }
+
+  // لم يُعثر عليه في بيانات الجهاز: ربما لم تكتمل بعد (جهاز جديد) - يُبحث عن الطالب في الخادم
+  // مباشرة، أو تُنتظر مزامنة البيانات، ثم تُعاد المحاولة مرة واحدة
+  if (
+    typeof tryCloudStudentLookupThenRetry === "function" &&
+    tryCloudStudentLookupThenRetry(userVal, () => handleLoginFormSubmit())
+  )
+    return false;
+  if (
+    typeof ensureFullDataThenRetry === "function" &&
+    ensureFullDataThenRetry(() => handleLoginFormSubmit())
+  )
+    return false;
 
   alert(
     "⚠️ اسم المستخدم أو رقم الهوية غير مسجل بالنظام. يرجى مراجعة إدارة المَجْمَع.",
@@ -549,6 +570,14 @@ window.handleStudentLoginFormSubmit = function (e) {
     doLogin(studentSessionUser, false);
     return false;
   }
+
+  if (
+    typeof tryCloudStudentLookupThenRetry === "function" &&
+    tryCloudStudentLookupThenRetry(identifier, () =>
+      handleStudentLoginFormSubmit(),
+    )
+  )
+    return false;
 
   alert(
     "⚠️ رقم الهوية أو الجوال غير مسجل بالنظام. يرجى مراجعة إدارة المَجْمَع.",
@@ -753,8 +782,13 @@ window.doLogin = function (user, isAutoSession = false) {
     );
     if (teacherObj) {
       teacherObj.lastLogin = loginTimestampStr;
+      // يُرسل وقت آخر دخول فقط (وليس السجل كاملاً) حتى لا تُكتب نسخة الجهاز القديمة فوق تعديل
+      // أحدث أجراه المدير على السجل نفسه
       if (typeof saveToCloud === "function")
-        saveToCloud("teachers", teacherObj.id, teacherObj);
+        saveToCloud("teachers", teacherObj.id, {
+          id: teacherObj.id,
+          lastLogin: loginTimestampStr,
+        });
     }
     user.lastLogin = loginTimestampStr;
 
@@ -776,7 +810,10 @@ window.doLogin = function (user, isAutoSession = false) {
     if (stuObj) {
       stuObj.lastLogin = loginTimestampStr;
       if (typeof saveToCloud === "function")
-        saveToCloud("students", stuObj.id, stuObj);
+        saveToCloud("students", stuObj.id, {
+          id: stuObj.id,
+          lastLogin: loginTimestampStr,
+        });
     }
     user.lastLogin = loginTimestampStr;
   }
@@ -790,7 +827,10 @@ window.doLogin = function (user, isAutoSession = false) {
   if (userRec) {
     userRec.lastLogin = loginTimestampStr;
     if (typeof saveToCloud === "function")
-      saveToCloud("users", userRec.id, userRec);
+      saveToCloud("users", userRec.id, {
+        id: userRec.id,
+        lastLogin: loginTimestampStr,
+      });
   }
 
   try {
@@ -871,6 +911,9 @@ window.doLogin = function (user, isAutoSession = false) {
   }
 
   adjustSidebarAndViewsForRole(user.role);
+
+  // الطالب/ولي الأمر: تحميل بيانات الطالب فقط. المدير/المعلم: التحديث اللحظي بين الأجوال
+  if (typeof startLiveUpdatesForUser === "function") startLiveUpdatesForUser(user);
 };
 
 // حساب الشاشة: عند الدخول يُطلب ملء الشاشة فوراً (تنجح مباشرة بعد ضغط زر الدخول). وإن رفضها
@@ -1100,6 +1143,14 @@ function adjustSidebarAndViewsForRole(role) {
 window.navigateTo = function (targetViewId) {
   if (!window.currentUser) {
     showMainLoginView();
+    return;
+  }
+
+  // التسميع عن بعد: للمدير فقط في هذه المرحلة التجريبية
+  if (
+    targetViewId === "view-remote-tasmeea" &&
+    window.currentUser.role !== window.ROLES.ADMIN
+  ) {
     return;
   }
 
@@ -1573,6 +1624,32 @@ function renderStudentData() {
   if (!window.currentUser || window.currentUser.role !== window.ROLES.STUDENT)
     return;
 
+  // أول تحميل لبيانات الطالب على هذا الجهاز: رسالة انتظار بدل أصفار توحي بأن البيانات حُذفت،
+  // ورسالة واضحة مع زر إعادة المحاولة إن تعذّر التحميل
+  const dataStatus = window.studentDataStatus;
+  if (dataStatus === "loading" || dataStatus === "error") {
+    const box = document.getElementById("view-student-home");
+    if (box) {
+      box.innerHTML = `
+        <div class="card mb-3" style="padding: 2rem 1.25rem; text-align: center; border-radius: 12px;">
+          ${
+            dataStatus === "loading"
+              ? `<div style="font-size: 2rem;">⏳</div>
+                 <h3 style="color: var(--primary-brown); font-weight: 800; margin: 0.5rem 0;">جاري تحميل بيانات الطالب...</h3>
+                 <p class="text-muted" style="margin: 0;">لحظات من فضلك، البيانات محفوظة ولم يُحذف منها شيء.</p>`
+              : `<div style="font-size: 2rem;">📶</div>
+                 <h3 style="color: #c62828; font-weight: 800; margin: 0.5rem 0;">تعذّر تحميل بيانات الطالب الآن</h3>
+                 <p class="text-muted" style="margin: 0 0 1rem;">البيانات محفوظة ولم يُحذف منها شيء. تأكد من اتصال الإنترنت ثم أعد المحاولة.</p>
+                 <button type="button" class="btn btn-primary" onclick="startStudentScopedSync(window.currentUser)">🔄 إعادة المحاولة</button>`
+          }
+          <div style="margin-top: 1rem;">
+            <button type="button" class="btn btn-danger btn-sm" onclick="handleLogout()">🚪 تسجيل الخروج</button>
+          </div>
+        </div>`;
+    }
+    return;
+  }
+
   const studentId = window.currentUser.id;
   const student =
     (window.appStore?.students || []).find((s) => s.id === studentId) ||
@@ -1649,7 +1726,10 @@ function renderStudentData() {
       ? getTamayuzDisplayWeekLabel()
       : "";
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  // تاريخ اليوم بالتوقيت المحلي (toISOString بالتوقيت العالمي كانت تعطي تاريخ الأمس بين
+  // منتصف الليل والثالثة فجراً بتوقيت السعودية)
+  const nowLocal = new Date();
+  const todayStr = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, "0")}-${String(nowLocal.getDate()).padStart(2, "0")}`;
   const todayRecord = studentTasmeea.find((t) => t.date === todayStr) || {};
   const todayAttRecord = studentAtt.find((a) => a.date === todayStr);
 
@@ -1677,17 +1757,33 @@ function renderStudentData() {
         )
       : todayRecord.tilawaSurah;
 
-  const latestTasmWithNext =
-    studentTasmeea
-      .filter((t) => t.nextHifz || t.nextMurajaa || t.nextTilawa)
-      .sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0] || {};
-
-  const tomorrowHifz =
-    todayRecord.nextHifz || latestTasmWithNext.nextHifz || "لم يحدد بعد";
+  // مقرر الغد لكل قسم على حدة: آخر "مقرر غد" حدده المعلم لهذا القسم بالذات (كان يُؤخذ من
+  // آخر سجل فيه أي مقرر غد، فاعتماد قسم واحد اليوم كان يُظهر القسمين الآخرين "لم يحدد بعد")
+  const latestNextFor = (field) => {
+    const rec = studentTasmeea
+      .filter(
+        (t) =>
+          (t.date || "") <= todayStr &&
+          t[field] &&
+          !(typeof isTasmeeaStopText === "function" && isTasmeeaStopText(t[field])),
+      )
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0];
+    return rec ? rec[field] : "";
+  };
+  const tomorrowHifz = escapeHtml(latestNextFor("nextHifz")) || "لم يحدد بعد";
   const tomorrowMurajaa =
-    todayRecord.nextMurajaa || latestTasmWithNext.nextMurajaa || "لم يحدد بعد";
+    escapeHtml(latestNextFor("nextMurajaa")) || "لم يحدد بعد";
   const tomorrowTilawa =
-    todayRecord.nextTilawa || latestTasmWithNext.nextTilawa || "لم يحدد بعد";
+    escapeHtml(latestNextFor("nextTilawa")) || "لم يحدد بعد";
+
+  // قسم متوقف اليوم: يظهر "متوقف" مع آخر مقرر كتبه المعلم
+  const stoppedToday = (section) =>
+    typeof isTasmeeaSectionStopped === "function" &&
+    isTasmeeaSectionStopped(todayRecord, section);
+  const todayLessonHtml = (section, carried) =>
+    stoppedToday(section)
+      ? `<span class="badge" style="background:#fff3e0; color:#e65100; font-weight:800;">⏸️ متوقف</span>${carried ? `<br><small class="text-muted">آخر مقرر: ${escapeHtml(carried)}</small>` : ""}`
+      : escapeHtml(carried) || "لم يسجل بعد";
 
   let attStatusBadge =
     '<span class="badge" style="background:#e0e0e0; color:#555;">لم يُسجَّل بعد</span>';
@@ -1882,6 +1978,14 @@ function renderStudentData() {
   }
 
   container.innerHTML = `
+    ${
+      dataStatus === "stale"
+        ? `<div class="card mb-3" style="background:#fff8e1; border:1px solid #f9a825; padding:0.6rem 0.9rem; font-weight:700; font-size:0.85rem; display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+             <span>📶 تعذّر تحديث البيانات الآن، والمعروض آخر بيانات محفوظة على الجهاز.</span>
+             <button type="button" class="btn btn-sm btn-primary" onclick="startStudentScopedSync(window.currentUser)">🔄 تحديث</button>
+           </div>`
+        : ""
+    }
     <!-- ترويسة الحساب والمعلومات الأساسية -->
     <div class="card mb-3" style="background: linear-gradient(135deg, var(--primary-brown) 0%, var(--primary-dark) 100%); color: #ffffff; border-radius: 12px; padding: 1.5rem; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
       <button onclick="handleLogout()" class="btn btn-danger btn-sm" style="position: absolute; top: 12px; left: 12px; font-size: 0.8rem; padding: 5px 12px; border-radius: 6px; z-index: 10;">
@@ -2092,17 +2196,17 @@ function renderStudentData() {
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem;">
           <div style="background: #f4f9f9; padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
             <strong style="color: var(--primary-brown); font-size: 0.85rem;">📖 الدرس الجديد:</strong>
-            <p style="margin-top: 4px; font-weight: 700;">${carriedHifzSurah || "لم يسجل بعد"}</p>
+            <p style="margin-top: 4px; font-weight: 700;">${todayLessonHtml("hifz", carriedHifzSurah)}</p>
             ${todayRecord.hifzRating ? `<span class="badge badge-active mt-1">${todayRecord.hifzRating}</span>` : ""}
           </div>
           <div style="background: #f4f9f9; padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
             <strong style="color: var(--primary-brown); font-size: 0.85rem;">🔄 المراجعة:</strong>
-            <p style="margin-top: 4px; font-weight: 700;">${carriedMurajaaSurah || "لم يسجل بعد"}</p>
+            <p style="margin-top: 4px; font-weight: 700;">${todayLessonHtml("murajaa", carriedMurajaaSurah)}</p>
             ${todayRecord.murajaaRating ? `<span class="badge badge-active mt-1">${todayRecord.murajaaRating}</span>` : ""}
           </div>
           <div style="background: #f4f9f9; padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
             <strong style="color: var(--primary-brown); font-size: 0.85rem;">🎧 التلاوة:</strong>
-            <p style="margin-top: 4px; font-weight: 700;">${carriedTilawaSurah || "لم يسجل بعد"}</p>
+            <p style="margin-top: 4px; font-weight: 700;">${todayLessonHtml("tilawa", carriedTilawaSurah)}</p>
             ${todayRecord.tilawaRating ? `<span class="badge badge-active mt-1">${todayRecord.tilawaRating}</span>` : ""}
           </div>
         </div>
@@ -2133,11 +2237,11 @@ function renderStudentData() {
                       (t) => `
                   <tr>
                     <td>${escapeHtml(formatHijriDate(t.date))}</td>
-                    <td>${escapeHtml(t.hifzSurah) || "—"}</td>
+                    <td>${tasmeeaSectionDisplay(t, "hifz", "—")}</td>
                     <td>${escapeHtml(t.hifzRating) || "—"}</td>
-                    <td>${escapeHtml(t.murajaaSurah) || "—"}</td>
+                    <td>${tasmeeaSectionDisplay(t, "murajaa", "—")}</td>
                     <td>${escapeHtml(t.murajaaRating) || "—"}</td>
-                    <td>${escapeHtml(t.tilawaSurah) || "—"}</td>
+                    <td>${tasmeeaSectionDisplay(t, "tilawa", "—")}</td>
                     <td>${escapeHtml(t.tilawaRating) || "—"}</td>
                   </tr>
                 `,
@@ -2260,6 +2364,11 @@ function refreshActiveView(viewId) {
     }
     if (viewId === "view-settings" && typeof renderThemePicker === "function")
       renderThemePicker();
+    if (
+      viewId === "view-remote-tasmeea" &&
+      typeof renderRemoteTasmeea === "function"
+    )
+      renderRemoteTasmeea();
     if (viewId === "view-settings" && typeof renderBackupStatus === "function")
       renderBackupStatus();
 
@@ -2285,7 +2394,11 @@ function refreshActiveView(viewId) {
       // التشغيل فقط) حتى تصل تعديلات المدير (حذف طالب، تغيير حالة إلى متأخر/
       // مستأذن...) لجهاز المعلم بدون إعادة تحميل الصفحة كاملة - يخضع لنفس الحد
       // الأدنى بين كل مزامنتين (دقيقتان) المطبَّق أصلاً داخل الدالة نفسها
-      if (typeof syncAndPurgeDataFromCloud === "function")
+      // (لا حاجة لها إذا كان التحديث اللحظي يعمل: التعديلات تصل وحدها)
+      if (
+        typeof syncAndPurgeDataFromCloud === "function" &&
+        !(typeof isUserLiveSyncActive === "function" && isUserLiveSyncActive())
+      )
         syncAndPurgeDataFromCloud();
     }
     if (
@@ -2293,7 +2406,11 @@ function refreshActiveView(viewId) {
       typeof renderTasmeeaStudents === "function"
     ) {
       renderTasmeeaStudents();
-      if (typeof syncAndPurgeDataFromCloud === "function")
+      // (لا حاجة لها إذا كان التحديث اللحظي يعمل: التعديلات تصل وحدها)
+      if (
+        typeof syncAndPurgeDataFromCloud === "function" &&
+        !(typeof isUserLiveSyncActive === "function" && isUserLiveSyncActive())
+      )
         syncAndPurgeDataFromCloud();
     }
     if (
@@ -2593,9 +2710,9 @@ window.openTasmeeaDetailsModal = function (type) {
           <td style="font-weight: 700;">${s.name}</td>
           <td><span style="font-weight: 600; color: var(--text-dark);">${circleName}</span></td>
           <td>${statusBadge}</td>
-          <td>${tasm.hifzSurah || "—"}</td>
-          <td>${tasm.murajaaSurah || "—"}</td>
-          <td>${tasm.tilawaSurah || "—"}</td>
+          <td>${tasmeeaSectionDisplay(tasm, "hifz", "—")}</td>
+          <td>${tasmeeaSectionDisplay(tasm, "murajaa", "—")}</td>
+          <td>${tasmeeaSectionDisplay(tasm, "tilawa", "—")}</td>
           <td><span class="badge badge-active">${tasm.rating || tasm.hifzRating || "—"}</span></td>
           <td>${tasm.studentNotes || tasm.adminNotes || "—"}</td>
         </tr>
@@ -2752,6 +2869,7 @@ window.handleLogout = function () {
   window.currentUser = null;
   // إيقاف استماع شاشة العرض ومؤقتاتها حتى لا تستمر القراءات بعد الخروج
   if (typeof stopScreenLiveSync === "function") stopScreenLiveSync();
+  if (typeof stopLiveUpdatesForUser === "function") stopLiveUpdatesForUser();
   ["screenFlipTimer", "screenDataRefreshTimer", "screenDayChangeTimer"].forEach(
     (t) => {
       if (window[t]) clearInterval(window[t]);

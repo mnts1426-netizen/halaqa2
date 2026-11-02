@@ -518,6 +518,35 @@ window.buildRepeatingHeaderTableHtml = function (originalTable, headerHtml) {
 };
 
 // دوال الطباعة والتصدير العام
+// انتظار تحميل صور العنصر فعلياً (الشعارات) قبل الطباعة أو التصوير إلى PDF - بدونها قد تُطبع
+// أو تُصوَّر قبل وصولها فتظهر بيضاء. حد أقصى 4 ثوانٍ حتى لا يتعلق شيء
+window.waitForImagesIn = function (root, maxMs = 4000) {
+  const imgs = Array.from((root && root.querySelectorAll("img")) || []);
+  const one = (img) =>
+    new Promise((resolve) => {
+      const done = () => {
+        if (typeof img.decode === "function") {
+          img.decode().then(resolve, resolve);
+        } else resolve();
+      };
+      if (img.complete && img.naturalWidth > 0) done();
+      else {
+        img.addEventListener("load", done, { once: true });
+        img.addEventListener("error", resolve, { once: true });
+      }
+    });
+  return Promise.race([
+    Promise.all(imgs.map(one)),
+    new Promise((r) => setTimeout(r, maxMs)),
+  ]);
+};
+
+// عنوان أساس لنافذة الطباعة حتى تُفتح مسارات الصور النسبية (مثل report_logo_right.png) من
+// موقع البرنامج نفسه في كل المتصفحات
+window.printBaseHref = function () {
+  return String(window.location.href).split("#")[0].split("?")[0].replace(/[^/]*$/, "");
+};
+
 window.printTableElement = function (tableId, title) {
   const table = document.getElementById(tableId);
   if (!table) {
@@ -543,6 +572,7 @@ window.printTableElement = function (tableId, title) {
     <html dir="rtl" lang="ar">
       <head>
         <meta charset="utf-8" />
+        <base href="${printBaseHref()}" />
         <title>${title}</title>
         <style>
           @page { size: A4 landscape; margin: 8mm; }
@@ -565,18 +595,21 @@ window.printTableElement = function (tableId, title) {
   `);
   printWindow.document.close();
   printWindow.focus();
-  setTimeout(() => {
-    printWindow.onafterprint = () => printWindow.close();
-    printWindow.print();
+  // الطباعة بعد وصول الشعارات فعلياً (كانت بعد 350 ملّي ثانية فقط فتُطبع الصور أحياناً بيضاء)
+  waitForImagesIn(printWindow.document).then(() => {
     setTimeout(() => {
-      try {
-        printWindow.close();
-      } catch (e) {}
-    }, 60000);
-  }, 350);
+      printWindow.onafterprint = () => printWindow.close();
+      printWindow.print();
+      setTimeout(() => {
+        try {
+          printWindow.close();
+        } catch (e) {}
+      }, 60000);
+    }, 150);
+  });
 };
 
-window.directDownloadPDF = function (elementId, filename, title) {
+window.directDownloadPDF = async function (elementId, filename, title) {
   const element = document.getElementById(elementId);
   if (!element) {
     alert("⚠️ لا توجد بيانات متاحة للتنزيل!");
@@ -612,6 +645,7 @@ window.directDownloadPDF = function (elementId, filename, title) {
       "position: fixed; top: -99999px; left: -99999px; background:#fff; padding: 1.2rem; width: 1200px; font-family: 'Cairo','Tajawal',sans-serif;";
     wrapper.innerHTML = contentHtml + chrome.footer;
     document.body.appendChild(wrapper);
+    await waitForImagesIn(wrapper);
 
     const opt = {
       margin: [6, 6, 6, 6],
@@ -737,6 +771,7 @@ window.generateMultiPagePDF = async function (
       (isLastPage ? chromeFooter : "");
     document.body.appendChild(pageWrapper);
     await new Promise((r) => setTimeout(r, 30));
+    await waitForImagesIn(pageWrapper);
 
     const w = pageWrapper.scrollWidth,
       h = pageWrapper.scrollHeight;
@@ -1036,15 +1071,21 @@ window.openStudentsFollowupModal = function () {
     }
 
     const tasmRecord = tasmMap.get(s.id) || {};
-    const hifzCol = tasmRecord.hifzSurah
-      ? '<span class="badge badge-active" style="font-size:0.85rem;">✅ سمّع</span>'
-      : '<span class="text-muted">—</span>';
-    const murajaaCol = tasmRecord.murajaaSurah
-      ? '<span class="badge badge-active" style="font-size:0.85rem;">✅ سمّع</span>'
-      : '<span class="text-muted">—</span>';
-    const tilawaCol = tasmRecord.tilawaSurah
-      ? '<span class="badge badge-active" style="font-size:0.85rem;">✅ سمّع</span>'
-      : '<span class="text-muted">—</span>';
+    const hifzCol = isTasmeeaSectionStopped(tasmRecord, "hifz")
+      ? '<span class="badge" style="font-size:0.85rem; background:#fff3e0; color:#e65100;">⏸️ متوقف</span>'
+      : tasmRecord.hifzSurah
+        ? '<span class="badge badge-active" style="font-size:0.85rem;">✅ سمّع</span>'
+        : '<span class="text-muted">—</span>';
+    const murajaaCol = isTasmeeaSectionStopped(tasmRecord, "murajaa")
+      ? '<span class="badge" style="font-size:0.85rem; background:#fff3e0; color:#e65100;">⏸️ متوقف</span>'
+      : tasmRecord.murajaaSurah
+        ? '<span class="badge badge-active" style="font-size:0.85rem;">✅ سمّع</span>'
+        : '<span class="text-muted">—</span>';
+    const tilawaCol = isTasmeeaSectionStopped(tasmRecord, "tilawa")
+      ? '<span class="badge" style="font-size:0.85rem; background:#fff3e0; color:#e65100;">⏸️ متوقف</span>'
+      : tasmRecord.tilawaSurah
+        ? '<span class="badge badge-active" style="font-size:0.85rem;">✅ سمّع</span>'
+        : '<span class="text-muted">—</span>';
 
     html += `
       <tr>
@@ -3175,16 +3216,38 @@ window.toggleUserAccountStatus = function (userId) {
   if (typeof saveToCloud === "function") saveToCloud("users", user.id, user);
 
   if (user.role === "student") {
-    const stu = (window.appStore?.students || []).find((s) => s.id === userId);
+    // سجل الطالب المرتبط بهذا الحساب: بنفس المعرّف، أو (للحسابات القديمة التي أُنشئت بمعرّف
+    // مختلف) باسم المستخدم = رقم الهوية أو الجوال - وإلا كان الإيقاف يمنع الدخول فقط ويبقى
+    // الطالب "نشطاً" في قوائم المعلم والتحضير
+    const uname = String(user.username || "").trim();
+    const stu =
+      (window.appStore?.students || []).find((s) => s.id === userId) ||
+      (uname
+        ? (window.appStore?.students || []).find(
+            (s) =>
+              String(s.nationalId || "").trim() === uname ||
+              String(s.phone || "").trim() === uname,
+          )
+        : null);
     if (stu) {
       stu.status = user.status === "active" ? "active" : "archived";
       if (typeof saveToCloud === "function")
         saveToCloud("students", stu.id, stu);
     }
   } else if (user.role === "teacher") {
-    const teach = (window.appStore?.teachers || []).find(
-      (t) => t.userId === userId || t.id === userId,
-    );
+    const uname = String(user.username || "").trim();
+    const teach =
+      (window.appStore?.teachers || []).find(
+        (t) => t.userId === userId || t.id === userId,
+      ) ||
+      (uname
+        ? (window.appStore?.teachers || []).find(
+            (t) =>
+              !t.userId &&
+              (String(t.phone || "").trim() === uname ||
+                String(t.username || "").trim() === uname),
+          )
+        : null);
     if (teach) {
       teach.status = user.status;
       if (typeof saveToCloud === "function")
@@ -3272,7 +3335,7 @@ window.renderAttendanceTable = function () {
 
     html += `
       <tr>
-        <td style="font-weight: 700;">${escapeHtml(s.name)}</td>
+        <td style="font-weight: 700;">${escapeHtml(s.name)}${isTeacher && typeof adminEditBadgeHtml === "function" ? `<div>${adminEditBadgeHtml(record)}</div>` : ""}</td>
         <td>${escapeHtml(getCircleName(s.circleId))}</td>
         <td>
           <select class="form-control" style="font-weight: 700;" onchange="setStudentAttendance('${s.id}', this.value)" ${isLockedForTeacher ? 'disabled title="لا يمكن تعديل حالة مسجّلة مسبقاً - متاح لمدير المَجْمَع فقط"' : ""}>
@@ -3795,7 +3858,7 @@ window.renderTestsTable = function () {
   rows.forEach(({ test: t, studentName, circleName }) => {
     html += `
       <tr>
-        <td style="font-weight: 700;">${escapeHtml(studentName)}</td>
+        <td style="font-weight: 700;">${escapeHtml(studentName)}${window.currentUser && window.currentUser.role === "teacher" && typeof adminEditBadgeHtml === "function" ? `<div>${adminEditBadgeHtml(t)}</div>` : ""}</td>
         <td><span style="font-weight: 600; color: var(--text-dark);">${escapeHtml(circleName)}</span></td>
         <td>${escapeHtml(t.type) || "—"}</td>
         <td style="font-weight: 700; color: var(--primary-brown);">${formatTestScore(t.score)}</td>
@@ -6629,4 +6692,376 @@ window.runManualFullSync = async function () {
   } finally {
     if (btn) btn.disabled = false;
   }
+};
+
+// ==========================================================================
+// التسميع عن بعد (تجريبي - للمدير فقط حالياً)
+// الصوت والصورة في غرفة خارجية دائمة لكل حلقة (Jitsi Meet افتراضياً لأنه بلا حد وقت ولا يحتاج
+// الطالب حساباً، ويمكن وضع أي رابط آخر). داخل البرنامج: رابط الغرفة، والدخول بالاسم وبالصوت
+// فقط، ودور التسميع مع عدّاد وقت لكل طالب، والانتقال لرصد تسميعه في شاشة التسميع المعتادة.
+// - رابط الغرفة يُحفظ في سجل الحلقة نفسه (حقل remoteRoomUrl فقط، دون إعادة كتابة السجل كاملاً).
+// - الدور والتوقيت يُحفظان على هذا الجهاز فقط (لا قراءات ولا كتابات).
+// ==========================================================================
+const REMOTE_QUEUE_KEY = "HALAQAT_REMOTE_QUEUE_V1";
+let remoteTimerInterval = null;
+
+function remoteTodayStr() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+}
+
+function readRemoteQueue(circleId) {
+  try {
+    const all = JSON.parse(localStorage.getItem(REMOTE_QUEUE_KEY) || "{}");
+    const q = all[circleId];
+    return q && q.date === remoteTodayStr() ? q : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeRemoteQueue(circleId, q) {
+  try {
+    const all = JSON.parse(localStorage.getItem(REMOTE_QUEUE_KEY) || "{}");
+    // يُحتفظ بدور اليوم فقط
+    Object.keys(all).forEach((k) => {
+      if (!all[k] || all[k].date !== remoteTodayStr()) delete all[k];
+    });
+    all[circleId] = q;
+    localStorage.setItem(REMOTE_QUEUE_KEY, JSON.stringify(all));
+  } catch (e) {}
+}
+
+function remoteCircleStudents(circleId) {
+  return (window.appStore?.students || [])
+    .filter((s) => s.status === "active" && studentInCircle(s, circleId))
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
+}
+
+// دور اليوم للحلقة: الترتيب المحفوظ + أي طالب جديد في آخره، ويُستبعد من لم يعد نشطاً
+function getRemoteQueue(circleId) {
+  const ids = remoteCircleStudents(circleId).map((s) => s.id);
+  const q = readRemoteQueue(circleId) || {
+    date: remoteTodayStr(),
+    order: [],
+    done: {},
+    currentId: null,
+    startedAt: null,
+  };
+  q.order = q.order.filter((id) => ids.includes(id));
+  ids.forEach((id) => {
+    if (!q.order.includes(id)) q.order.push(id);
+  });
+  if (q.currentId && !ids.includes(q.currentId)) {
+    q.currentId = null;
+    q.startedAt = null;
+  }
+  return q;
+}
+
+function formatRemoteDuration(ms) {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function newJitsiRoomUrl(circleId) {
+  const rand = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+    .map((b) => (b % 36).toString(36))
+    .join("");
+  const safeCircle = String(circleId).replace(/[^a-zA-Z0-9]/g, "").slice(-8);
+  return `https://meet.jit.si/HudaHalaqa-${safeCircle}-${rand}`;
+}
+
+// رابط الدخول: في Jitsi يُكتب الاسم تلقائياً ويبدأ بالصوت فقط (الكاميرا تُفتح عند الحاجة)
+function remoteJoinUrl(roomUrl, displayName) {
+  if (!/^https:\/\/meet\.jit\.si\//i.test(roomUrl)) return roomUrl;
+  const base = roomUrl.split("#")[0];
+  const params = [
+    `userInfo.displayName=${encodeURIComponent(JSON.stringify(displayName || "المدير"))}`,
+    "config.startWithVideoMuted=true",
+    "config.startWithAudioMuted=false",
+  ];
+  return `${base}#${params.join("&")}`;
+}
+
+window.renderRemoteTasmeea = function () {
+  if (!window.currentUser || window.currentUser.role !== window.ROLES.ADMIN)
+    return;
+  const select = document.getElementById("remote-circle-select");
+  const roomBox = document.getElementById("remote-room-box");
+  const queueBox = document.getElementById("remote-queue-box");
+  if (!select || !roomBox || !queueBox) return;
+
+  const circles = (window.appStore?.circles || [])
+    .slice()
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
+  const current = select.value;
+  select.innerHTML =
+    '<option value="">— اختر الحلقة —</option>' +
+    circles
+      .map(
+        (c) =>
+          `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`,
+      )
+      .join("");
+  if (circles.some((c) => c.id === current)) select.value = current;
+
+  const circleId = select.value;
+  clearInterval(remoteTimerInterval);
+  if (!circleId) {
+    roomBox.innerHTML =
+      '<p class="text-muted" style="margin: 0.5rem 0 0;">اختر الحلقة لعرض غرفتها ودور التسميع.</p>';
+    queueBox.innerHTML = "";
+    return;
+  }
+  const circle = circles.find((c) => c.id === circleId) || {};
+  const roomUrl = String(circle.remoteRoomUrl || "").trim();
+  const cid = escapeHtml(circleId);
+
+  roomBox.innerHTML = `
+    <div style="background: var(--bg-soft-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.9rem; margin-top: 0.5rem;">
+      <label style="font-weight: 800;">🔗 رابط غرفة الحلقة (دائم)</label>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;">
+        <input type="url" id="remote-room-url" class="form-control" style="flex: 1 1 260px; direction: ltr; text-align: left;" value="${escapeHtml(roomUrl)}" placeholder="https://meet.jit.si/..." />
+        <button type="button" class="btn btn-outline-brown btn-sm" onclick="saveRemoteRoomUrl('${cid}')">💾 حفظ الرابط</button>
+        ${roomUrl ? "" : `<button type="button" class="btn btn-sm" style="background:#4527a0; color:#fff;" onclick="createRemoteRoom('${cid}')">✨ إنشاء غرفة Jitsi دائمة</button>`}
+      </div>
+      <small class="text-muted" style="display:block; margin-top:6px;">يمكن وضع رابط أي برنامج (Jitsi أو Google Meet أو Teams). Jitsi مجاني بلا حد وقت والطالب لا يحتاج حساباً، وفي الجوال يحتاج تطبيق Jitsi Meet المجاني. أول دخول للمدير قد يطلب تسجيل الدخول بحساب Google لفتح الغرفة.</small>
+      ${
+        roomUrl
+          ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:0.75rem;">
+               <a class="btn btn-primary" href="${escapeHtml(remoteJoinUrl(roomUrl, window.currentUser.name))}" target="_blank" rel="noopener">🎙️ دخول الغرفة (بالصوت)</a>
+               <button type="button" class="btn btn-outline-brown" onclick="copyRemoteRoomUrl()">📋 نسخ الرابط</button>
+             </div>`
+          : ""
+      }
+    </div>`;
+
+  renderRemoteQueue(circleId);
+};
+
+window.copyRemoteRoomUrl = function () {
+  const v = document.getElementById("remote-room-url")?.value || "";
+  if (!v) return;
+  const done = () => showQuickSaveConfirmation("📋 تم نسخ الرابط");
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard
+      .writeText(v)
+      .then(done, () => prompt("انسخ الرابط:", v));
+  } else {
+    prompt("انسخ الرابط:", v);
+  }
+};
+
+window.saveRemoteRoomUrl = async function (circleId) {
+  if (!window.currentUser || window.currentUser.role !== window.ROLES.ADMIN)
+    return;
+  const v = String(
+    document.getElementById("remote-room-url")?.value || "",
+  ).trim();
+  if (v && !/^https:\/\//i.test(v)) {
+    alert("⚠️ يجب أن يبدأ الرابط بـ https://");
+    return;
+  }
+  const circle = (window.appStore?.circles || []).find(
+    (c) => c.id === circleId,
+  );
+  if (!circle) return;
+  circle.remoteRoomUrl = v;
+  // يُحفظ حقل الرابط فقط (لا يُعاد إرسال سجل الحلقة كاملاً)
+  const ok = await saveToCloud("circles", circleId, {
+    id: circleId,
+    remoteRoomUrl: v,
+  });
+  if (ok !== false) showQuickSaveConfirmation("✅ تم حفظ رابط الغرفة");
+  renderRemoteTasmeea();
+};
+
+window.createRemoteRoom = function (circleId) {
+  const input = document.getElementById("remote-room-url");
+  if (input) input.value = newJitsiRoomUrl(circleId);
+  saveRemoteRoomUrl(circleId);
+};
+
+function renderRemoteQueue(circleId) {
+  const box = document.getElementById("remote-queue-box");
+  if (!box) return;
+  const q = getRemoteQueue(circleId);
+  writeRemoteQueue(circleId, q);
+  const byId = new Map(remoteCircleStudents(circleId).map((s) => [s.id, s]));
+  const today = remoteTodayStr();
+  const attFor = (sid) =>
+    (window.appStore?.attendance || []).find(
+      (a) => a.studentId === sid && a.date === today,
+    );
+  const attLabel = {
+    present: "🟢 حاضر",
+    late: "🟡 متأخر",
+    absent: "🔴 غائب",
+    excused: "🔵 مستأذن",
+  };
+  const doneCount = q.order.filter((id) => q.done[id]).length;
+  const cur = q.currentId ? byId.get(q.currentId) : null;
+  const cid = escapeHtml(circleId);
+
+  const rows = q.order
+    .map((sid, i) => {
+      const s = byId.get(sid);
+      if (!s) return "";
+      const id = escapeHtml(sid);
+      const isCur = q.currentId === sid;
+      const done = q.done[sid];
+      const att = attFor(sid);
+      return `
+        <tr style="${isCur ? "background:#ede7f6;" : done ? "opacity:0.75;" : ""}">
+          <td style="text-align:center; font-weight:800;">${i + 1}</td>
+          <td style="font-weight:700;">${escapeHtml(s.name)} ${isCur ? '<span class="badge" style="background:#4527a0; color:#fff;">يسمّع الآن</span>' : ""}</td>
+          <td style="text-align:center;">${att ? attLabel[att.status] || "—" : '<span class="text-muted">—</span>'}</td>
+          <td style="text-align:center; font-weight:700;">${done ? `✅ ${formatRemoteDuration(done.ms)}` : isCur ? `<span id="remote-live-timer">⏱️ ${formatRemoteDuration(Date.now() - q.startedAt)}</span>` : "—"}</td>
+          <td>
+            <div style="display:flex; gap:4px; flex-wrap:wrap; justify-content:center;">
+              ${isCur ? `<button type="button" class="btn btn-success btn-sm" onclick="remoteFinishCurrent('${cid}')">⏹️ انتهى</button>` : `<button type="button" class="btn btn-outline-brown btn-sm" onclick="remoteStartStudent('${cid}', '${id}')">▶️ ابدأ</button>`}
+              <button type="button" class="btn btn-sm btn-primary" onclick="remoteOpenTasmeea('${cid}', '${id}')">📝 رصد</button>
+              <button type="button" class="btn btn-sm" title="تقديم" onclick="remoteMove('${cid}', '${id}', -1)" ${i === 0 ? "disabled" : ""}>⬆️</button>
+              <button type="button" class="btn btn-sm" title="تأخير" onclick="remoteMove('${cid}', '${id}', 1)" ${i === q.order.length - 1 ? "disabled" : ""}>⬇️</button>
+            </div>
+          </td>
+        </tr>`;
+    })
+    .join("");
+
+  box.innerHTML = `
+    <div class="card">
+      <div class="card-header flex-between" style="flex-wrap: wrap; gap: 0.5rem;">
+        <h3 style="margin: 0;">📋 دور التسميع اليوم</h3>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+          <span class="badge badge-active">سمّع ${doneCount} من ${q.order.length}</span>
+          <button type="button" class="btn btn-sm btn-primary" onclick="remoteNext('${cid}')">⏭️ التالي</button>
+          <button type="button" class="btn btn-sm btn-outline-brown" onclick="remoteResetQueue('${cid}')">↺ بدء الدور من جديد</button>
+        </div>
+      </div>
+      ${cur ? `<div style="padding:0.6rem 1rem; background:#ede7f6; font-weight:800;">🎙️ يسمّع الآن: ${escapeHtml(cur.name)}</div>` : ""}
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:40px;">م</th>
+                <th>الطالب</th>
+                <th style="text-align:center;">حضور اليوم</th>
+                <th style="text-align:center;">الوقت</th>
+                <th style="text-align:center;">إجراء</th>
+              </tr>
+            </thead>
+            <tbody>${rows || '<tr><td colspan="5" class="text-center text-muted p-4">لا يوجد طلاب نشطون في هذه الحلقة</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+
+  clearInterval(remoteTimerInterval);
+  if (q.currentId && q.startedAt) {
+    remoteTimerInterval = setInterval(() => {
+      const el = document.getElementById("remote-live-timer");
+      if (!el) {
+        clearInterval(remoteTimerInterval);
+        return;
+      }
+      el.textContent = `⏱️ ${formatRemoteDuration(Date.now() - q.startedAt)}`;
+    }, 1000);
+  }
+}
+
+function remoteFinishInQueue(q) {
+  if (q.currentId && q.startedAt) {
+    const prev = q.done[q.currentId];
+    q.done[q.currentId] = {
+      ms: (prev ? prev.ms : 0) + (Date.now() - q.startedAt),
+    };
+  }
+  q.currentId = null;
+  q.startedAt = null;
+}
+
+window.remoteStartStudent = function (circleId, sid) {
+  const q = getRemoteQueue(circleId);
+  remoteFinishInQueue(q);
+  q.currentId = sid;
+  q.startedAt = Date.now();
+  writeRemoteQueue(circleId, q);
+  renderRemoteQueue(circleId);
+};
+
+window.remoteFinishCurrent = function (circleId) {
+  const q = getRemoteQueue(circleId);
+  remoteFinishInQueue(q);
+  writeRemoteQueue(circleId, q);
+  renderRemoteQueue(circleId);
+};
+
+window.remoteNext = function (circleId) {
+  const q = getRemoteQueue(circleId);
+  remoteFinishInQueue(q);
+  const next = q.order.find((id) => !q.done[id]);
+  if (next) {
+    q.currentId = next;
+    q.startedAt = Date.now();
+  } else {
+    showQuickSaveConfirmation("✅ انتهى دور التسميع لجميع الطلاب");
+  }
+  writeRemoteQueue(circleId, q);
+  renderRemoteQueue(circleId);
+};
+
+window.remoteMove = function (circleId, sid, dir) {
+  const q = getRemoteQueue(circleId);
+  const i = q.order.indexOf(sid);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= q.order.length) return;
+  [q.order[i], q.order[j]] = [q.order[j], q.order[i]];
+  writeRemoteQueue(circleId, q);
+  renderRemoteQueue(circleId);
+};
+
+window.remoteResetQueue = function (circleId) {
+  if (
+    !confirm(
+      "بدء دور التسميع من جديد لهذه الحلقة (يُمسح التوقيت المسجّل اليوم على هذا الجهاز)؟",
+    )
+  )
+    return;
+  writeRemoteQueue(circleId, {
+    date: remoteTodayStr(),
+    order: [],
+    done: {},
+    currentId: null,
+    startedAt: null,
+  });
+  renderRemoteQueue(circleId);
+};
+
+// رصد تسميع الطالب في شاشة التسميع المعتادة (نفس أزرار الاعتماد والتوقف تماماً)
+window.remoteOpenTasmeea = function (circleId, sid) {
+  navigateTo("view-tasmeea");
+  const cs = document.getElementById("tasmeea-circle-select");
+  const ds = document.getElementById("tasmeea-date-select");
+  if (ds) ds.value = remoteTodayStr();
+  if (cs) {
+    cs.value = circleId;
+    if (typeof renderTasmeeaStudents === "function") renderTasmeeaStudents();
+  }
+  setTimeout(() => {
+    const details = document.getElementById(`tasmeea-details-${sid}`);
+    if (
+      details &&
+      details.style.display === "none" &&
+      typeof toggleTasmeeaAccordion === "function"
+    )
+      toggleTasmeeaAccordion(sid);
+    document
+      .getElementById(`tasmeea-card-${sid}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 150);
 };

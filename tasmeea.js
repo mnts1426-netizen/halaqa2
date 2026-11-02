@@ -30,6 +30,33 @@ document.addEventListener("DOMContentLoaded", () => {
     dateSelect.value = `${y}-${m}-${d}`;
   }
 
+  // إن بقيت الصفحة مفتوحة حتى بعد منتصف الليل: يتقدّم التاريخ وحده لليوم الجديد (فقط إن كان
+  // ما زال على "اليوم" الذي فُتحت به الصفحة، وليس تاريخاً اختاره المستخدم بنفسه)
+  if (dateSelect) {
+    const localToday = () => {
+      const n = new Date();
+      return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+    };
+    let autoDate = dateSelect.value;
+    const advanceIfNewDay = () => {
+      const today = localToday();
+      if (today === autoDate) return;
+      if (dateSelect.value === autoDate) {
+        dateSelect.value = today;
+        if (
+          document.getElementById("view-tasmeea")?.classList.contains("active")
+        ) {
+          renderTasmeeaStudents();
+        }
+      }
+      autoDate = today;
+    };
+    setInterval(advanceIfNewDay, 60 * 1000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") advanceIfNewDay();
+    });
+  }
+
   if (circleSelect) {
     circleSelect.addEventListener("change", renderTasmeeaStudents);
   }
@@ -85,7 +112,57 @@ function getCircleNameTasmeea(circleId) {
   return c ? c.name : "—";
 }
 
-// ترحيل تلقائي لمقرر اليوم: يبقى نفس آخر مقرر معروف ويتكرر يوماً بعد يوم
+// حقول كل قسم من أقسام التسميع الثلاثة
+window.TASMEEA_SECTION_FIELDS = {
+  hifz: {
+    surah: "hifzSurah",
+    rating: "hifzRating",
+    next: "nextHifz",
+    order: "hifzOrderAt",
+    stopped: "hifzStopped",
+    label: "الدرس الجديد",
+  },
+  murajaa: {
+    surah: "murajaaSurah",
+    rating: "murajaaRating",
+    next: "nextMurajaa",
+    order: "murajaaOrderAt",
+    stopped: "murajaaStopped",
+    label: "المراجعة",
+  },
+  tilawa: {
+    surah: "tilawaSurah",
+    rating: "tilawaRating",
+    next: "nextTilawa",
+    order: "tilawaOrderAt",
+    stopped: "tilawaStopped",
+    label: "التلاوة",
+  },
+};
+
+// التوقف: زر "متوقف" يسجّل القسم متوقفاً في ذلك اليوم فقط دون كتابة أي نص في خانة الدرس.
+// والنصوص القديمة التي كتبها المعلم يدوياً (مثل "متوقف عن الدرس") تُعامل كتوقف أيضاً، فلا
+// تُرحَّل كمقرر ولا تظهر كبداية أو نهاية في التقارير
+window.isTasmeeaStopText = function (value) {
+  return /(توقف|موقوف)/.test(String(value || ""));
+};
+
+window.isTasmeeaSectionStopped = function (record, section) {
+  const f = window.TASMEEA_SECTION_FIELDS[section];
+  if (!record || !f) return false;
+  return record[f.stopped] === true || isTasmeeaStopText(record[f.surah]);
+};
+
+// نص القسم للعرض في الجداول والتقارير اليومية: "⏸️ متوقف" للقسم المتوقف، وإلا نص المقرر
+window.tasmeeaSectionDisplay = function (record, section, emptyText) {
+  const f = window.TASMEEA_SECTION_FIELDS[section];
+  if (!record || !f) return emptyText;
+  if (isTasmeeaSectionStopped(record, section)) return "⏸️ متوقف";
+  return escapeHtml(record[f.surah]) || emptyText;
+};
+
+// ترحيل تلقائي لمقرر اليوم: يبقى نفس آخر مقرر معروف ويتكرر يوماً بعد يوم (أيام التوقف
+// تُتخطّى فيبقى آخر درس حقيقي هو المقرر)
 window.getCarriedForwardLessonValue = function (
   studentId,
   dateVal,
@@ -95,16 +172,17 @@ window.getCarriedForwardLessonValue = function (
   const allTasm = (window.appStore?.tasmeea || [])
     .filter((t) => t.studentId === studentId)
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const usable = (v) => Boolean(v) && !isTasmeeaStopText(v);
 
   const todayRecord = allTasm.find((t) => t.date === dateVal);
-  if (todayRecord && todayRecord[todayField]) {
+  if (todayRecord && usable(todayRecord[todayField])) {
     return todayRecord[todayField];
   }
 
   for (const t of allTasm) {
     if (t.date >= dateVal) continue;
-    if (t[nextFieldName]) return t[nextFieldName];
-    if (t[todayField]) return t[todayField];
+    if (usable(t[nextFieldName])) return t[nextFieldName];
+    if (usable(t[todayField])) return t[todayField];
   }
   return "";
 };
@@ -626,13 +704,13 @@ function buildStudentAccordionCard(
 ) {
   const ratings = ["ممتاز", "جيد جداً", "جيد", "يعيد"];
 
-  const buildRatingSelect = (currentVal, name) => {
+  const buildRatingSelect = (currentVal, name, extraAttr = "") => {
     let opts = '<option value="">— التقدير —</option>';
     ratings.forEach((r) => {
       const selected = currentVal === r ? "selected" : "";
       opts += `<option value="${r}" ${selected}>${r}</option>`;
     });
-    return `<select class="form-control" name="${name}" style="font-weight: 700; background: var(--bg-card);">${opts}</select>`;
+    return `<select class="form-control" name="${name}" style="font-weight: 700; background: var(--bg-card);" ${extraAttr}>${opts}</select>`;
   };
 
   const isSaved = Boolean(record.id);
@@ -660,6 +738,29 @@ function buildStudentAccordionCard(
     "tilawaSurah",
     "nextTilawa",
   );
+
+  // زر "متوقف" بجانب زر الاعتماد لكل قسم. القسم المتوقف في هذا اليوم: خاناته معطّلة وتعرض
+  // آخر مقرر للعلم فقط، ولا يلغي التوقف إلا المدير
+  const isStoppedToday = (section) =>
+    record[window.TASMEEA_SECTION_FIELDS[section].stopped] === true;
+  const stopDis = (section) => (isStoppedToday(section) ? "disabled" : "");
+  const stoppedBanner = (section, carried) =>
+    isStoppedToday(section)
+      ? `<div style="background:#fff3e0; border:1px solid #ef6c00; color:#e65100; border-radius:6px; padding:6px 8px; font-weight:800; font-size:0.82rem; margin-bottom:0.5rem;">⏸️ متوقف في هذا اليوم${carried ? ` — آخر مقرر: ${escapeHtml(carried)}` : ""}</div>`
+      : "";
+  const sectionButtons = (section, approveLabel) => {
+    if (isStoppedToday(section)) {
+      return isAdmin
+        ? `<button type="button" class="btn btn-danger btn-sm" style="width: 100%;" onclick="cancelTasmeeaStop('${student.id}', '${section}')">↩️ إلغاء التوقف</button>`
+        : `<div class="text-muted" style="font-size:0.78rem; text-align:center;">إلغاء التوقف متاح للمدير فقط</div>`;
+    }
+    return `
+              <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-success btn-sm" style="flex: 1 1 140px;" onclick="saveTasmeeaSection('${student.id}', '${section}')">${approveLabel}</button>
+                <button type="button" class="btn btn-sm" style="flex: 0 0 auto; background:#ef6c00; color:#fff; font-weight:800;" onclick="stopTasmeeaSection('${student.id}', '${section}')">⏸️ متوقف</button>
+              </div>
+              ${isAdmin ? `<button type="button" class="btn btn-danger btn-sm mt-1" style="width: 100%;" onclick="cancelTasmeeaSection('${student.id}', '${section}')">↩️ إلغاء الاعتماد</button>` : ""}`;
+  };
 
   // المعلم: ثلاث حالات فقط (غير محدد/حاضر/غائب)، ولا يقدر يعدّل حالة سبق تسجيلها
   // (القائمة تُقفَل بعدها). المدير: كل الحالات الأربع دائماً وقابلة للتعديل دوماً
@@ -704,6 +805,7 @@ function buildStudentAccordionCard(
             <small class="text-muted">
               ${isSaved ? '<span style="color:#2e7d32; font-weight:700;">🟢 تم رصد التسميع</span>' : "⚪ لم يُرصد التسميع بعد"}
               ${isAdmin ? '<span class="badge" style="background:#805333; color:#fff; margin-right:4px; font-size:0.72rem;">تعديل المدير</span>' : ""}
+              ${!isAdmin && typeof adminEditBadgeHtml === "function" ? adminEditBadgeHtml(attRecord, "الحضور") + adminEditBadgeHtml(record, "التسميع") : ""}
             </small>
           </div>
         </div>
@@ -727,58 +829,58 @@ function buildStudentAccordionCard(
             <!-- 1. الدرس الجديد -->
             <div class="tasmeea-section-box p-3" style="background: var(--bg-soft-panel); border: 1px solid var(--border-color); border-radius: 8px;">
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">📖 الدرس الجديد</h4>
+              ${stoppedBanner("hifz", initialHifz)}
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">مقرر اليوم</label>
-                <input type="text" class="form-control" name="hifz_surah" value="${escapeHtml(initialHifz)}" placeholder="مثال: البقرة (1-15)">
+                <input type="text" class="form-control" name="hifz_surah" value="${escapeHtml(initialHifz)}" ${stopDis("hifz")} placeholder="مثال: البقرة (1-15)">
               </div>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">التقدير</label>
-                ${buildRatingSelect(record.hifzRating, "hifz_rating")}
+                ${buildRatingSelect(record.hifzRating, "hifz_rating", stopDis("hifz"))}
               </div>
               <div class="form-group mb-2" style="border-top: 2px dashed #ef6c00; background: linear-gradient(135deg, #fff3e0 0%, #ffebee 100%); border-radius: 6px; padding: 0.5rem 0.6rem; margin-top: 0.5rem;">
                 <label style="font-size: 0.82rem; color: #d84315; font-weight: 800;">📌 مقرر الغد</label>
-                <input type="text" class="form-control" name="next_hifz" value="${escapeHtml(record.nextHifz)}" placeholder="مثال: سورة البقرة (16-30)">
+                <input type="text" class="form-control" name="next_hifz" value="${escapeHtml(record.nextHifz)}" ${stopDis("hifz")} placeholder="مثال: سورة البقرة (16-30)">
               </div>
-              <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'hifz')">✅ اعتماد الدرس الجديد (اليوم والغد)</button>
-              ${isAdmin ? `<button type="button" class="btn btn-danger btn-sm mt-1" style="width: 100%;" onclick="cancelTasmeeaSection('${student.id}', 'hifz')">↩️ إلغاء الاعتماد</button>` : ""}
+              ${sectionButtons("hifz", "✅ اعتماد الدرس الجديد (اليوم والغد)")}
             </div>
 
             <!-- 2. المراجعة -->
             <div class="tasmeea-section-box p-3" style="background: var(--bg-soft-panel); border: 1px solid var(--border-color); border-radius: 8px;">
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">🔄 المراجعة</h4>
+              ${stoppedBanner("murajaa", initialMurajaa)}
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">مقرر اليوم</label>
-                <input type="text" class="form-control" name="murajaa_surah" value="${escapeHtml(initialMurajaa)}" placeholder="مثال: سورة يس كاملة">
+                <input type="text" class="form-control" name="murajaa_surah" value="${escapeHtml(initialMurajaa)}" ${stopDis("murajaa")} placeholder="مثال: سورة يس كاملة">
               </div>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">التقدير</label>
-                ${buildRatingSelect(record.murajaaRating, "murajaa_rating")}
+                ${buildRatingSelect(record.murajaaRating, "murajaa_rating", stopDis("murajaa"))}
               </div>
               <div class="form-group mb-2" style="border-top: 2px dashed #ef6c00; background: linear-gradient(135deg, #fff3e0 0%, #ffebee 100%); border-radius: 6px; padding: 0.5rem 0.6rem; margin-top: 0.5rem;">
                 <label style="font-size: 0.82rem; color: #d84315; font-weight: 800;">📌 مقرر الغد</label>
-                <input type="text" class="form-control" name="next_murajaa" value="${escapeHtml(record.nextMurajaa)}" placeholder="مثال: سورة الكهف كاملة">
+                <input type="text" class="form-control" name="next_murajaa" value="${escapeHtml(record.nextMurajaa)}" ${stopDis("murajaa")} placeholder="مثال: سورة الكهف كاملة">
               </div>
-              <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'murajaa')">✅ اعتماد المراجعة (اليوم والغد)</button>
-              ${isAdmin ? `<button type="button" class="btn btn-danger btn-sm mt-1" style="width: 100%;" onclick="cancelTasmeeaSection('${student.id}', 'murajaa')">↩️ إلغاء الاعتماد</button>` : ""}
+              ${sectionButtons("murajaa", "✅ اعتماد المراجعة (اليوم والغد)")}
             </div>
 
             <!-- 3. التلاوة -->
             <div class="tasmeea-section-box p-3" style="background: var(--bg-soft-panel); border: 1px solid var(--border-color); border-radius: 8px;">
               <h4 style="font-weight: 800; color: var(--primary-brown); margin-bottom: 0.6rem;">🎧 التلاوة</h4>
+              ${stoppedBanner("tilawa", initialTilawa)}
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">مقرر اليوم</label>
-                <input type="text" class="form-control" name="tilawa_surah" value="${escapeHtml(initialTilawa)}" placeholder="مثال: آل عمران (1-20)">
+                <input type="text" class="form-control" name="tilawa_surah" value="${escapeHtml(initialTilawa)}" ${stopDis("tilawa")} placeholder="مثال: آل عمران (1-20)">
               </div>
               <div class="form-group mb-2">
                 <label style="font-size: 0.82rem;">التقدير</label>
-                ${buildRatingSelect(record.tilawaRating, "tilawa_rating")}
+                ${buildRatingSelect(record.tilawaRating, "tilawa_rating", stopDis("tilawa"))}
               </div>
               <div class="form-group mb-2" style="border-top: 2px dashed #ef6c00; background: linear-gradient(135deg, #fff3e0 0%, #ffebee 100%); border-radius: 6px; padding: 0.5rem 0.6rem; margin-top: 0.5rem;">
                 <label style="font-size: 0.82rem; color: #d84315; font-weight: 800;">📌 مقرر الغد</label>
-                <input type="text" class="form-control" name="next_tilawa" value="${escapeHtml(record.nextTilawa)}" placeholder="مثال: سورة النساء (1-10)">
+                <input type="text" class="form-control" name="next_tilawa" value="${escapeHtml(record.nextTilawa)}" ${stopDis("tilawa")} placeholder="مثال: سورة النساء (1-10)">
               </div>
-              <button type="button" class="btn btn-success btn-sm" style="width: 100%;" onclick="saveTasmeeaSection('${student.id}', 'tilawa')">✅ اعتماد التلاوة (اليوم والغد)</button>
-              ${isAdmin ? `<button type="button" class="btn btn-danger btn-sm mt-1" style="width: 100%;" onclick="cancelTasmeeaSection('${student.id}', 'tilawa')">↩️ إلغاء الاعتماد</button>` : ""}
+              ${sectionButtons("tilawa", "✅ اعتماد التلاوة (اليوم والغد)")}
             </div>
 
           </div>
@@ -998,6 +1100,25 @@ function saveTasmeeaSection(studentId, section) {
   const recordId = `tasm_${studentId}_${dateVal}`;
 
   if (!window.appStore.tasmeea) window.appStore.tasmeea = [];
+  const stoppedRecord = window.appStore.tasmeea.find((t) => t.id === recordId);
+  const stopField = window.TASMEEA_SECTION_FIELDS[section].stopped;
+  if (stoppedRecord && stoppedRecord[stopField] === true) {
+    // القسم مسجّل "متوقف" اليوم: إلغاء التوقف للمدير فقط
+    if (!isAdmin) {
+      alert(
+        `⚠️ (${cfg.label}) مسجّل متوقف في هذا اليوم، وإلغاء التوقف متاح للمدير فقط.`,
+      );
+      return;
+    }
+    if (
+      !confirm(
+        `(${cfg.label}) مسجّل متوقف في هذا اليوم.\nهل تريد إلغاء التوقف واعتماد المقرر؟`,
+      )
+    )
+      return;
+    stoppedRecord[stopField] = false;
+  }
+
   let record = window.appStore.tasmeea.find((t) => t.id === recordId);
   if (!record) {
     record = {
@@ -1147,6 +1268,161 @@ function cancelTasmeeaSection(studentId, section) {
   renderTasmeeaStudents();
 }
 
+// زر "متوقف" لقسم واحد في هذا اليوم فقط (المعلم أو المدير): لا يُكتب أي نص في خانة الدرس،
+// فيبقى آخر درس حقيقي هو المقرر ويُرحَّل كما هو، ولا يظهر التوقف في تقرير البداية والنهاية،
+// ويظهر لولي الأمر "متوقف" مع آخر مقرر. لا يمنع التميز. إلغاؤه للمدير فقط
+function stopTasmeeaSection(studentId, section) {
+  const dateVal = document.getElementById("tasmeea-date-select")?.value;
+  const circleId = document.getElementById("tasmeea-circle-select")?.value;
+  if (!dateVal || !circleId) {
+    alert("⚠️ يرجى التأكد من اختيار الحلقة والتاريخ أولاً.");
+    return;
+  }
+  const cfg = window.TASMEEA_SECTION_FIELDS[section];
+  if (!cfg) return;
+
+  const user = window.currentUser;
+  const isAdmin = user && user.role === "admin";
+  const recordId = `tasm_${studentId}_${dateVal}`;
+  if (!window.appStore.tasmeea) window.appStore.tasmeea = [];
+  let record = window.appStore.tasmeea.find((t) => t.id === recordId);
+
+  if (record && record[cfg.stopped] === true) {
+    alert(`ℹ️ (${cfg.label}) مسجّل متوقف في هذا اليوم مسبقاً.`);
+    return;
+  }
+
+  const hasApproval =
+    record &&
+    ((record[cfg.surah] && !isTasmeeaStopText(record[cfg.surah])) ||
+      record[cfg.rating] ||
+      record[cfg.next]);
+  if (hasApproval) {
+    // المعلم لا يلغي اعتماداً سابقاً (إلغاء الاعتماد للمدير فقط)
+    if (!isAdmin) {
+      alert(
+        `⚠️ (${cfg.label}) معتمد في هذا اليوم، ولا يمكن تحويله إلى متوقف إلا من المدير.`,
+      );
+      return;
+    }
+    if (
+      !confirm(
+        `(${cfg.label}) معتمد في هذا اليوم.\nتسجيله متوقفاً يلغي اعتماد اليوم لهذا القسم. متابعة؟`,
+      )
+    )
+      return;
+  } else if (
+    !confirm(`تسجيل (${cfg.label}) متوقفاً لهذا الطالب في هذا اليوم؟`)
+  ) {
+    return;
+  }
+
+  if (!record) {
+    record = {
+      id: recordId,
+      studentId: studentId,
+      circleId: circleId,
+      date: dateVal,
+      hifzSurah: "",
+      hifzRating: "",
+      murajaaSurah: "",
+      murajaaRating: "",
+      tilawaSurah: "",
+      tilawaRating: "",
+      rating: "",
+      studentNotes: "",
+      adminNotes: "",
+      nextHifz: "",
+      nextMurajaa: "",
+      nextTilawa: "",
+    };
+    window.appStore.tasmeea.push(record);
+  }
+
+  record[cfg.surah] = "";
+  record[cfg.rating] = "";
+  record[cfg.next] = "";
+  record[cfg.order] = null;
+  record[cfg.stopped] = true;
+  record.rating =
+    record.hifzRating || record.murajaaRating || record.tilawaRating || "";
+  record.updatedBy = isAdmin ? "admin" : "teacher";
+  record.updatedAt = Date.now();
+
+  if (typeof saveToCloud === "function") {
+    saveToCloud("tasmeea", record.id, record);
+  }
+  if (typeof saveLocalStore === "function") saveLocalStore();
+
+  if (typeof window.logTeacherActivity === "function") {
+    const student = (window.appStore?.students || []).find(
+      (s) => s.id === studentId,
+    );
+    const stuName = student ? student.name : "طالب";
+    const actorTitle = isAdmin ? "المدير" : "المعلم";
+    window.logTeacherActivity(
+      `توقف ${cfg.label}`,
+      `تم تسجيل (${cfg.label}) متوقفاً للطالب (${stuName}) بواسطة (${actorTitle})`,
+      user?.name || actorTitle,
+      getCircleNameTasmeea(circleId),
+    );
+  }
+
+  markTasmeeaFieldsClean(studentId, [
+    `${section}_surah`,
+    `${section}_rating`,
+    `next_${section}`,
+  ]);
+  alert(`⏸️ تم تسجيل (${cfg.label}) متوقفاً لهذا اليوم.`);
+  renderTasmeeaStudents();
+}
+
+// إلغاء التوقف (للمدير فقط)
+function cancelTasmeeaStop(studentId, section) {
+  const user = window.currentUser;
+  if (!user || user.role !== "admin") {
+    alert("⚠️ إلغاء التوقف متاح للمدير فقط.");
+    return;
+  }
+  const dateVal = document.getElementById("tasmeea-date-select")?.value;
+  const circleId = document.getElementById("tasmeea-circle-select")?.value;
+  if (!dateVal || !circleId) return;
+  const cfg = window.TASMEEA_SECTION_FIELDS[section];
+  if (!cfg) return;
+
+  const record = (window.appStore.tasmeea || []).find(
+    (t) => t.id === `tasm_${studentId}_${dateVal}`,
+  );
+  if (!record || record[cfg.stopped] !== true) {
+    alert("⚠️ هذا القسم غير مسجّل متوقفاً في هذا اليوم.");
+    return;
+  }
+  if (!confirm(`هل أنت متأكد من إلغاء توقف (${cfg.label}) لهذا الطالب؟`))
+    return;
+
+  record[cfg.stopped] = false;
+  record.updatedBy = "admin";
+  record.updatedAt = Date.now();
+  if (typeof saveToCloud === "function") {
+    saveToCloud("tasmeea", record.id, record);
+  }
+  if (typeof saveLocalStore === "function") saveLocalStore();
+
+  if (typeof window.logTeacherActivity === "function") {
+    const student = (window.appStore?.students || []).find(
+      (s) => s.id === studentId,
+    );
+    window.logTeacherActivity(
+      `إلغاء توقف ${cfg.label}`,
+      `تم إلغاء توقف (${cfg.label}) للطالب (${student ? student.name : "طالب"}) بواسطة (المدير)`,
+      user?.name || "المدير",
+      getCircleNameTasmeea(circleId),
+    );
+  }
+  alert(`↩️ تم إلغاء توقف (${cfg.label}).`);
+  renderTasmeeaStudents();
+}
+
 // حفظ واعتماد التسميع وترحيل المقررات مع توثيق العملية
 function saveStudentTasmeea(e, studentId) {
   e.preventDefault();
@@ -1221,6 +1497,28 @@ function saveStudentTasmeea(e, studentId) {
     updatedBy: isAdmin ? "admin" : "teacher",
     updatedAt: Date.now(),
   };
+
+  // القسم المسجّل "متوقف" في هذا اليوم يبقى متوقفاً كما هو (خاناته معطّلة في الشاشة وتعرض
+  // آخر مقرر للعلم فقط)، فلا يُحفظ ذلك المقرر كاعتماد جديد لهذا اليوم
+  Object.keys(window.TASMEEA_SECTION_FIELDS).forEach((section) => {
+    const f = window.TASMEEA_SECTION_FIELDS[section];
+    if (oldRecord && oldRecord[f.stopped] === true) {
+      tasmeeaData[f.surah] = "";
+      tasmeeaData[f.rating] = "";
+      tasmeeaData[f.next] = "";
+      tasmeeaData[f.order] = null;
+      tasmeeaData[f.stopped] = true;
+    }
+  });
+  tasmeeaData.rating =
+    tasmeeaData.hifzRating ||
+    tasmeeaData.murajaaRating ||
+    tasmeeaData.tilawaRating ||
+    (Object.keys(window.TASMEEA_SECTION_FIELDS).some(
+      (s) => tasmeeaData[window.TASMEEA_SECTION_FIELDS[s].stopped],
+    )
+      ? ""
+      : fallbackRating);
 
   if (existingIndex > -1) {
     window.appStore.tasmeea[existingIndex] = tasmeeaData;

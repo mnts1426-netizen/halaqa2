@@ -116,10 +116,11 @@ function showIosInstallGuide() {
           <button class="modal-close" onclick="closeModal('modal-ios-install')">&times;</button>
         </div>
         <div class="modal-body" style="line-height: 1.9; font-weight: 700;">
-          <p style="margin-top: 0;">شركة آبل لا تسمح بالتثبيت بضغطة زر، لكنه سهل بثلاث خطوات:</p>
+          <p style="margin-top: 0;">شركة آبل لا تسمح لأي موقع بالتثبيت بضغطة زر واحدة (هذا خاص بالآيفون)، لكنه سهل بثلاث خطوات:</p>
           ${notSafari ? '<p style="color:#c62828;">⚠️ افتح هذه الصفحة أولاً من متصفح <b>Safari</b> (انسخ الرابط والصقه فيه).</p>' : ""}
-          <div>1️⃣ اضغط زر <b>المشاركة</b> <span style="display:inline-block;border:2px solid #0a84ff;border-radius:6px;padding:0 6px;color:#0a84ff;">⬆</span> أسفل الشاشة (أو أعلاها في الآيباد).</div>
-          <div>2️⃣ مرّر للأسفل واختر <b>"إضافة إلى الشاشة الرئيسية"</b> ➕</div>
+          <p style="background:#fff8e1; border:1px solid #f9a825; border-radius:6px; padding:6px 8px; font-size:0.85rem;">📌 إذا فتحت الرابط من <b>الواتساب</b>: اضغط أولاً زر <b>Safari</b> (البوصلة 🧭) أو "فتح في Safari"، ثم أكمل الخطوات.</p>
+          <div>1️⃣ اضغط زر <b>المشاركة</b> <span style="display:inline-block;border:2px solid #0a84ff;border-radius:6px;padding:0 6px;color:#0a84ff;">⬆</span> — وفي الإصدارات الجديدة إن لم تجده أسفل الشاشة اضغط زر النقاط الثلاث <b>( ⋯ )</b> ثم <b>مشاركة</b>.</div>
+          <div>2️⃣ مرّر للأسفل واختر <b>"إضافة إلى الشاشة الرئيسية"</b> ➕ (قد تكون تحت <b>"عرض المزيد"</b>).</div>
           <div>3️⃣ اضغط <b>"إضافة"</b> في أعلى الشاشة.</div>
           <p style="margin-bottom: 0; color: var(--text-muted);">بعدها يظهر التطبيق بين تطبيقاتك ويفتح مباشرة بدون شريط المتصفح.</p>
         </div>

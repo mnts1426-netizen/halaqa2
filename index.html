@@ -420,6 +420,26 @@
               </svg>
               <span>التقارير</span>
             </a>
+            <!-- التسميع عن بعد (تجريبي - للمدير فقط حالياً) -->
+            <a
+              href="#"
+              class="nav-link nav-admin-only"
+              data-target="view-remote-tasmeea"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="23" />
+              </svg>
+              <span>التسميع عن بعد</span>
+            </a>
             <!-- رابط التقارير المالية للمصرح لهم فقط -->
             <a
               href="#"
@@ -1680,6 +1700,29 @@
             id="tests-report-wrapper"
             style="display: none"
           ></div>
+        </section>
+
+        <!-- التسميع عن بعد (تجريبي - للمدير فقط حالياً): الصوت والصورة في غرفة خارجية دائمة لكل
+             حلقة (Jitsi افتراضياً أو أي رابط آخر)، والدور والتوقيت والرصد هنا في البرنامج -->
+        <section id="view-remote-tasmeea" class="content-view">
+          <div class="card mb-3">
+            <div class="card-header flex-between" style="flex-wrap: wrap; gap: 0.5rem">
+              <h3 style="margin: 0">🎙️ التسميع عن بعد</h3>
+              <span class="badge" style="background: #ede7f6; color: #4527a0">تجريبي — يظهر للمدير فقط</span>
+            </div>
+            <div class="card-body">
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label>الحلقة</label>
+                  <select id="remote-circle-select" class="form-control" onchange="renderRemoteTasmeea()">
+                    <option value="">— اختر الحلقة —</option>
+                  </select>
+                </div>
+              </div>
+              <div id="remote-room-box"></div>
+            </div>
+          </div>
+          <div id="remote-queue-box"></div>
         </section>
 
         <!-- 8. شاشة التقارير الرسمية (محدثة بالنماذج الأربعة المعتمدة من الـ PDF) -->
