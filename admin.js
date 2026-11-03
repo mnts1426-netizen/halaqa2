@@ -3335,7 +3335,7 @@ window.renderAttendanceTable = function () {
 
     html += `
       <tr>
-        <td style="font-weight: 700;">${escapeHtml(s.name)}${isTeacher && typeof adminEditBadgeHtml === "function" ? `<div>${adminEditBadgeHtml(record)}</div>` : ""}</td>
+        <td style="font-weight: 700;">${escapeHtml(s.name)}</td>
         <td>${escapeHtml(getCircleName(s.circleId))}</td>
         <td>
           <select class="form-control" style="font-weight: 700;" onchange="setStudentAttendance('${s.id}', this.value)" ${isLockedForTeacher ? 'disabled title="لا يمكن تعديل حالة مسجّلة مسبقاً - متاح لمدير المَجْمَع فقط"' : ""}>
@@ -3858,7 +3858,7 @@ window.renderTestsTable = function () {
   rows.forEach(({ test: t, studentName, circleName }) => {
     html += `
       <tr>
-        <td style="font-weight: 700;">${escapeHtml(studentName)}${window.currentUser && window.currentUser.role === "teacher" && typeof adminEditBadgeHtml === "function" ? `<div>${adminEditBadgeHtml(t)}</div>` : ""}</td>
+        <td style="font-weight: 700;">${escapeHtml(studentName)}</td>
         <td><span style="font-weight: 600; color: var(--text-dark);">${escapeHtml(circleName)}</span></td>
         <td>${escapeHtml(t.type) || "—"}</td>
         <td style="font-weight: 700; color: var(--primary-brown);">${formatTestScore(t.score)}</td>

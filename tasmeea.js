@@ -805,7 +805,6 @@ function buildStudentAccordionCard(
             <small class="text-muted">
               ${isSaved ? '<span style="color:#2e7d32; font-weight:700;">🟢 تم رصد التسميع</span>' : "⚪ لم يُرصد التسميع بعد"}
               ${isAdmin ? '<span class="badge" style="background:#805333; color:#fff; margin-right:4px; font-size:0.72rem;">تعديل المدير</span>' : ""}
-              ${!isAdmin && typeof adminEditBadgeHtml === "function" ? adminEditBadgeHtml(attRecord, "الحضور") + adminEditBadgeHtml(record, "التسميع") : ""}
             </small>
           </div>
         </div>

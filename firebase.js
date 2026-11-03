@@ -1786,26 +1786,6 @@ window.ensureFullDataThenRetry = function (retry) {
   return true;
 };
 
-const ADMIN_EDIT_MARKED_COLLECTIONS = ["attendance", "tasmeea", "tests"];
-
-// نص علامة تعديل المدير للعرض عند المعلم (فارغ إن لم يعدّله المدير)
-window.adminEditBadgeHtml = function (record, what) {
-  if (!record || !record.editedByAdminAt) return "";
-  const at = new Date(record.editedByAdminAt);
-  if (isNaN(at.getTime())) return "";
-  const time = at.toLocaleTimeString("ar-SA", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const day =
-    typeof formatHijriDate === "function" &&
-    typeof localGregorianStr === "function"
-      ? formatHijriDate(localGregorianStr(at))
-      : "";
-  const label = what ? `عدّل المدير ${what}` : "عدّله المدير";
-  return `<span class="badge" title="عدّل المدير هذا السجل" style="background:#ede7f6; color:#4527a0; font-size:0.72rem; margin-right:4px;">✏️ ${escapeHtml(label)} ${escapeHtml(day ? `${day} ${time}` : time)}</span>`;
-};
-
 // دالة الحفظ السحابي المحمية من الأخطاء وحفظ النسخة المحلية فوراً
 async function saveToCloud(collectionName, docId, data, isDelete = false) {
   if (!collectionName || !docId) return;
@@ -1816,16 +1796,6 @@ async function saveToCloud(collectionName, docId, data, isDelete = false) {
   // محلياً حديثاً جداً لحالته القديمة إن قرأت المزامنة الدورية نسخة سحابية لم تتحدّث بعد
   if (!isDelete && data && typeof data === "object") {
     data.updatedAt = Date.now();
-    // علامة "عدّله المدير": سجلات الطلاب اليومية (التحضير والتسميع والاختبارات) إذا حفظها المدير
-    // تظهر عند المعلم بعلامة ✏️ مع وقت التعديل، وتزول إذا حفظ المعلم السجل نفسه بعد ذلك
-    if (ADMIN_EDIT_MARKED_COLLECTIONS.includes(collectionName)) {
-      const role = window.currentUser && window.currentUser.role;
-      if (role === SAFE_ROLES.ADMIN) {
-        data.editedByAdminAt = data.updatedAt;
-      } else if (role === SAFE_ROLES.TEACHER) {
-        data.editedByAdminAt = null;
-      }
-    }
   }
 
   // تحديث المخزن المحلي فوراً
