@@ -1770,20 +1770,21 @@ function renderStudentData() {
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0];
     return rec ? rec[field] : "";
   };
-  const tomorrowHifz = escapeHtml(latestNextFor("nextHifz")) || "لم يحدد بعد";
-  const tomorrowMurajaa =
-    escapeHtml(latestNextFor("nextMurajaa")) || "لم يحدد بعد";
-  const tomorrowTilawa =
-    escapeHtml(latestNextFor("nextTilawa")) || "لم يحدد بعد";
-
-  // قسم متوقف اليوم: يظهر "متوقف" مع آخر مقرر كتبه المعلم
+  // قسم متوقف اليوم: يظهر للطالب "متوقف" فقط، بلا أي مقرر (لا لليوم ولا للغد) حتى لا يحفظ شيئاً
   const stoppedToday = (section) =>
     typeof isTasmeeaSectionStopped === "function" &&
     isTasmeeaSectionStopped(todayRecord, section);
+  const stoppedBadge =
+    '<span class="badge" style="background:#fff3e0; color:#e65100; font-weight:800;">⏸️ متوقف</span>';
   const todayLessonHtml = (section, carried) =>
+    stoppedToday(section) ? stoppedBadge : escapeHtml(carried) || "لم يسجل بعد";
+  const tomorrowFor = (section, field) =>
     stoppedToday(section)
-      ? `<span class="badge" style="background:#fff3e0; color:#e65100; font-weight:800;">⏸️ متوقف</span>${carried ? `<br><small class="text-muted">آخر مقرر: ${escapeHtml(carried)}</small>` : ""}`
-      : escapeHtml(carried) || "لم يسجل بعد";
+      ? stoppedBadge
+      : escapeHtml(latestNextFor(field)) || "لم يحدد بعد";
+  const tomorrowHifz = tomorrowFor("hifz", "nextHifz");
+  const tomorrowMurajaa = tomorrowFor("murajaa", "nextMurajaa");
+  const tomorrowTilawa = tomorrowFor("tilawa", "nextTilawa");
 
   let attStatusBadge =
     '<span class="badge" style="background:#e0e0e0; color:#555;">لم يُسجَّل بعد</span>';
