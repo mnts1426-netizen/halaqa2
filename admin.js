@@ -5907,19 +5907,93 @@ function getPayrollRecord(teacherId, month) {
   );
 }
 
-function countWorkdaysInMonth(month) {
+// علامة "يداوم 5 أيام" تُحفظ لكل شهر في سجل مسيره، وإن لم تُحدَّد لهذا الشهر تُؤخذ من آخر شهر
+// سابق حُدِّدت فيه (فتبقى ظاهرة ومنقولة دائماً)، وإلا فالأصل 4 أيام. تغييرها في شهر لا يغيّر
+// حسابات الأشهر السابقة
+function getPayrollFiveDays(teacherId, month) {
+  const recs = (window.appStore.payroll || []).filter(
+    (p) =>
+      p &&
+      p.teacherId === teacherId &&
+      typeof p.fiveDays === "boolean" &&
+      String(p.month || "") <= month,
+  );
+  if (recs.length === 0) return false;
+  recs.sort((a, b) => String(b.month).localeCompare(String(a.month)));
+  return recs[0].fiveDays;
+}
+
+// أيام الدوام: الأحد-الأربعاء لمن يداوم 4 أيام، والأحد-الخميس لمن يداوم 5. الجمعة والسبت
+// أيام إضافية للجميع. والخميس لمن يداوم 4 أيام لا يُحسب له شيء (لا دوام ولا إضافي)
+function payrollDayKind(dateStr, fiveDays) {
+  const day = new Date(dateStr + "T00:00:00").getDay();
+  if (day >= 0 && day <= 3) return "work";
+  if (day === 4) return fiveDays ? "work" : "none";
+  return "extra";
+}
+
+function payrollMonthDates(month) {
   const [y, m] = month.split("-").map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
-  let count = 0;
+  const dates = [];
   for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    const isWorkday =
-      typeof isOfficialWorkday === "function"
-        ? isOfficialWorkday(dateStr)
-        : true;
-    if (isWorkday) count++;
+    dates.push(
+      `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
+    );
   }
-  return count || 1;
+  return dates;
+}
+
+// حساب مسير شخص في شهر: أيام الدوام في الشهر كله، والحضور (المتأخر حاضر) والاستئذان والغياب
+// في أيام دوامه، والأيام الإضافية (الجمعة والسبت). الغياب يُحسب حتى اليوم فقط (الأيام القادمة
+// ليست غياباً). الغياب والاستئذان لا يُدفع لهما
+function computePayrollRow(teacherId, month, rec) {
+  const fiveDays = getPayrollFiveDays(teacherId, month);
+  const dates = payrollMonthDates(month);
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  const statusByDate = new Map();
+  (window.appStore.teacherAttendance || []).forEach((a) => {
+    if (a && a.teacherId === teacherId && a.date && a.date.startsWith(month))
+      statusByDate.set(a.date, a.status);
+  });
+
+  let workdays = 0;
+  let present = 0;
+  let extra = 0;
+  let excused = 0;
+  let absent = 0;
+  dates.forEach((date) => {
+    const kind = payrollDayKind(date, fiveDays);
+    const st = statusByDate.get(date);
+    const attended = st === "present" || st === "late";
+    if (kind === "work") {
+      workdays++;
+      if (attended) present++;
+      else if (st === "excused") excused++;
+      else if (date <= todayStr) absent++;
+    } else if (kind === "extra" && attended) {
+      extra++;
+    }
+  });
+
+  const baseSalary = parseFloat(rec.baseSalary) || 0;
+  const bonus = parseFloat(rec.bonus) || 0;
+  const dailyRate = workdays > 0 ? baseSalary / workdays : 0;
+  const total = Math.max(0, dailyRate * (present + extra) + bonus);
+  return {
+    fiveDays,
+    workdays,
+    present,
+    extra,
+    excused,
+    absent,
+    baseSalary,
+    bonus,
+    dailyRate,
+    total,
+  };
 }
 
 window.renderPayrollTable = function () {
@@ -5932,7 +6006,6 @@ window.renderPayrollTable = function () {
     monthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   }
   const month = monthInput.value;
-  const workdaysInMonth = countWorkdaysInMonth(month);
 
   const isAdmin = isFinanceAdminUser();
   const isFinTeacher = isFinanceTeacherUser();
@@ -5961,50 +6034,40 @@ window.renderPayrollTable = function () {
   tbody.innerHTML = allStaff
     .map((t) => {
       const rec = getPayrollRecord(t.id, month);
-      const attRecords = (window.appStore.teacherAttendance || []).filter(
-        (a) => a.teacherId === t.id && a.date && a.date.startsWith(month),
-      );
-      const presentDays = attRecords.filter(
-        (a) => a.status === "present" || a.status === "late",
-      ).length;
-      const excusedDays = attRecords.filter(
-        (a) => a.status === "excused",
-      ).length;
-      const absentDays = Math.max(
-        0,
-        workdaysInMonth - presentDays - excusedDays,
-      );
-
-      const baseSalary = parseFloat(rec.baseSalary) || 0;
-      const bonus = parseFloat(rec.bonus) || 0;
-      const dailyRate = workdaysInMonth > 0 ? baseSalary / workdaysInMonth : 0;
-      const deduction = dailyRate * absentDays;
-      const total = Math.max(0, baseSalary - deduction + bonus);
+      const row = computePayrollRow(t.id, month, rec);
 
       const canEditBase = isAdmin;
       const canEditBonus =
         isAdmin || (isFinTeacher && t.id !== currentUserTeacherId);
+      const daysLabel = row.fiveDays ? "5 أيام" : "4 أيام";
 
       return `
       <tr style="${t.isDirector ? "background: #fdfbf7;" : ""}">
         <td style="font-weight:800; text-align:right; color:${t.isDirector ? "var(--primary-brown)" : "inherit"};">
           ${escapeHtml(t.name)}
         </td>
+        <td style="text-align:center; white-space:nowrap;">${
+          isAdmin
+            ? `<label style="display:inline-flex; align-items:center; gap:4px; cursor:pointer; font-weight:700;"><input type="checkbox" style="width:18px; height:18px; cursor:pointer;" ${row.fiveDays ? "checked" : ""} onchange="savePayrollField('${t.id}', '${month}', 'fiveDays', this.checked)"><span>${daysLabel}</span></label>`
+            : daysLabel
+        }</td>
         <td>${
           canEditBase
-            ? `<input type="number" step="0.01" min="0" class="form-control" style="width:110px; display:inline-block;" value="${baseSalary}" onchange="savePayrollField('${t.id}', '${month}', 'baseSalary', this.value)">`
-            : fmt(baseSalary)
+            ? `<input type="number" step="0.01" min="0" class="form-control" style="width:110px; display:inline-block;" value="${row.baseSalary}" onchange="savePayrollField('${t.id}', '${month}', 'baseSalary', this.value)">`
+            : fmt(row.baseSalary)
         }</td>
-        <td>${fmt(dailyRate)}</td>
-        <td style="color:#2e7d32; font-weight:700;">${presentDays}</td>
-        <td style="color:#c62828; font-weight:700;">${absentDays}</td>
-        <td style="color:#1565c0; font-weight:700;">${excusedDays}</td>
+        <td style="font-weight:700;">${row.workdays}</td>
+        <td>${fmt(row.dailyRate)}</td>
+        <td style="color:#2e7d32; font-weight:700;">${row.present}</td>
+        <td style="color:#6a1b9a; font-weight:700;">${row.extra}</td>
+        <td style="color:#c62828; font-weight:700;">${row.absent}</td>
+        <td style="color:#1565c0; font-weight:700;">${row.excused}</td>
         <td>${
           canEditBonus
-            ? `<input type="number" step="0.01" class="form-control" style="width:100px; display:inline-block;" value="${bonus}" onchange="savePayrollField('${t.id}', '${month}', 'bonus', this.value)">`
-            : fmt(bonus)
+            ? `<input type="number" step="0.01" class="form-control" style="width:100px; display:inline-block;" value="${row.bonus}" onchange="savePayrollField('${t.id}', '${month}', 'bonus', this.value)">`
+            : fmt(row.bonus)
         }</td>
-        <td style="font-weight:900; color:var(--primary-brown);">${fmt(total)}</td>
+        <td style="font-weight:900; color:var(--primary-brown);">${fmt(row.total)}</td>
       </tr>
     `;
     })
@@ -6018,6 +6081,11 @@ window.savePayrollField = function (teacherId, month, field, value) {
     ? window.currentUser.teacherId || window.currentUser.id
     : null;
 
+  if (field === "fiveDays" && !isAdmin) {
+    alert("⚠️ تحديد أيام الدوام متاح للمدير فقط.");
+    renderPayrollTable();
+    return;
+  }
   if (field === "baseSalary" && !isAdmin) {
     alert("⚠️ تعديل المكافأة الأساسية متاح للمدير فقط.");
     renderPayrollTable();
@@ -6039,7 +6107,8 @@ window.savePayrollField = function (teacherId, month, field, value) {
     if (!window.appStore.payroll) window.appStore.payroll = [];
     window.appStore.payroll.push(rec);
   }
-  rec[field] = parseFloat(value) || 0;
+  rec[field] =
+    field === "fiveDays" ? value === true || value === "true" : parseFloat(value) || 0;
   rec.updatedBy = window.currentUser?.name || "";
   rec.updatedAt = Date.now();
 
